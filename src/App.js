@@ -1,11 +1,8 @@
-import React from "react";
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 
-// ─── Supabase config ──────────────────────────────────────────────────────────
+// ─── Supabase ─────────────────────────────────────────────────────────────────
 const SUPA_URL = "https://tawgfibmeymxjgwkgnsc.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRhd2dmaWJtZXlteGpnd2tnbnNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MzIzODcsImV4cCI6MjA5NTMwODM4N30.iWVX276PbFNt8rC2ZGO58Kc8nOuEjVcahhMh7vzZk3Q";
-
-// Admin emails — agrega los emails de quienes son admins
 const ADMIN_EMAILS = ["arodriguezr@axtel.com.mx"];
 
 async function supa(path, opts = {}) {
@@ -24,698 +21,55 @@ async function supa(path, opts = {}) {
   return text ? JSON.parse(text) : null;
 }
 
-async function authRequest(path, body) {
+async function authReq(path, body) {
   const res = await fetch(`${SUPA_URL}/auth/v1/${path}`, {
     method: "POST",
     headers: { "apikey": SUPA_KEY, "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   const data = await res.json();
-  if (data.error || data.error_description) throw new Error(data.error_description || data.error?.message || "Error de autenticación");
+  if (data.error || data.error_description) throw new Error(data.error_description || data.error?.message || "Error");
   return data;
 }
 
-// ─── Datos México ─────────────────────────────────────────────────────────────
+// ─── México ───────────────────────────────────────────────────────────────────
 const MEXICO = {
-  "Aguascalientes": ["Aguascalientes", "Jesús María", "San Francisco de los Romo"],
-  "Baja California": ["Tijuana", "Mexicali", "Ensenada", "Rosarito", "Tecate"],
-  "Baja California Sur": ["La Paz", "Los Cabos", "Loreto", "Comondú"],
-  "Campeche": ["Campeche", "Ciudad del Carmen", "Champotón"],
-  "Chiapas": ["Tuxtla Gutiérrez", "San Cristóbal de las Casas", "Tapachula", "Comitán", "Palenque"],
-  "Chihuahua": ["Chihuahua", "Ciudad Juárez", "Delicias", "Cuauhtémoc", "Parral"],
-  "Ciudad de México": ["Álvaro Obregón", "Azcapotzalco", "Benito Juárez", "Coyoacán", "Cuajimalpa", "Cuauhtémoc", "Gustavo A. Madero", "Iztapalapa", "Miguel Hidalgo", "Tlalpan", "Venustiano Carranza", "Xochimilco"],
-  "Coahuila": ["Saltillo", "Torreón", "Monclova", "Piedras Negras", "Acuña"],
-  "Colima": ["Colima", "Manzanillo", "Tecomán"],
-  "Durango": ["Durango", "Gómez Palacio", "Lerdo"],
-  "Estado de México": ["Toluca", "Ecatepec", "Naucalpan", "Tlalnepantla", "Nezahualcóyotl", "Texcoco", "Metepec", "Atizapán"],
-  "Guanajuato": ["León", "Irapuato", "Celaya", "Salamanca", "Guanajuato", "San Miguel de Allende"],
-  "Guerrero": ["Acapulco", "Chilpancingo", "Zihuatanejo", "Taxco", "Iguala"],
-  "Hidalgo": ["Pachuca", "Tulancingo", "Tula", "Actopan"],
-  "Jalisco": ["Guadalajara", "Zapopan", "Tlaquepaque", "Tonalá", "Puerto Vallarta"],
-  "Michoacán": ["Morelia", "Uruapan", "Zamora", "Lázaro Cárdenas"],
-  "Morelos": ["Cuernavaca", "Jiutepec", "Cuautla", "Temixco"],
-  "Nayarit": ["Tepic", "Bahía de Banderas"],
-  "Nuevo León": ["Monterrey", "Guadalupe", "San Nicolás", "Apodaca", "Santa Catarina", "San Pedro Garza García"],
-  "Oaxaca": ["Oaxaca de Juárez", "Salina Cruz", "Juchitán", "Tuxtepec"],
-  "Puebla": ["Puebla", "Tehuacán", "San Martín Texmelucan", "Atlixco", "Cholula"],
-  "Querétaro": ["Querétaro", "San Juan del Río", "Corregidora", "El Marqués"],
-  "Quintana Roo": ["Cancún", "Playa del Carmen", "Chetumal", "Cozumel", "Tulum"],
-  "San Luis Potosí": ["San Luis Potosí", "Soledad de Graciano Sánchez", "Matehuala", "Cd. Valles"],
-  "Sinaloa": ["Culiacán", "Mazatlán", "Los Mochis", "Guasave"],
-  "Sonora": ["Hermosillo", "Cd. Obregón", "Nogales", "San Luis Río Colorado", "Guaymas"],
-  "Tabasco": ["Villahermosa", "Cárdenas", "Comalcalco"],
-  "Tamaulipas": ["Reynosa", "Matamoros", "Nuevo Laredo", "Tampico", "Victoria"],
-  "Tlaxcala": ["Tlaxcala", "Apizaco", "Huamantla"],
-  "Veracruz": ["Veracruz", "Xalapa", "Coatzacoalcos", "Córdoba", "Poza Rica", "Minatitlán"],
-  "Yucatán": ["Mérida", "Valladolid", "Progreso", "Umán"],
-  "Zacatecas": ["Zacatecas", "Guadalupe", "Fresnillo", "Jerez"],
+  "Aguascalientes":["Aguascalientes","Jesús María","San Francisco de los Romo"],
+  "Baja California":["Tijuana","Mexicali","Ensenada","Rosarito","Tecate"],
+  "Baja California Sur":["La Paz","Los Cabos","Loreto","Comondú"],
+  "Campeche":["Campeche","Ciudad del Carmen","Champotón"],
+  "Chiapas":["Tuxtla Gutiérrez","San Cristóbal de las Casas","Tapachula","Comitán","Palenque"],
+  "Chihuahua":["Chihuahua","Ciudad Juárez","Delicias","Cuauhtémoc","Parral"],
+  "Ciudad de México":["Álvaro Obregón","Azcapotzalco","Benito Juárez","Coyoacán","Cuajimalpa","Cuauhtémoc","Gustavo A. Madero","Iztapalapa","Miguel Hidalgo","Tlalpan","Venustiano Carranza","Xochimilco"],
+  "Coahuila":["Saltillo","Torreón","Monclova","Piedras Negras","Acuña"],
+  "Colima":["Colima","Manzanillo","Tecomán"],
+  "Durango":["Durango","Gómez Palacio","Lerdo"],
+  "Estado de México":["Toluca","Ecatepec","Naucalpan","Tlalnepantla","Nezahualcóyotl","Texcoco","Metepec","Atizapán"],
+  "Guanajuato":["León","Irapuato","Celaya","Salamanca","Guanajuato","San Miguel de Allende"],
+  "Guerrero":["Acapulco","Chilpancingo","Zihuatanejo","Taxco","Iguala"],
+  "Hidalgo":["Pachuca","Tulancingo","Tula","Actopan"],
+  "Jalisco":["Guadalajara","Zapopan","Tlaquepaque","Tonalá","Puerto Vallarta"],
+  "Michoacán":["Morelia","Uruapan","Zamora","Lázaro Cárdenas"],
+  "Morelos":["Cuernavaca","Jiutepec","Cuautla","Temixco"],
+  "Nayarit":["Tepic","Bahía de Banderas"],
+  "Nuevo León":["Monterrey","Guadalupe","San Nicolás","Apodaca","Santa Catarina","San Pedro Garza García"],
+  "Oaxaca":["Oaxaca de Juárez","Salina Cruz","Juchitán","Tuxtepec"],
+  "Puebla":["Puebla","Tehuacán","San Martín Texmelucan","Atlixco","Cholula"],
+  "Querétaro":["Querétaro","San Juan del Río","Corregidora","El Marqués"],
+  "Quintana Roo":["Cancún","Playa del Carmen","Chetumal","Cozumel","Tulum"],
+  "San Luis Potosí":["San Luis Potosí","Soledad de Graciano Sánchez","Matehuala","Cd. Valles"],
+  "Sinaloa":["Culiacán","Mazatlán","Los Mochis","Guasave"],
+  "Sonora":["Hermosillo","Cd. Obregón","Nogales","San Luis Río Colorado","Guaymas"],
+  "Tabasco":["Villahermosa","Cárdenas","Comalcalco"],
+  "Tamaulipas":["Reynosa","Matamoros","Nuevo Laredo","Tampico","Victoria"],
+  "Tlaxcala":["Tlaxcala","Apizaco","Huamantla"],
+  "Veracruz":["Veracruz","Xalapa","Coatzacoalcos","Córdoba","Poza Rica","Minatitlán"],
+  "Yucatán":["Mérida","Valladolid","Progreso","Umán"],
+  "Zacatecas":["Zacatecas","Guadalupe","Fresnillo","Jerez"],
 };
 const ESTADOS = Object.keys(MEXICO).sort();
 
-const CATEGORIAS = ["Medición eléctrica", "Análisis de señal", "Radiofrecuencia", "Temperatura", "Presión", "Flujo", "Vibración", "Óptico", "Otro"];
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function getDias(fechaISO) {
-  const diff = new Date() - new Date(fechaISO);
-  const d = Math.floor(diff / 86400000), h = Math.floor((diff % 86400000) / 3600000);
-  return d === 0 ? `${h}h` : `${d}d ${h}h`;
-}
-function fmt(iso) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString("es-MX", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
-}
-
-// ─── Estilos base ─────────────────────────────────────────────────────────────
-const C = {
-  bg: "#07070f", card: "#0e0e1c", border: "#1c1c30",
-  green: "#00e87a", greenDark: "#001f0e",
-  orange: "#ff9500", orangeDark: "#1a0e00",
-  red: "#ff3b3b", blue: "#4a9eff",
-  text: "#eee", muted: "#666", subtle: "#333",
-};
-
-const inputSt = {
-  width:"100%", padding:"13px 15px", boxSizing:"border-box",
-  background:"#12121f", border:`1px solid ${C.border}`,
-  borderRadius:"11px", color:C.text, fontSize:"14px",
-  outline:"none", fontFamily:"inherit",
-};
-
-const btnPrimary = (disabled) => ({
-  width:"100%", padding:"15px", border:"none", borderRadius:"13px",
-  background: disabled ? C.subtle : `linear-gradient(135deg, ${C.green}, #00c066)`,
-  color: disabled ? C.muted : "#001a0d",
-  fontWeight:"800", fontSize:"15px", cursor: disabled ? "not-allowed" : "pointer",
-  fontFamily:"inherit", transition:"all 0.2s",
-});
-
-// ─── Componentes pequeños ─────────────────────────────────────────────────────
-function Row({ label, value, last }) {
-  return (
-    <div style={{ display:"flex", justifyContent:"space-between", padding:"8px 0",
-      borderBottom: last ? "none" : `1px solid ${C.border}` }}>
-      <span style={{ color:C.muted, fontSize:"12px" }}>{label}</span>
-      <span style={{ color:"#ccc", fontSize:"13px", fontWeight:"600", textAlign:"right", maxWidth:"65%" }}>{value}</span>
-    </div>
-  );
-}
-
-function Badge({ registro }) {
-  if (!registro) return <span style={{ background:`linear-gradient(135deg,${C.green},#00c066)`,
-    color:"#001a0d", padding:"3px 12px", borderRadius:"20px", fontSize:"11px",
-    fontWeight:"700", textTransform:"uppercase", letterSpacing:"0.05em" }}>Disponible</span>;
-  const dias = getDias(registro.fecha_retiro);
-  const alerta = parseInt(dias) > 7;
-  const esEnvio = registro.tipo === "paqueteria";
-  return <span style={{
-    background: esEnvio ? `linear-gradient(135deg,${C.blue},#2266cc)`
-      : alerta ? `linear-gradient(135deg,${C.red},#cc0000)`
-      : `linear-gradient(135deg,${C.orange},#cc7700)`,
-    color:"#fff", padding:"3px 12px", borderRadius:"20px", fontSize:"11px",
-    fontWeight:"700", textTransform:"uppercase", letterSpacing:"0.04em" }}>
-    {esEnvio ? `📦 En tránsito · ${dias}` : `En uso · ${dias}`}
-  </span>;
-}
-
-function Toast({ msg, ok }) {
-  return (
-    <div style={{ position:"fixed", top:"18px", left:"50%", transform:"translateX(-50%)",
-      background: ok ? C.greenDark : "#1a0000",
-      border:`1px solid ${ok ? C.green : C.red}`,
-      borderRadius:"40px", padding:"11px 22px",
-      color: ok ? C.green : C.red, fontSize:"13px", fontWeight:"700",
-      zIndex:9999, whiteSpace:"nowrap", boxShadow:"0 8px 32px rgba(0,0,0,0.6)",
-      animation:"fadeIn 0.25s ease" }}>
-      {msg}
-    </div>
-  );
-}
-
-function Spinner() {
-  return <div style={{ display:"flex", alignItems:"center", justifyContent:"center",
-    padding:"60px", color:C.muted, fontSize:"13px", gap:"10px" }}>
-    <div style={{ width:"18px", height:"18px", border:`2px solid ${C.border}`,
-      borderTop:`2px solid ${C.green}`, borderRadius:"50%",
-      animation:"spin 0.7s linear infinite" }} />
-    Cargando…
-  </div>;
-}
-
-// ─── Selector Estado/Ciudad ───────────────────────────────────────────────────
-function EstadoCiudadSelect({ estado, ciudad, onEstado, onCiudad, required }) {
-  const ciudades = estado ? MEXICO[estado] || [] : [];
-  return (
-    <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
-      <div>
-        <label style={{ color:"#999", fontSize:"11px", letterSpacing:"0.08em", display:"block", marginBottom:"6px" }}>
-          ESTADO {required && <span style={{ color:C.red }}>*</span>}
-        </label>
-        <select value={estado} onChange={e => { onEstado(e.target.value); onCiudad(""); }}
-          style={{ ...inputSt, cursor:"pointer", color: estado ? C.text : C.muted }}>
-          <option value="">Selecciona estado…</option>
-          {ESTADOS.map(e => <option key={e} value={e}>{e}</option>)}
-        </select>
-      </div>
-      {estado && (
-        <div>
-          <label style={{ color:"#999", fontSize:"11px", letterSpacing:"0.08em", display:"block", marginBottom:"6px" }}>
-            CIUDAD / MUNICIPIO {required && <span style={{ color:C.red }}>*</span>}
-          </label>
-          <select value={ciudad} onChange={e => onCiudad(e.target.value)}
-            style={{ ...inputSt, cursor:"pointer", color: ciudad ? C.text : C.muted }}>
-            <option value="">Selecciona ciudad…</option>
-            {ciudades.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Cámara ───────────────────────────────────────────────────────────────────
-function CamaraModal({ titulo, onCaptura, onCerrar }) {
-  const videoRef = useRef(null), canvasRef = useRef(null), streamRef = useRef(null);
-  const [live, setLive] = useState(false), [cap, setCap] = useState(null), [err, setErr] = useState(false);
-
-  useEffect(() => { init(); return stop; }, []);
-
-  async function init() {
-    try {
-      const s = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment" }, audio:false });
-      streamRef.current = s;
-      if (videoRef.current) { videoRef.current.srcObject = s; videoRef.current.play(); setLive(true); }
-    } catch { setErr(true); }
-  }
-  function stop() { streamRef.current?.getTracks().forEach(t => t.stop()); }
-
-  function capturar() {
-    if (live && videoRef.current && canvasRef.current) {
-      const cv = canvasRef.current, ctx = cv.getContext("2d");
-      cv.width = videoRef.current.videoWidth; cv.height = videoRef.current.videoHeight;
-      ctx.drawImage(videoRef.current, 0, 0);
-      setCap(cv.toDataURL("image/jpeg", 0.8)); stop();
-    } else {
-      const cv = document.createElement("canvas"); cv.width=400; cv.height=300;
-      const ctx = cv.getContext("2d");
-      ctx.fillStyle="#12121f"; ctx.fillRect(0,0,400,300);
-      ctx.fillStyle=C.green; ctx.font="bold 15px monospace"; ctx.textAlign="center";
-      ctx.fillText("📷 Evidencia simulada", 200, 130);
-      ctx.fillStyle=C.muted; ctx.font="12px monospace";
-      ctx.fillText(new Date().toLocaleString("es-MX"), 200, 165);
-      setCap(cv.toDataURL("image/jpeg", 0.8));
-    }
-  }
-
-  return (
-    <div style={{ position:"fixed", inset:0, zIndex:3000, background:"rgba(0,0,0,0.95)",
-      display:"flex", alignItems:"center", justifyContent:"center", padding:"20px" }}>
-      <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:"20px",
-        padding:"22px", width:"100%", maxWidth:"460px" }}>
-        <h3 style={{ color:C.green, margin:"0 0 14px", fontSize:"12px",
-          letterSpacing:"0.12em", textTransform:"uppercase" }}>📷 {titulo}</h3>
-        {err && <p style={{ color:C.orange, fontSize:"12px", marginBottom:"10px",
-          background:"#1a1200", padding:"8px 12px", borderRadius:"8px" }}>
-          Cámara no disponible — modo simulado</p>}
-        {!cap ? (
-          <>
-            <div style={{ background:"#000", borderRadius:"12px", overflow:"hidden",
-              aspectRatio:"4/3", display:"flex", alignItems:"center", justifyContent:"center",
-              marginBottom:"14px", position:"relative" }}>
-              <video ref={videoRef} style={{ width:"100%", height:"100%", objectFit:"cover" }} playsInline muted />
-              {!live && <div style={{ position:"absolute", color:C.muted, textAlign:"center" }}>
-                <div style={{ fontSize:"36px", marginBottom:"6px" }}>📷</div>
-                <div style={{ fontSize:"12px" }}>Iniciando…</div>
-              </div>}
-            </div>
-            <canvas ref={canvasRef} style={{ display:"none" }} />
-            <button onClick={capturar} style={{ ...btnPrimary(false), marginBottom:"8px" }}>
-              {live ? "📸 Capturar" : "📸 Simular captura"}
-            </button>
-          </>
-        ) : (
-          <>
-            <img src={cap} alt="ev" style={{ width:"100%", borderRadius:"12px", marginBottom:"14px" }} />
-            <div style={{ display:"flex", gap:"8px" }}>
-              <button onClick={() => { setCap(null); init(); }}
-                style={{ flex:1, padding:"12px", background:"transparent",
-                  border:`1px solid ${C.border}`, borderRadius:"11px", color:C.muted,
-                  cursor:"pointer", fontFamily:"inherit" }}>🔄 Repetir</button>
-              <button onClick={() => { onCaptura(cap); onCerrar(); }}
-                style={{ flex:2, ...btnPrimary(false) }}>✅ Usar foto</button>
-            </div>
-          </>
-        )}
-        <button onClick={onCerrar} style={{ width:"100%", marginTop:"8px", padding:"9px",
-          background:"transparent", border:"none", color:C.muted,
-          cursor:"pointer", fontFamily:"inherit", fontSize:"13px" }}>Cancelar</button>
-      </div>
-    </div>
-  );
-}
-
-// ─── LOGIN ────────────────────────────────────────────────────────────────────
-function Login({ onLogin }) {
-  const [email, setEmail] = useState(""), [pass, setPass] = useState("");
-  const [loading, setLoading] = useState(false), [err, setErr] = useState("");
-
-  async function login(e) {
-    e.preventDefault();
-    setLoading(true); setErr("");
-    try {
-      const data = await authRequest("token?grant_type=password", { email, password: pass });
-      onLogin({ token: data.access_token, email: data.user.email, user: data.user });
-    } catch (ex) { setErr(ex.message); }
-    finally { setLoading(false); }
-  }
-
-  return (
-    <div style={{ minHeight:"100vh", background:C.bg, display:"flex",
-      alignItems:"center", justifyContent:"center", padding:"20px",
-      fontFamily:"'Sora',sans-serif" }}>
-      <div style={{ width:"100%", maxWidth:"380px" }}>
-        <div style={{ textAlign:"center", marginBottom:"40px" }}>
-          <div style={{ width:"64px", height:"64px", margin:"0 auto 16px",
-            background:`linear-gradient(135deg,${C.green},#00c066)`,
-            borderRadius:"20px", display:"flex", alignItems:"center",
-            justifyContent:"center", fontSize:"28px" }}>⚡</div>
-          <h1 style={{ fontSize:"26px", fontWeight:"800", margin:"0 0 6px", color:C.text }}>EquipoTrack</h1>
-          <p style={{ color:C.muted, fontSize:"13px", letterSpacing:"0.08em",
-            fontFamily:"'JetBrains Mono',monospace" }}>CONTROL DE INSTRUMENTOS</p>
-        </div>
-
-        <form onSubmit={login} style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
-          <div>
-            <label style={{ color:"#999", fontSize:"11px", letterSpacing:"0.08em",
-              display:"block", marginBottom:"6px" }}>CORREO ELECTRÓNICO</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-              placeholder="ingeniero@empresa.com" style={inputSt} required />
-          </div>
-          <div>
-            <label style={{ color:"#999", fontSize:"11px", letterSpacing:"0.08em",
-              display:"block", marginBottom:"6px" }}>CONTRASEÑA</label>
-            <input type="password" value={pass} onChange={e => setPass(e.target.value)}
-              placeholder="••••••••" style={inputSt} required />
-          </div>
-          {err && <p style={{ color:C.red, fontSize:"13px", background:"#1a0000",
-            padding:"10px 14px", borderRadius:"9px", margin:0 }}>⚠️ {err}</p>}
-          <button type="submit" disabled={loading} style={{ ...btnPrimary(loading), marginTop:"8px" }}>
-            {loading ? "Entrando…" : "Iniciar sesión"}
-          </button>
-        </form>
-
-        <p style={{ textAlign:"center", color:C.muted, fontSize:"11px", marginTop:"24px" }}>
-          ¿No tienes acceso? Contacta al administrador del sistema.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// ─── ADMIN: Alta de equipo ────────────────────────────────────────────────────
-function AdminPanel({ token, onClose, onEquipoCreado }) {
-  const [nombre, setNombre]   = useState("");
-  const [serie, setSerie]     = useState("");
-  const [cat, setCat]         = useState("");
-  const [estadoB, setEstadoB] = useState("");
-  const [ciudadB, setCiudadB] = useState("");
-  const [sitio, setSitio]     = useState("");
-  const [loading, setLoading] = useState(false);
-  const [err, setErr]         = useState("");
-
-  async function crear() {
-    if (!nombre || !serie || !cat || !estadoB || !ciudadB || !sitio) {
-      setErr("Todos los campos son requeridos"); return;
-    }
-    setLoading(true); setErr("");
-    try {
-      // Generar ID secuencial simple
-      const existentes = await supa("equipos", { token, params: { select:"id", order:"created_at.desc", limit:"1" } });
-      let nextNum = 1;
-      if (existentes && existentes.length > 0) {
-        const lastId = existentes[0].id; // EQ-001
-        const num = parseInt(lastId.replace("EQ-", "")) || 0;
-        nextNum = num + 1;
-      }
-      const id = `EQ-${String(nextNum).padStart(3, "0")}`;
-      await supa("equipos", { method:"POST", token, body: {
-        id, nombre, serie, categoria: cat,
-        estado_base: estadoB, ciudad_base: ciudadB, sitio_base: sitio, activo: true,
-      }});
-      onEquipoCreado();
-      onClose();
-    } catch (ex) { setErr(ex.message); }
-    finally { setLoading(false); }
-  }
-
-  return (
-    <div style={{ position:"fixed", inset:0, zIndex:2000, background:"rgba(0,0,0,0.88)",
-      display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
-      <div style={{ background:C.card, border:`1px solid ${C.border}`,
-        borderTopLeftRadius:"22px", borderTopRightRadius:"22px",
-        padding:"26px 22px", width:"100%", maxWidth:"520px",
-        maxHeight:"92vh", overflowY:"auto" }}>
-
-        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"22px" }}>
-          <div>
-            <p style={{ color:C.blue, fontSize:"11px", letterSpacing:"0.15em",
-              textTransform:"uppercase", margin:"0 0 4px" }}>PANEL ADMIN</p>
-            <h2 style={{ color:C.text, margin:0, fontSize:"19px", fontWeight:"800" }}>Nuevo equipo</h2>
-          </div>
-          <button onClick={onClose} style={{ background:"none", border:"none",
-            color:C.muted, fontSize:"22px", cursor:"pointer" }}>✕</button>
-        </div>
-
-        <div style={{ display:"flex", flexDirection:"column", gap:"13px" }}>
-          <div>
-            <label style={{ color:"#999", fontSize:"11px", letterSpacing:"0.08em", display:"block", marginBottom:"6px" }}>
-              NOMBRE DEL EQUIPO <span style={{ color:C.red }}>*</span>
-            </label>
-            <input value={nombre} onChange={e => setNombre(e.target.value)}
-              placeholder="Ej. Multímetro Fluke 87V" style={inputSt} />
-          </div>
-          <div>
-            <label style={{ color:"#999", fontSize:"11px", letterSpacing:"0.08em", display:"block", marginBottom:"6px" }}>
-              NÚMERO DE SERIE <span style={{ color:C.red }}>*</span>
-            </label>
-            <input value={serie} onChange={e => setSerie(e.target.value)}
-              placeholder="Ej. FL87V-2024-001" style={inputSt} />
-          </div>
-          <div>
-            <label style={{ color:"#999", fontSize:"11px", letterSpacing:"0.08em", display:"block", marginBottom:"6px" }}>
-              CATEGORÍA <span style={{ color:C.red }}>*</span>
-            </label>
-            <select value={cat} onChange={e => setCat(e.target.value)}
-              style={{ ...inputSt, cursor:"pointer", color: cat ? C.text : C.muted }}>
-              <option value="">Selecciona categoría…</option>
-              {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-
-          <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:"14px" }}>
-            <p style={{ color:C.blue, fontSize:"11px", letterSpacing:"0.1em",
-              textTransform:"uppercase", marginBottom:"12px" }}>📍 UBICACIÓN BASE</p>
-            <EstadoCiudadSelect estado={estadoB} ciudad={ciudadB}
-              onEstado={setEstadoB} onCiudad={setCiudadB} required />
-          </div>
-          <div>
-            <label style={{ color:"#999", fontSize:"11px", letterSpacing:"0.08em", display:"block", marginBottom:"6px" }}>
-              SITIO / EDIFICIO BASE <span style={{ color:C.red }}>*</span>
-            </label>
-            <input value={sitio} onChange={e => setSitio(e.target.value)}
-              placeholder="Ej. Puente de Vigas — Piso 3" style={inputSt} />
-          </div>
-        </div>
-
-        {err && <p style={{ color:C.red, fontSize:"13px", background:"#1a0000",
-          padding:"10px 14px", borderRadius:"9px", marginTop:"12px" }}>⚠️ {err}</p>}
-
-        <button onClick={crear} disabled={loading}
-          style={{ ...btnPrimary(loading), marginTop:"20px" }}>
-          {loading ? "Creando…" : "✅ Crear equipo"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Modal CHECK-OUT ──────────────────────────────────────────────────────────
-function ModalCheckout({ equipo, token, onConfirmar, onCerrar }) {
-  const [paso, setPaso]       = useState(1);
-  const [ingeniero, setIng]   = useState("");
-  const [estado, setEstado]   = useState("");
-  const [ciudad, setCiudad]   = useState("");
-  const [tipo, setTipo]       = useState("directo"); // directo | paqueteria
-  const [guia, setGuia]       = useState("");
-  const [foto, setFoto]       = useState(null);
-  const [showCam, setShowCam] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  const paso1ok = ingeniero && estado && ciudad;
-  const paso2ok = foto;
-
-  async function confirmar() {
-    setLoading(true);
-    try {
-      await supa("registros", { method:"POST", token, body: {
-        equipo_id: equipo.id, ingeniero, estado, ciudad,
-        tipo, guia_paqueteria: guia || null,
-        foto_retiro: foto, fecha_retiro: new Date().toISOString(),
-      }});
-      onConfirmar();
-    } catch (ex) { alert("Error: " + ex.message); }
-    finally { setLoading(false); }
-  }
-
-  return (
-    <>
-      {showCam && <CamaraModal titulo="Foto de RETIRO" onCaptura={img => { setFoto(img); setShowCam(false); }} onCerrar={() => setShowCam(false)} />}
-      <div style={{ position:"fixed", inset:0, zIndex:900, background:"rgba(0,0,0,0.85)",
-        display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
-        <div style={{ background:C.card, border:`1px solid ${C.border}`,
-          borderTopLeftRadius:"22px", borderTopRightRadius:"22px",
-          padding:"26px 22px", width:"100%", maxWidth:"520px",
-          maxHeight:"92vh", overflowY:"auto" }}>
-
-          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"18px" }}>
-            <div>
-              <p style={{ color:C.green, fontSize:"11px", letterSpacing:"0.15em",
-                textTransform:"uppercase", margin:"0 0 3px" }}>CHECK-OUT · {equipo.id}</p>
-              <h2 style={{ color:C.text, margin:0, fontSize:"17px", fontWeight:"800" }}>{equipo.nombre}</h2>
-              <p style={{ color:C.muted, fontSize:"11px", marginTop:"2px" }}>
-                Base: {equipo.sitio_base} — {equipo.ciudad_base}, {equipo.estado_base}
-              </p>
-            </div>
-            <button onClick={onCerrar} style={{ background:"none", border:"none", color:C.muted, fontSize:"22px", cursor:"pointer" }}>✕</button>
-          </div>
-
-          {/* Barra pasos */}
-          <div style={{ display:"flex", gap:"5px", marginBottom:"22px" }}>
-            {[1,2,3].map(p => <div key={p} style={{ flex:1, height:"3px", borderRadius:"2px",
-              background: p <= paso ? C.green : C.border, transition:"background 0.3s" }} />)}
-          </div>
-
-          {/* Paso 1 — Datos ingeniero */}
-          {paso === 1 && (
-            <div style={{ display:"flex", flexDirection:"column", gap:"13px" }}>
-              <div>
-                <label style={{ color:"#999", fontSize:"11px", letterSpacing:"0.08em", display:"block", marginBottom:"6px" }}>
-                  NOMBRE DEL INGENIERO <span style={{ color:C.red }}>*</span>
-                </label>
-                <input value={ingeniero} onChange={e => setIng(e.target.value)}
-                  placeholder="Ej. Carlos Mendoza" style={inputSt} />
-              </div>
-
-              <EstadoCiudadSelect estado={estado} ciudad={ciudad}
-                onEstado={setEstado} onCiudad={setCiudad} required />
-
-              <div>
-                <label style={{ color:"#999", fontSize:"11px", letterSpacing:"0.08em", display:"block", marginBottom:"8px" }}>
-                  TIPO DE TRASLADO
-                </label>
-                <div style={{ display:"flex", gap:"8px" }}>
-                  {[{ k:"directo", label:"🤝 Retiro directo" }, { k:"paqueteria", label:"📦 Paquetería" }].map(t => (
-                    <button key={t.k} onClick={() => setTipo(t.k)}
-                      style={{ flex:1, padding:"11px", border:`1px solid ${tipo === t.k ? C.green : C.border}`,
-                        borderRadius:"11px", background: tipo === t.k ? "#001a0d" : "transparent",
-                        color: tipo === t.k ? C.green : C.muted, cursor:"pointer",
-                        fontFamily:"inherit", fontSize:"13px", fontWeight:"600" }}>
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {tipo === "paqueteria" && (
-                <div>
-                  <label style={{ color:"#999", fontSize:"11px", letterSpacing:"0.08em", display:"block", marginBottom:"6px" }}>
-                    NÚMERO DE GUÍA
-                  </label>
-                  <input value={guia} onChange={e => setGuia(e.target.value)}
-                    placeholder="Ej. 1Z999AA10123456784" style={inputSt} />
-                  <p style={{ color:C.muted, fontSize:"11px", marginTop:"5px" }}>
-                    El check-in lo hará quien reciba el equipo en destino.
-                  </p>
-                </div>
-              )}
-
-              <button onClick={() => paso1ok && setPaso(2)} disabled={!paso1ok}
-                style={btnPrimary(!paso1ok)}>Continuar →</button>
-            </div>
-          )}
-
-          {/* Paso 2 — Foto obligatoria */}
-          {paso === 2 && (
-            <div>
-              <p style={{ color:"#aaa", fontSize:"13px", marginBottom:"5px" }}>
-                📸 <strong style={{ color:C.text }}>Foto obligatoria</strong> — estado del equipo al retirarlo.
-              </p>
-              <p style={{ color:C.muted, fontSize:"11px", marginBottom:"16px" }}>Esta imagen es evidencia del estado inicial.</p>
-              {!foto ? (
-                <button onClick={() => setShowCam(true)}
-                  style={{ width:"100%", aspectRatio:"16/9", background:"#12121f",
-                    border:`2px dashed ${C.border}`, borderRadius:"14px", color:C.muted,
-                    cursor:"pointer", display:"flex", flexDirection:"column",
-                    alignItems:"center", justifyContent:"center", gap:"8px", marginBottom:"16px" }}>
-                  <span style={{ fontSize:"38px" }}>📷</span>
-                  <span style={{ fontSize:"13px" }}>Toca para abrir cámara</span>
-                  <span style={{ fontSize:"11px", color:C.red, fontWeight:"700" }}>REQUERIDA</span>
-                </button>
-              ) : (
-                <div style={{ marginBottom:"16px", position:"relative" }}>
-                  <img src={foto} alt="ev" style={{ width:"100%", borderRadius:"14px", display:"block" }} />
-                  <button onClick={() => { setFoto(null); setShowCam(true); }}
-                    style={{ position:"absolute", top:"8px", right:"8px", background:"rgba(0,0,0,0.7)",
-                      border:"none", borderRadius:"20px", color:"#fff",
-                      padding:"5px 11px", fontSize:"11px", cursor:"pointer" }}>🔄 Repetir</button>
-                </div>
-              )}
-              <button onClick={() => foto && setPaso(3)} disabled={!foto} style={btnPrimary(!foto)}>
-                {foto ? "Continuar →" : "📷 Foto requerida"}
-              </button>
-            </div>
-          )}
-
-          {/* Paso 3 — Confirmación */}
-          {paso === 3 && (
-            <div>
-              <p style={{ color:"#aaa", fontSize:"13px", marginBottom:"14px" }}>Confirma el retiro:</p>
-              <div style={{ background:"#12121f", border:`1px solid ${C.border}`,
-                borderRadius:"13px", padding:"14px", marginBottom:"14px" }}>
-                <Row label="Ingeniero" value={ingeniero} />
-                <Row label="Destino" value={`${ciudad}, ${estado}`} />
-                <Row label="Tipo" value={tipo === "paqueteria" ? `📦 Paquetería${guia ? ` · ${guia}` : ""}` : "🤝 Retiro directo"} />
-                <Row label="Equipo" value={equipo.nombre} />
-                <Row label="Fecha" value={fmt(new Date().toISOString())} last />
-              </div>
-              <img src={foto} alt="ev" style={{ width:"100%", borderRadius:"13px", marginBottom:"16px", display:"block", opacity:0.9 }} />
-              <button onClick={confirmar} disabled={loading} style={btnPrimary(loading)}>
-                {loading ? "Guardando…" : "✅ Confirmar retiro"}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </>
-  );
-}
-
-// ─── Modal CHECK-IN ───────────────────────────────────────────────────────────
-function ModalCheckin({ equipo, registro, token, onConfirmar, onCerrar }) {
-  const [foto, setFoto]       = useState(null);
-  const [showCam, setShowCam] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [listo, setListo]     = useState(false);
-  // Para paquetería: el receptor puede ser diferente ciudad
-  const [estado, setEstado]   = useState(registro.estado || "");
-  const [ciudad, setCiudad]   = useState(registro.ciudad || "");
-  const esPaq = registro.tipo === "paqueteria";
-
-  async function confirmar() {
-    if (!foto) return;
-    setLoading(true);
-    try {
-      // Guardar en historial
-      await supa("historial", { method:"POST", token, body: {
-        equipo_id: equipo.id, equipo_nombre: equipo.nombre,
-        ingeniero: registro.ingeniero, estado, ciudad,
-        fecha_retiro: registro.fecha_retiro, fecha_devolucion: new Date().toISOString(),
-        foto_retiro: registro.foto_retiro, foto_devolucion: foto,
-        dias: getDias(registro.fecha_retiro), tipo: registro.tipo,
-        guia_paqueteria: registro.guia_paqueteria,
-      }});
-      // Borrar de registros activos
-      await supa(`registros?equipo_id=eq.${equipo.id}`, { method:"DELETE", token });
-      setListo(true);
-      setTimeout(() => { onConfirmar(); onCerrar(); }, 2000);
-    } catch (ex) { alert("Error: " + ex.message); }
-    finally { setLoading(false); }
-  }
-
-  if (listo) return (
-    <div style={{ position:"fixed", inset:0, zIndex:900, background:"rgba(0,0,0,0.92)",
-      display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:"12px" }}>
-      <div style={{ fontSize:"70px" }}>✅</div>
-      <p style={{ color:C.green, fontSize:"20px", fontWeight:"800" }}>¡Equipo devuelto!</p>
-      <p style={{ color:C.muted, fontSize:"13px" }}>Registro actualizado en Supabase</p>
-    </div>
-  );
-
-  return (
-    <>
-      {showCam && <CamaraModal titulo="Foto de DEVOLUCIÓN"
-        onCaptura={img => { setFoto(img); setShowCam(false); }} onCerrar={() => setShowCam(false)} />}
-      <div style={{ position:"fixed", inset:0, zIndex:900, background:"rgba(0,0,0,0.85)",
-        display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
-        <div style={{ background:C.card, border:`1px solid ${C.border}`,
-          borderTopLeftRadius:"22px", borderTopRightRadius:"22px",
-          padding:"26px 22px", width:"100%", maxWidth:"520px",
-          maxHeight:"92vh", overflowY:"auto" }}>
-
-          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"18px" }}>
-            <div>
-              <p style={{ color:C.orange, fontSize:"11px", letterSpacing:"0.15em",
-                textTransform:"uppercase", margin:"0 0 3px" }}>CHECK-IN · {equipo.id}</p>
-              <h2 style={{ color:C.text, margin:0, fontSize:"17px", fontWeight:"800" }}>{equipo.nombre}</h2>
-            </div>
-            <button onClick={onCerrar} style={{ background:"none", border:"none", color:C.muted, fontSize:"22px", cursor:"pointer" }}>✕</button>
-          </div>
-
-          <div style={{ background:"#12121f", border:`1px solid ${C.border}`,
-            borderRadius:"13px", padding:"14px", marginBottom:"18px" }}>
-            <Row label="Ingeniero"    value={registro.ingeniero} />
-            <Row label="Tiempo en uso" value={getDias(registro.fecha_retiro)} />
-            {registro.tipo === "paqueteria" && registro.guia_paqueteria &&
-              <Row label="Guía" value={registro.guia_paqueteria} />}
-            <Row label="Retiro" value={fmt(registro.fecha_retiro)} last />
-          </div>
-
-          {/* Si es paquetería, confirmar ciudad de recepción */}
-          {esPaq && (
-            <div style={{ marginBottom:"16px" }}>
-              <p style={{ color:C.blue, fontSize:"11px", letterSpacing:"0.1em",
-                textTransform:"uppercase", marginBottom:"10px" }}>📍 Ciudad de recepción</p>
-              <EstadoCiudadSelect estado={estado} ciudad={ciudad}
-                onEstado={setEstado} onCiudad={setCiudad} required />
-            </div>
-          )}
-
-          <p style={{ color:"#aaa", fontSize:"13px", marginBottom:"5px" }}>
-            📸 <strong style={{ color:C.text }}>Foto obligatoria</strong> — estado al devolver.
-          </p>
-          <p style={{ color:C.muted, fontSize:"11px", marginBottom:"14px" }}>Evidencia del estado al regresarlo.</p>
-
-          {!foto ? (
-            <button onClick={() => setShowCam(true)}
-              style={{ width:"100%", aspectRatio:"16/9", background:"#12121f",
-                border:`2px dashed ${C.border}`, borderRadius:"14px", color:C.muted,
-                cursor:"pointer", display:"flex", flexDirection:"column",
-                alignItems:"center", justifyContent:"center", gap:"8px", marginBottom:"16px" }}>
-              <span style={{ fontSize:"38px" }}>📷</span>
-              <span style={{ fontSize:"13px" }}>Foto de devolución</span>
-              <span style={{ fontSize:"11px", color:C.red, fontWeight:"700" }}>REQUERIDA</span>
-            </button>
-          ) : (
-            <div style={{ marginBottom:"16px", position:"relative" }}>
-              <img src={foto} alt="ev" style={{ width:"100%", borderRadius:"14px", display:"block" }} />
-              <button onClick={() => { setFoto(null); setShowCam(true); }}
-                style={{ position:"absolute", top:"8px", right:"8px", background:"rgba(0,0,0,0.7)",
-                  border:"none", borderRadius:"20px", color:"#fff",
-                  padding:"5px 11px", fontSize:"11px", cursor:"pointer" }}>🔄 Repetir</button>
-            </div>
-          )}
-
-          <button onClick={confirmar} disabled={!foto || loading || (esPaq && (!estado || !ciudad))}
-            style={btnPrimary(!foto || loading || (esPaq && (!estado || !ciudad)))}>
-            {loading ? "Guardando…" : foto ? "📦 Confirmar devolución" : "📷 Foto requerida"}
-          </button>
-        </div>
-      </div>
-    </>
-  );
-}
-
-// ─── Mapa ─────────────────────────────────────────────────────────────────────
-const COORDS = {
+const COORDS_ESTADO = {
   "Aguascalientes":[21.88,-102.28],"Baja California":[32.51,-117.04],"Baja California Sur":[24.14,-110.31],
   "Campeche":[19.84,-90.52],"Chiapas":[16.75,-93.11],"Chihuahua":[28.63,-106.07],
   "Ciudad de México":[19.43,-99.13],"Coahuila":[27.05,-101.53],"Colima":[19.24,-103.72],
@@ -729,409 +83,1411 @@ const COORDS = {
   "Yucatán":[20.97,-89.62],"Zacatecas":[22.77,-102.58],
 };
 
-function MapaModal({ registros, equipos, onCerrar }) {
-  const mapRef = useRef(null), mapInst = useRef(null);
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function getDias(iso) {
+  const diff = new Date() - new Date(iso);
+  const d = Math.floor(diff/86400000), h = Math.floor((diff%86400000)/3600000);
+  return d===0?`${h}h`:`${d}d ${h}h`;
+}
+function fmt(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("es-MX",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
+}
 
-  useEffect(() => {
-    if (!document.getElementById("lf-css")) {
-      const l = document.createElement("link");
-      l.id="lf-css"; l.rel="stylesheet";
-      l.href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
-      document.head.appendChild(l);
+// ─── Colores ──────────────────────────────────────────────────────────────────
+const C = {
+  bg:"#07070f",card:"#0e0e1c",border:"#1c1c30",
+  green:"#00e87a",greenDk:"#001f0e",
+  orange:"#ff9500",orangeDk:"#1a0e00",
+  red:"#ff3b3b",blue:"#4a9eff",blueDk:"#020d1a",
+  text:"#eee",muted:"#666",subtle:"#252538",
+};
+
+const inp = {
+  width:"100%",padding:"13px 15px",boxSizing:"border-box",
+  background:"#12121f",border:`1px solid ${C.border}`,
+  borderRadius:"11px",color:C.text,fontSize:"15px",
+  outline:"none",fontFamily:"inherit",
+};
+const btnP = (dis)=>({
+  width:"100%",padding:"15px",border:"none",borderRadius:"13px",
+  background:dis?C.subtle:`linear-gradient(135deg,${C.green},#00c066)`,
+  color:dis?C.muted:"#001a0d",fontWeight:"800",fontSize:"15px",
+  cursor:dis?"not-allowed":"pointer",fontFamily:"inherit",transition:"all 0.2s",
+});
+
+// ─── Pequeños ─────────────────────────────────────────────────────────────────
+function Row({label,value,last}){
+  return <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0",
+    borderBottom:last?"none":`1px solid ${C.border}`}}>
+    <span style={{color:C.muted,fontSize:"12px"}}>{label}</span>
+    <span style={{color:"#ccc",fontSize:"13px",fontWeight:"600",textAlign:"right",maxWidth:"65%"}}>{value}</span>
+  </div>;
+}
+
+function Badge({reg}){
+  if(!reg) return <span style={{background:`linear-gradient(135deg,${C.green},#00c066)`,
+    color:"#001a0d",padding:"3px 10px",borderRadius:"20px",fontSize:"11px",
+    fontWeight:"700",textTransform:"uppercase",letterSpacing:"0.05em"}}>Disponible</span>;
+  const dias=getDias(reg.fecha_retiro), alerta=parseInt(dias)>7;
+  if(reg.tipo==="paqueteria") return <span style={{background:`linear-gradient(135deg,${C.blue},#2266cc)`,
+    color:"#fff",padding:"3px 10px",borderRadius:"20px",fontSize:"11px",fontWeight:"700",
+    textTransform:"uppercase",letterSpacing:"0.04em"}}>📦 Tránsito · {dias}</span>;
+  return <span style={{background:alerta?`linear-gradient(135deg,${C.red},#cc0000)`:`linear-gradient(135deg,${C.orange},#cc7700)`,
+    color:"#fff",padding:"3px 10px",borderRadius:"20px",fontSize:"11px",fontWeight:"700",
+    textTransform:"uppercase",letterSpacing:"0.04em"}}>En uso · {dias}</span>;
+}
+
+function Toast({msg,ok}){
+  return <div style={{position:"fixed",top:"16px",left:"50%",transform:"translateX(-50%)",
+    background:ok?C.greenDk:"#1a0000",border:`1px solid ${ok?C.green:C.red}`,
+    borderRadius:"40px",padding:"11px 22px",color:ok?C.green:C.red,
+    fontSize:"13px",fontWeight:"700",zIndex:9999,whiteSpace:"nowrap",
+    boxShadow:"0 8px 32px rgba(0,0,0,0.6)",animation:"fadeIn 0.25s ease"}}>{msg}</div>;
+}
+
+function Spin(){
+  return <div style={{display:"flex",alignItems:"center",justifyContent:"center",
+    padding:"50px",color:C.muted,fontSize:"13px",gap:"10px"}}>
+    <div style={{width:"18px",height:"18px",border:`2px solid ${C.border}`,
+      borderTop:`2px solid ${C.green}`,borderRadius:"50%",animation:"spin 0.7s linear infinite"}}/>
+    Cargando…
+  </div>;
+}
+
+// ─── Estado/Ciudad ────────────────────────────────────────────────────────────
+function EstadoCiudad({estado,ciudad,onEstado,onCiudad}){
+  return <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
+    <div>
+      <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+        ESTADO <span style={{color:C.red}}>*</span>
+      </label>
+      <select value={estado} onChange={e=>{onEstado(e.target.value);onCiudad("");}}
+        style={{...inp,cursor:"pointer",color:estado?C.text:C.muted}}>
+        <option value="">Selecciona estado…</option>
+        {ESTADOS.map(e=><option key={e} value={e}>{e}</option>)}
+      </select>
+    </div>
+    {estado&&<div>
+      <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+        CIUDAD / MUNICIPIO <span style={{color:C.red}}>*</span>
+      </label>
+      <select value={ciudad} onChange={e=>onCiudad(e.target.value)}
+        style={{...inp,cursor:"pointer",color:ciudad?C.text:C.muted}}>
+        <option value="">Selecciona ciudad…</option>
+        {(MEXICO[estado]||[]).map(c=><option key={c} value={c}>{c}</option>)}
+      </select>
+    </div>}
+  </div>;
+}
+
+// ─── Cámara ───────────────────────────────────────────────────────────────────
+function CamaraModal({titulo,onCaptura,onCerrar}){
+  const vRef=useRef(),cRef=useRef(),sRef=useRef();
+  const [live,setLive]=useState(false),[cap,setCap]=useState(null),[err,setErr]=useState(false);
+  useEffect(()=>{init();return stop;},[]);
+  async function init(){
+    try{
+      const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false});
+      sRef.current=s;
+      if(vRef.current){vRef.current.srcObject=s;vRef.current.play();setLive(true);}
+    }catch{setErr(true);}
+  }
+  function stop(){sRef.current?.getTracks().forEach(t=>t.stop());}
+  function capturar(){
+    if(live&&vRef.current&&cRef.current){
+      const cv=cRef.current,ctx=cv.getContext("2d");
+      cv.width=vRef.current.videoWidth;cv.height=vRef.current.videoHeight;
+      ctx.drawImage(vRef.current,0,0);setCap(cv.toDataURL("image/jpeg",0.8));stop();
+    }else{
+      const cv=document.createElement("canvas");cv.width=400;cv.height=300;
+      const ctx=cv.getContext("2d");
+      ctx.fillStyle="#12121f";ctx.fillRect(0,0,400,300);
+      ctx.fillStyle=C.green;ctx.font="bold 15px monospace";ctx.textAlign="center";
+      ctx.fillText("📷 Evidencia simulada",200,130);
+      ctx.fillStyle=C.muted;ctx.font="12px monospace";
+      ctx.fillText(new Date().toLocaleString("es-MX"),200,165);
+      setCap(cv.toDataURL("image/jpeg",0.8));
     }
-    function init() {
-      if (mapInst.current || !mapRef.current) return;
-      const L = window.L;
-      mapInst.current = L.map(mapRef.current, { zoomControl:true }).setView([23.5,-102], 5);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        { attribution:"© OpenStreetMap contributors", maxZoom:18 }).addTo(mapInst.current);
-
-      // Agrupar por estado
-      const porEstado = {};
-      equipos.forEach(eq => {
-        const reg = registros[eq.id]; if (!reg) return;
-        const key = reg.estado;
-        if (!porEstado[key]) porEstado[key] = [];
-        porEstado[key].push({ eq, reg });
-      });
-
-      Object.entries(porEstado).forEach(([estado, items]) => {
-        const coords = COORDS[estado]; if (!coords) return;
-        const alerta = items.some(({ reg }) => parseInt(getDias(reg.fecha_retiro)) > 7);
-        const icon = L.divIcon({ className:"",
-          html:`<div style="background:${alerta?C.red:C.orange};color:${alerta?"#fff":"#1a0a00"};
-            border-radius:50%;width:34px;height:34px;display:flex;align-items:center;
-            justify-content:center;font-weight:800;font-size:13px;border:3px solid #fff;
-            box-shadow:0 2px 12px rgba(0,0,0,0.4)">${items.length}</div>`,
-          iconSize:[34,34], iconAnchor:[17,17] });
-        const popup = items.map(({ eq, reg }) =>
-          `<b>${eq.nombre}</b><br>👤 ${reg.ingeniero}<br>📍 ${reg.ciudad}<br>⏱ ${getDias(reg.fecha_retiro)}${reg.tipo==="paqueteria"?"<br>📦 En tránsito":""}`
-        ).join("<hr style='margin:6px 0;border-color:#333'>");
-        L.marker(coords, { icon }).addTo(mapInst.current)
-          .bindPopup(`<div style="font-family:sans-serif;font-size:13px;min-width:190px">
-            <b style="color:${C.orange}">📍 ${estado}</b><hr style="margin:6px 0;border-color:#ddd">${popup}</div>`);
-      });
-    }
-    if (window.L) init();
-    else {
-      const s = document.createElement("script");
-      s.src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
-      s.onload=init; document.head.appendChild(s);
-    }
-    return () => { mapInst.current?.remove(); mapInst.current=null; };
-  }, []);
-
-  const enUso = Object.keys(registros).length;
-  return (
-    <div style={{ position:"fixed", inset:0, zIndex:1500, background:C.bg, display:"flex", flexDirection:"column" }}>
-      <div style={{ padding:"20px 20px 10px", display:"flex", justifyContent:"space-between",
-        alignItems:"center", background:`linear-gradient(180deg,${C.card},transparent)` }}>
-        <div>
-          <h2 style={{ margin:0, fontSize:"17px", fontWeight:"800", color:C.text }}>🗺 Mapa de equipos</h2>
-          <p style={{ color:C.muted, fontSize:"11px", margin:"2px 0 0", fontFamily:"'JetBrains Mono',monospace" }}>
-            {enUso} en campo · OpenStreetMap (sin costo)
-          </p>
-        </div>
-        <button onClick={onCerrar} style={{ background:"#12121f", border:`1px solid ${C.border}`,
-          borderRadius:"11px", color:"#aaa", padding:"8px 15px",
-          cursor:"pointer", fontSize:"13px", fontFamily:"inherit" }}>✕ Cerrar</button>
-      </div>
-      <div style={{ display:"flex", gap:"12px", padding:"0 20px 10px" }}>
-        {[{c:C.orange,l:"En uso"},{c:C.red,l:"+7 días"},{c:C.blue,l:"En tránsito"}].map(x=>(
-          <div key={x.l} style={{ display:"flex", alignItems:"center", gap:"5px" }}>
-            <div style={{ width:"12px", height:"12px", borderRadius:"50%", background:x.c }} />
-            <span style={{ fontSize:"10px", color:C.muted }}>{x.l}</span>
+  }
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:3000,background:"rgba(0,0,0,0.95)",
+      display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
+      <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"20px",
+        padding:"20px",width:"100%",maxWidth:"440px"}}>
+        <h3 style={{color:C.green,margin:"0 0 12px",fontSize:"12px",letterSpacing:"0.12em",textTransform:"uppercase"}}>
+          📷 {titulo}
+        </h3>
+        {err&&<p style={{color:C.orange,fontSize:"12px",marginBottom:"10px",background:"#1a1200",padding:"8px 12px",borderRadius:"8px"}}>
+          Cámara no disponible — modo simulado</p>}
+        {!cap?<>
+          <div style={{background:"#000",borderRadius:"12px",overflow:"hidden",aspectRatio:"4/3",
+            display:"flex",alignItems:"center",justifyContent:"center",marginBottom:"12px",position:"relative"}}>
+            <video ref={vRef} style={{width:"100%",height:"100%",objectFit:"cover"}} playsInline muted/>
+            {!live&&<div style={{position:"absolute",color:C.muted,textAlign:"center"}}>
+              <div style={{fontSize:"36px",marginBottom:"6px"}}>📷</div>
+              <div style={{fontSize:"12px"}}>Iniciando…</div>
+            </div>}
           </div>
-        ))}
+          <canvas ref={cRef} style={{display:"none"}}/>
+          <button onClick={capturar} style={{...btnP(false),marginBottom:"8px"}}>
+            {live?"📸 Capturar":"📸 Simular captura"}
+          </button>
+        </>:<>
+          <img src={cap} alt="ev" style={{width:"100%",borderRadius:"12px",marginBottom:"12px"}}/>
+          <div style={{display:"flex",gap:"8px"}}>
+            <button onClick={()=>{setCap(null);init();}}
+              style={{flex:1,padding:"12px",background:"transparent",border:`1px solid ${C.border}`,
+                borderRadius:"11px",color:C.muted,cursor:"pointer",fontFamily:"inherit",fontSize:"14px"}}>🔄 Repetir</button>
+            <button onClick={()=>{onCaptura(cap);onCerrar();}} style={{flex:2,...btnP(false)}}>✅ Usar foto</button>
+          </div>
+        </>}
+        <button onClick={onCerrar} style={{width:"100%",marginTop:"8px",padding:"9px",
+          background:"transparent",border:"none",color:C.muted,cursor:"pointer",fontFamily:"inherit",fontSize:"13px"}}>
+          Cancelar
+        </button>
       </div>
-      <div ref={mapRef} style={{ flex:1 }} />
     </div>
   );
 }
 
-// ─── APP PRINCIPAL ────────────────────────────────────────────────────────────
-export default function App() {
-  const [session, setSession]       = useState(null);
-  const [equipos, setEquipos]       = useState([]);
-  const [registrosArr, setRegArr]   = useState([]);
-  const [historial, setHistorial]   = useState([]);
-  const [loading, setLoading]       = useState(false);
+// ─── QR Label (inline) ────────────────────────────────────────────────────────
+function QRLabel({equipo,onCerrar}){
+  const qrRef=useRef();
+  const APP_URL="https://equipotrack-app.vercel.app";
+  const url=`${APP_URL}?equipo=${equipo.id}`;
 
-  const [seleccionado, setSel]      = useState(null);
-  const [modoModal, setModo]        = useState(null);
-  const [showAdmin, setShowAdmin]   = useState(false);
-  const [showMapa, setShowMapa]     = useState(false);
-  const [vista, setVista]           = useState("equipos");
-  const [filtroCiudad, setFiltro]   = useState("todas");
-  const [busqueda, setBusq]         = useState("");
-  const [toast, setToast]           = useState(null);
+  useEffect(()=>{
+    function genQR(){
+      if(!qrRef.current||!window.QRCode) return;
+      qrRef.current.innerHTML="";
+      new window.QRCode(qrRef.current,{text:url,width:140,height:140,
+        colorDark:"#111",colorLight:"#fff",correctLevel:window.QRCode.CorrectLevel.H});
+    }
+    if(window.QRCode){genQR();}
+    else{
+      const s=document.createElement("script");
+      s.src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+      s.onload=genQR;document.head.appendChild(s);
+    }
+  },[]);
 
-  const isAdmin = session && ADMIN_EMAILS.includes(session.email);
+  function imprimir(){
+    const w=window.open("","_blank");
+    const qrHtml=qrRef.current?.innerHTML||"";
+    w.document.write(`<!DOCTYPE html><html><head>
+      <meta charset="UTF-8">
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@700;800&family=JetBrains+Mono:wght@500&display=swap');
+        body{margin:0;padding:20px;font-family:'Sora',sans-serif;background:#fff;}
+        .et{border:2px solid #111;border-radius:8px;overflow:hidden;max-width:280px;margin:0 auto;}
+        .eh{background:#111;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;}
+        .el{display:flex;align-items:center;gap:6px;}
+        .ei{width:22px;height:22px;background:#00e87a;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;}
+        .et-txt{color:#fff;font-size:13px;font-weight:800;}
+        .eid{font-family:'JetBrains Mono',monospace;color:#00e87a;font-size:12px;font-weight:700;}
+        .eb{padding:14px;display:flex;gap:14px;align-items:flex-start;}
+        .qr{width:140px;height:140px;flex-shrink:0;}
+        .qr canvas,.qr img{width:140px!important;height:140px!important;}
+        .en{font-size:14px;font-weight:800;color:#111;line-height:1.3;margin-bottom:4px;}
+        .es{font-family:'JetBrains Mono',monospace;font-size:10px;color:#888;}
+        .ec{font-size:10px;color:#555;background:#f5f5f5;padding:2px 8px;border-radius:20px;display:inline-block;margin-top:4px;}
+        .ef{background:#f8f8f8;border-top:1px solid #eee;padding:7px 12px;display:flex;align-items:center;justify-content:space-between;}
+        .es2{font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.08em;font-weight:600;}
+        .eu{font-family:'JetBrains Mono',monospace;font-size:7px;color:#bbb;}
+        @media print{body{padding:0;}}
+      </style>
+    </head><body>
+      <div class="et">
+        <div class="eh">
+          <div class="el"><div class="ei">⚡</div><span class="et-txt">EquipoTrack</span></div>
+          <span class="eid">${equipo.id}</span>
+        </div>
+        <div class="eb">
+          <div class="qr">${qrHtml}</div>
+          <div>
+            <div class="en">${equipo.nombre}</div>
+            <div class="es">S/N: ${equipo.serie}</div>
+            <div class="ec">${equipo.categoria}</div>
+          </div>
+        </div>
+        <div class="ef">
+          <span class="es2">📱 Escanea para registrar</span>
+          <span class="eu">${APP_URL}</span>
+        </div>
+      </div>
+      <script>window.onload=()=>setTimeout(()=>{window.print();window.close();},500);<\/script>
+    </body></html>`);
+    w.document.close();
+  }
 
-  // registros como map { equipo_id -> registro }
-  const registros = {};
-  registrosArr.forEach(r => { registros[r.equipo_id] = r; });
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:4000,background:"rgba(0,0,0,0.92)",
+      display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
+      <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"20px",
+        padding:"24px",width:"100%",maxWidth:"380px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:"18px"}}>
+          <div>
+            <p style={{color:C.green,fontSize:"11px",letterSpacing:"0.15em",textTransform:"uppercase",margin:"0 0 3px"}}>
+              ETIQUETA QR
+            </p>
+            <h2 style={{color:C.text,margin:0,fontSize:"16px",fontWeight:"800"}}>{equipo.nombre}</h2>
+          </div>
+          <button onClick={onCerrar} style={{background:"none",border:"none",color:C.muted,fontSize:"22px",cursor:"pointer"}}>✕</button>
+        </div>
 
-  function mostrarToast(msg, ok=true) { setToast({msg,ok}); setTimeout(()=>setToast(null),3200); }
+        {/* Preview etiqueta */}
+        <div style={{border:`2px solid ${C.border}`,borderRadius:"12px",overflow:"hidden",marginBottom:"16px"}}>
+          <div style={{background:"#111",padding:"8px 12px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
+              <div style={{width:"20px",height:"20px",background:C.green,borderRadius:"5px",
+                display:"flex",alignItems:"center",justifyContent:"center",fontSize:"11px"}}>⚡</div>
+              <span style={{color:"#fff",fontSize:"12px",fontWeight:"800"}}>EquipoTrack</span>
+            </div>
+            <span style={{fontFamily:"'JetBrains Mono',monospace",color:C.green,fontSize:"11px",fontWeight:"700"}}>
+              {equipo.id}
+            </span>
+          </div>
+          <div style={{padding:"14px",display:"flex",gap:"12px",alignItems:"flex-start",background:"#fff"}}>
+            <div ref={qrRef} style={{width:"140px",height:"140px",flexShrink:0}}/>
+            <div>
+              <p style={{fontWeight:"800",fontSize:"13px",color:"#111",lineHeight:1.3,marginBottom:"4px"}}>{equipo.nombre}</p>
+              <p style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",color:"#888"}}>S/N: {equipo.serie}</p>
+              <span style={{fontSize:"10px",color:"#555",background:"#f5f5f5",padding:"2px 8px",
+                borderRadius:"20px",display:"inline-block",marginTop:"4px"}}>{equipo.categoria}</span>
+            </div>
+          </div>
+          <div style={{background:"#f8f8f8",borderTop:"1px solid #eee",padding:"6px 12px",
+            display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span style={{fontSize:"9px",color:"#999",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:"600"}}>
+              📱 Escanea para registrar
+            </span>
+          </div>
+        </div>
 
-  async function cargar(token) {
+        <button onClick={imprimir} style={{...btnP(false)}}>🖨️ Imprimir etiqueta</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── PANTALLA REGISTRO DE NOMBRE ─────────────────────────────────────────────
+function RegistroNombre({sessionTemp,onComplete}){
+  const [nombre,setNombre]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [err,setErr]=useState("");
+
+  async function guardar(e){
+    e.preventDefault();
+    if(!nombre.trim()){setErr("Por favor ingresa tu nombre completo");return;}
+    setLoading(true);setErr("");
+    try{
+      // Intentar insertar, si ya existe actualizar
+      try{
+        await supa("perfiles",{method:"POST",token:sessionTemp.token,
+          body:{id:sessionTemp.user.id,nombre:nombre.trim(),email:sessionTemp.email}});
+      }catch{
+        await supa(`perfiles?id=eq.${sessionTemp.user.id}`,{method:"PATCH",token:sessionTemp.token,
+          body:{nombre:nombre.trim()}});
+      }
+      onComplete({...sessionTemp,nombre:nombre.trim()});
+    }catch(ex){setErr(ex.message);}
+    finally{setLoading(false);}
+  }
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
+      justifyContent:"center",padding:"20px",fontFamily:"'Sora',sans-serif"}}>
+      <div style={{width:"100%",maxWidth:"360px"}}>
+        <div style={{textAlign:"center",marginBottom:"32px"}}>
+          <div style={{width:"64px",height:"64px",margin:"0 auto 14px",
+            background:`linear-gradient(135deg,${C.green},#00c066)`,
+            borderRadius:"20px",display:"flex",alignItems:"center",
+            justifyContent:"center",fontSize:"28px"}}>👤</div>
+          <h1 style={{fontSize:"22px",fontWeight:"800",margin:"0 0 8px",color:C.text}}>
+            ¡Bienvenido!
+          </h1>
+          <p style={{color:C.muted,fontSize:"13px",lineHeight:1.5}}>
+            Es tu primera vez entrando.<br/>
+            ¿Cómo quieres que aparezca tu nombre en los registros?
+          </p>
+        </div>
+
+        <form onSubmit={guardar} style={{display:"flex",flexDirection:"column",gap:"12px"}}>
+          <div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",
+              display:"block",marginBottom:"6px"}}>NOMBRE COMPLETO</label>
+            <input
+              value={nombre}
+              onChange={e=>setNombre(e.target.value)}
+              placeholder="Ej. Carlos Mendoza López"
+              style={inp}
+              autoFocus
+              required/>
+            <p style={{color:C.muted,fontSize:"11px",marginTop:"6px"}}>
+              Este nombre aparecerá en todos los registros de equipos.
+            </p>
+          </div>
+
+          {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",
+            padding:"10px 14px",borderRadius:"9px",margin:0}}>⚠️ {err}</p>}
+
+          <button type="submit" disabled={loading||!nombre.trim()} style={{...btnP(loading||!nombre.trim()),marginTop:"6px"}}>
+            {loading?"Guardando…":"Continuar →"}
+          </button>
+        </form>
+
+        <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
+          El administrador puede modificar tu nombre si es necesario.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── LOGIN ────────────────────────────────────────────────────────────────────
+function Login({onLogin}){
+  const [email,setEmail]=useState(""),[pass,setPass]=useState("");
+  const [loading,setLoading]=useState(false),[err,setErr]=useState("");
+  async function login(e){
+    e.preventDefault();setLoading(true);setErr("");
+    try{
+      const data=await authReq("token?grant_type=password",{email,password:pass});
+      // Cargar perfil existente
+      let perfil=null;
+      try{
+        const p=await supa("perfiles",{token:data.access_token,
+          params:{id:`eq.${data.user.id}`,limit:"1"}});
+        perfil=p&&p[0]?p[0]:null;
+      }catch{}
+      const sessionData={token:data.access_token,email:data.user.email,
+        user:data.user,nombre:perfil?.nombre||null,necesitaNombre:!perfil?.nombre};
+      onLogin(sessionData);
+    }catch(ex){setErr(ex.message);}
+    finally{setLoading(false);}
+  }
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
+      justifyContent:"center",padding:"20px",fontFamily:"'Sora',sans-serif"}}>
+      <div style={{width:"100%",maxWidth:"360px"}}>
+        <div style={{textAlign:"center",marginBottom:"36px"}}>
+          <div style={{width:"64px",height:"64px",margin:"0 auto 14px",
+            background:`linear-gradient(135deg,${C.green},#00c066)`,
+            borderRadius:"20px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"28px"}}>⚡</div>
+          <h1 style={{fontSize:"26px",fontWeight:"800",margin:"0 0 4px",color:C.text}}>EquipoTrack</h1>
+          <p style={{color:C.muted,fontSize:"12px",letterSpacing:"0.08em",fontFamily:"'JetBrains Mono',monospace"}}>
+            CONTROL DE EQUIPOS
+          </p>
+        </div>
+        <form onSubmit={login} style={{display:"flex",flexDirection:"column",gap:"12px"}}>
+          <div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+              CORREO ELECTRÓNICO
+            </label>
+            <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
+              placeholder="nombre@axtel.com.mx" style={inp} required/>
+          </div>
+          <div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+              CONTRASEÑA
+            </label>
+            <input type="password" value={pass} onChange={e=>setPass(e.target.value)}
+              placeholder="••••••••" style={inp} required/>
+          </div>
+          {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",padding:"10px 14px",borderRadius:"9px",margin:0}}>
+            ⚠️ {err}</p>}
+          <button type="submit" disabled={loading} style={{...btnP(loading),marginTop:"6px"}}>
+            {loading?"Entrando…":"Iniciar sesión"}
+          </button>
+        </form>
+        <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
+          ¿Sin acceso? Contacta a arodriguezr@axtel.com.mx.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── MODAL CHECKOUT ───────────────────────────────────────────────────────────
+function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
+  const isAdmin=ADMIN_EMAILS.includes(session.email);
+  const [paso,setPaso]=useState(1);
+  const [ingeniero,setIng]=useState(isAdmin?"":session.nombre);
+  const [estado,setEstado]=useState(""),[ciudad,setCiudad]=useState("");
+  const [tipo,setTipo]=useState("directo"),[guia,setGuia]=useState("");
+  const [foto,setFoto]=useState(null),[showCam,setShowCam]=useState(false);
+  const [loading,setLoading]=useState(false);
+
+  const ok1=ingeniero&&estado&&ciudad;
+
+  async function confirmar(){
     setLoading(true);
-    try {
-      const [eqs, regs, hist] = await Promise.all([
-        supa("equipos", { token, params:{ order:"created_at.asc", activo:"eq.true" } }),
-        supa("registros", { token, params:{ order:"fecha_retiro.desc" } }),
-        supa("historial", { token, params:{ order:"fecha_devolucion.desc", limit:"50" } }),
-      ]);
-      setEquipos(eqs || []); setRegArr(regs || []); setHistorial(hist || []);
-    } catch (ex) { mostrarToast("Error cargando datos: "+ex.message, false); }
-    finally { setLoading(false); }
+    try{
+      await supa("registros",{method:"POST",token,body:{
+        equipo_id:equipo.id,ingeniero,estado,ciudad,
+        tipo,guia_paqueteria:guia||null,
+        foto_retiro:foto,fecha_retiro:new Date().toISOString(),
+      }});
+      onConfirmar(`✅ ${equipo.nombre} asignado a ${ingeniero}`);
+    }catch(ex){alert("Error: "+ex.message);}
+    finally{setLoading(false);}
   }
 
-  function handleLogin(s) { setSession(s); cargar(s.token); }
+  return(<>
+    {showCam&&<CamaraModal titulo="Foto de RETIRO" onCaptura={img=>{setFoto(img);setShowCam(false);}} onCerrar={()=>setShowCam(false)}/>}
+    <div style={{position:"fixed",inset:0,zIndex:900,background:"rgba(0,0,0,0.85)",
+      display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+      <div style={{background:C.card,border:`1px solid ${C.border}`,
+        borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
+        padding:"24px 20px",width:"100%",maxWidth:"520px",maxHeight:"92vh",overflowY:"auto"}}>
 
-  function cerrarModal() { setSel(null); setModo(null); }
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:"16px"}}>
+          <div>
+            <p style={{color:C.green,fontSize:"11px",letterSpacing:"0.15em",textTransform:"uppercase",margin:"0 0 3px"}}>
+              CHECK-OUT · {equipo.id}
+            </p>
+            <h2 style={{color:C.text,margin:0,fontSize:"17px",fontWeight:"800"}}>{equipo.nombre}</h2>
+            <p style={{color:C.muted,fontSize:"11px",marginTop:"2px"}}>
+              Base: {equipo.sitio_base} — {equipo.ciudad_base}
+            </p>
+          </div>
+          <button onClick={onCerrar} style={{background:"none",border:"none",color:C.muted,fontSize:"22px",cursor:"pointer"}}>✕</button>
+        </div>
 
-  function abrirEquipo(equipo) {
-    setSel(equipo);
-    setModo(registros[equipo.id] ? "checkin" : "checkout");
-  }
+        <div style={{display:"flex",gap:"5px",marginBottom:"20px"}}>
+          {[1,2,3].map(p=><div key={p} style={{flex:1,height:"3px",borderRadius:"2px",
+            background:p<=paso?C.green:C.border,transition:"background 0.3s"}}/>)}
+        </div>
 
-  function onAccion(msg) { mostrarToast(msg); cargar(session.token); cerrarModal(); }
-
-  // Ciudades con equipos en uso
-  const ciudadesEnUso = [...new Set(registrosArr.map(r => r.ciudad))].sort();
-
-  const equiposFiltrados = equipos.filter(eq => {
-    const matchB = eq.nombre.toLowerCase().includes(busqueda.toLowerCase()) || eq.id.toLowerCase().includes(busqueda.toLowerCase());
-    const reg = registros[eq.id];
-    const matchC = filtroCiudad === "todas" || (filtroCiudad === "disponibles" && !reg) || (reg && reg.ciudad === filtroCiudad);
-    return matchB && matchC;
-  });
-
-  const enUso = registrosArr.length;
-  const disponibles = equipos.length - enUso;
-
-  if (!session) return <Login onLogin={handleLogin} />;
-
-  return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
-        *{box-sizing:border-box;margin:0;padding:0}
-        body{background:${C.bg}}
-        ::-webkit-scrollbar{width:4px}
-        ::-webkit-scrollbar-thumb{background:${C.border};border-radius:4px}
-        input::placeholder{color:${C.muted}}
-        select option{background:#12121f;color:#fff}
-        @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes slideUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes spin{to{transform:rotate(360deg)}}
-        .eq-card{transition:transform 0.1s}
-        .eq-card:active{transform:scale(0.985)}
-      `}</style>
-
-      <div style={{ minHeight:"100vh", background:C.bg, fontFamily:"'Sora',sans-serif",
-        color:C.text, maxWidth:"600px", margin:"0 auto", paddingBottom:"100px" }}>
-
-        {toast && <Toast {...toast} />}
-
-        {/* ── Header ── */}
-        <div style={{ padding:"34px 20px 0", background:`linear-gradient(180deg,${C.card} 60%,transparent)`,
-          position:"sticky", top:0, zIndex:100, backdropFilter:"blur(20px)" }}>
-
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"18px" }}>
-            <div style={{ display:"flex", alignItems:"center", gap:"11px" }}>
-              <div style={{ width:"40px", height:"40px", background:`linear-gradient(135deg,${C.green},#00c066)`,
-                borderRadius:"12px", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"20px" }}>⚡</div>
-              <div>
-                <h1 style={{ fontSize:"19px", fontWeight:"800", lineHeight:1 }}>EquipoTrack</h1>
-                <p style={{ fontSize:"10px", color:C.muted, letterSpacing:"0.1em", fontFamily:"'JetBrains Mono',monospace" }}>
-                  {session.email}
-                  {isAdmin && <span style={{ color:C.blue, marginLeft:"6px" }}>· ADMIN</span>}
-                </p>
-              </div>
-            </div>
-
-            <div style={{ display:"flex", gap:"8px" }}>
-              {/* Botón admin */}
-              {isAdmin && (
-                <button onClick={() => setShowAdmin(true)}
-                  style={{ background:"#0a0a20", border:`1px solid ${C.blue}33`,
-                    borderRadius:"12px", padding:"9px 14px", cursor:"pointer",
-                    color:C.blue, fontFamily:"'Sora',sans-serif", fontSize:"12px", fontWeight:"700" }}>
-                  ⚙️ Admin
-                </button>
-              )}
-              {/* Botón mapa */}
-              <button onClick={() => setShowMapa(true)}
-                style={{ display:"flex", alignItems:"center", gap:"6px",
-                  background: enUso > 0 ? "#12121f" : C.card,
-                  border:`1px solid ${enUso > 0 ? C.border : C.subtle}`,
-                  borderRadius:"12px", padding:"9px 14px", cursor:"pointer",
-                  color: enUso > 0 ? C.text : C.muted,
-                  fontFamily:"'Sora',sans-serif", fontSize:"12px", fontWeight:"700" }}>
-                <span>🗺</span>
-                {enUso > 0 && <span style={{ background:C.orange, color:"#1a0a00",
-                  borderRadius:"10px", padding:"1px 7px", fontSize:"10px", fontWeight:"800" }}>{enUso}</span>}
-              </button>
-              {/* Logout */}
-              <button onClick={() => setSession(null)}
-                style={{ background:"transparent", border:`1px solid ${C.border}`,
-                  borderRadius:"12px", padding:"9px 12px", cursor:"pointer",
-                  color:C.muted, fontFamily:"'Sora',sans-serif", fontSize:"12px" }}>
-                ↩
-              </button>
-            </div>
+        {paso===1&&<div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
+          <div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+              INGENIERO <span style={{color:C.red}}>*</span>
+            </label>
+            {isAdmin?(
+              <select value={ingeniero} onChange={e=>setIng(e.target.value)}
+                style={{...inp,cursor:"pointer",color:ingeniero?C.text:C.muted}}>
+                <option value="">Selecciona ingeniero…</option>
+                {perfiles.map(p=><option key={p.id} value={p.nombre}>{p.nombre} — {p.email}</option>)}
+              </select>
+            ):(
+              <input value={ingeniero} readOnly
+                style={{...inp,background:"#0a0a18",color:C.green,fontWeight:"700",cursor:"default"}}/>
+            )}
           </div>
 
-          {/* Stats */}
-          <div style={{ display:"flex", gap:"9px", marginBottom:"14px" }}>
-            {[{label:"Disponibles",val:disponibles,color:C.green},{label:"En uso",val:enUso,color:C.orange},{label:"Total",val:equipos.length,color:"#888"}].map(s=>(
-              <div key={s.label} style={{ flex:1, background:C.card, border:`1px solid ${C.border}`,
-                borderRadius:"13px", padding:"11px", textAlign:"center" }}>
-                <div style={{ fontSize:"22px", fontWeight:"800", color:s.color }}>{s.val}</div>
-                <div style={{ fontSize:"9px", color:C.muted, letterSpacing:"0.08em",
-                  textTransform:"uppercase", marginTop:"2px" }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
+          <EstadoCiudad estado={estado} ciudad={ciudad} onEstado={setEstado} onCiudad={setCiudad}/>
 
-          {/* Búsqueda */}
-          {vista === "equipos" && (
-            <input value={busqueda} onChange={e=>setBusq(e.target.value)}
-              placeholder="Buscar equipo o código…"
-              style={{ ...inputSt, marginBottom:"10px" }} />
-          )}
-
-          {/* Filtros */}
-          {vista === "equipos" && (
-            <div style={{ display:"flex", gap:"7px", overflowX:"auto", paddingBottom:"14px", scrollbarWidth:"none" }}>
-              {[{key:"todas",label:"Todos"},{key:"disponibles",label:"Disponibles"},
-                ...ciudadesEnUso.map(c=>({key:c,label:c}))].map(f=>(
-                <button key={f.key} onClick={()=>setFiltro(f.key)}
-                  style={{ flexShrink:0, padding:"6px 13px",
-                    background: filtroCiudad===f.key ? C.green : C.card,
-                    border:`1px solid ${filtroCiudad===f.key ? C.green : C.border}`,
-                    borderRadius:"20px", cursor:"pointer", whiteSpace:"nowrap",
-                    color: filtroCiudad===f.key ? "#001a0d" : C.muted,
-                    fontWeight: filtroCiudad===f.key ? "700" : "500",
-                    fontSize:"11px", fontFamily:"'Sora',sans-serif" }}>
-                  {f.label}
+          <div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"8px"}}>
+              TIPO DE TRASLADO
+            </label>
+            <div style={{display:"flex",gap:"8px"}}>
+              {[{k:"directo",l:"🤝 Retiro directo"},{k:"paqueteria",l:"📦 Paquetería"}].map(t=>(
+                <button key={t.k} onClick={()=>setTipo(t.k)}
+                  style={{flex:1,padding:"11px",border:`1px solid ${tipo===t.k?C.green:C.border}`,
+                    borderRadius:"11px",background:tipo===t.k?"#001a0d":"transparent",
+                    color:tipo===t.k?C.green:C.muted,cursor:"pointer",
+                    fontFamily:"inherit",fontSize:"13px",fontWeight:"600"}}>
+                  {t.l}
                 </button>
               ))}
             </div>
+          </div>
+
+          {tipo==="paqueteria"&&<div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+              NÚMERO DE GUÍA
+            </label>
+            <input value={guia} onChange={e=>setGuia(e.target.value)}
+              placeholder="Ej. 1Z999AA10123456784" style={inp}/>
+            <p style={{color:C.muted,fontSize:"11px",marginTop:"5px"}}>
+              El check-in lo hará quien reciba el equipo en destino.
+            </p>
+          </div>}
+
+          <button onClick={()=>ok1&&setPaso(2)} disabled={!ok1} style={btnP(!ok1)}>Continuar →</button>
+        </div>}
+
+        {paso===2&&<div>
+          <p style={{color:"#aaa",fontSize:"13px",marginBottom:"4px"}}>
+            📸 <strong style={{color:C.text}}>Foto obligatoria</strong> — estado al retirar.
+          </p>
+          <p style={{color:C.muted,fontSize:"11px",marginBottom:"14px"}}>Evidencia del estado inicial del equipo.</p>
+          {!foto?(
+            <button onClick={()=>setShowCam(true)}
+              style={{width:"100%",aspectRatio:"16/9",background:"#12121f",border:`2px dashed ${C.border}`,
+                borderRadius:"14px",color:C.muted,cursor:"pointer",display:"flex",flexDirection:"column",
+                alignItems:"center",justifyContent:"center",gap:"8px",marginBottom:"14px"}}>
+              <span style={{fontSize:"36px"}}>📷</span>
+              <span style={{fontSize:"13px"}}>Toca para abrir cámara</span>
+              <span style={{fontSize:"11px",color:C.red,fontWeight:"700"}}>REQUERIDA</span>
+            </button>
+          ):(
+            <div style={{marginBottom:"14px",position:"relative"}}>
+              <img src={foto} alt="ev" style={{width:"100%",borderRadius:"14px",display:"block"}}/>
+              <button onClick={()=>{setFoto(null);setShowCam(true);}}
+                style={{position:"absolute",top:"8px",right:"8px",background:"rgba(0,0,0,0.7)",
+                  border:"none",borderRadius:"20px",color:"#fff",padding:"5px 11px",fontSize:"11px",cursor:"pointer"}}>
+                🔄 Repetir
+              </button>
+            </div>
           )}
+          <button onClick={()=>foto&&setPaso(3)} disabled={!foto} style={btnP(!foto)}>
+            {foto?"Continuar →":"📷 Foto requerida"}
+          </button>
+        </div>}
+
+        {paso===3&&<div>
+          <p style={{color:"#aaa",fontSize:"13px",marginBottom:"12px"}}>Confirma el retiro:</p>
+          <div style={{background:"#12121f",border:`1px solid ${C.border}`,borderRadius:"13px",padding:"14px",marginBottom:"12px"}}>
+            <Row label="Ingeniero" value={ingeniero}/>
+            <Row label="Destino" value={`${ciudad}, ${estado}`}/>
+            <Row label="Tipo" value={tipo==="paqueteria"?`📦 Paquetería${guia?` · ${guia}`:""}` :"🤝 Retiro directo"}/>
+            <Row label="Equipo" value={equipo.nombre}/>
+            <Row label="Fecha" value={fmt(new Date().toISOString())} last/>
+          </div>
+          {foto&&<img src={foto} alt="ev" style={{width:"100%",borderRadius:"13px",marginBottom:"14px",display:"block",opacity:0.9}}/>}
+          <button onClick={confirmar} disabled={loading} style={btnP(loading)}>
+            {loading?"Guardando…":"✅ Confirmar retiro"}
+          </button>
+        </div>}
+      </div>
+    </div>
+  </>);
+}
+
+// ─── MODAL RECEPCIÓN PAQUETERÍA ───────────────────────────────────────────────
+function ModalRecepcion({equipo,registro,token,session,onConfirmar,onCerrar}){
+  const [estado,setEstado]=useState(""),[ciudad,setCiudad]=useState("");
+  const [foto,setFoto]=useState(null),[showCam,setShowCam]=useState(false);
+  const [loading,setLoading]=useState(false);
+
+  async function confirmar(){
+    if(!foto||!estado||!ciudad)return;
+    setLoading(true);
+    try{
+      // Actualizar registro: cambia tipo a "directo" y actualiza ciudad de recepción
+      await supa(`registros?equipo_id=eq.${equipo.id}`,{method:"PATCH",token,body:{
+        tipo:"directo",estado,ciudad,
+        foto_retiro:foto, // foto de recepción reemplaza la de envío
+        fecha_retiro:new Date().toISOString(),
+        ingeniero:session.nombre,
+      }});
+      onConfirmar(`📦 ${equipo.nombre} recibido en ${ciudad}`);
+    }catch(ex){alert("Error: "+ex.message);}
+    finally{setLoading(false);}
+  }
+
+  return(<>
+    {showCam&&<CamaraModal titulo="Foto de RECEPCIÓN" onCaptura={img=>{setFoto(img);setShowCam(false);}} onCerrar={()=>setShowCam(false)}/>}
+    <div style={{position:"fixed",inset:0,zIndex:900,background:"rgba(0,0,0,0.85)",
+      display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+      <div style={{background:C.card,border:`1px solid ${C.border}`,
+        borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
+        padding:"24px 20px",width:"100%",maxWidth:"520px",maxHeight:"92vh",overflowY:"auto"}}>
+
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:"16px"}}>
+          <div>
+            <p style={{color:C.blue,fontSize:"11px",letterSpacing:"0.15em",textTransform:"uppercase",margin:"0 0 3px"}}>
+              RECEPCIÓN DE PAQUETE · {equipo.id}
+            </p>
+            <h2 style={{color:C.text,margin:0,fontSize:"17px",fontWeight:"800"}}>{equipo.nombre}</h2>
+          </div>
+          <button onClick={onCerrar} style={{background:"none",border:"none",color:C.muted,fontSize:"22px",cursor:"pointer"}}>✕</button>
         </div>
 
-        {/* Tabs */}
-        <div style={{ display:"flex", padding:"0 20px 18px" }}>
-          {["equipos","historial"].map(v=>(
-            <button key={v} onClick={()=>setVista(v)} style={{
-              flex:1, padding:"10px", background: vista===v ? C.card : "transparent",
-              border:"1px solid", borderColor: vista===v ? C.border : "transparent",
-              borderRadius: v==="equipos" ? "10px 0 0 10px" : "0 10px 10px 0",
-              color: vista===v ? C.green : C.muted, fontWeight:"700", fontSize:"12px",
-              cursor:"pointer", letterSpacing:"0.05em", textTransform:"uppercase",
-              fontFamily:"'Sora',sans-serif", transition:"all 0.2s" }}>
-              {v==="equipos" ? "⚡ Equipos" : "📋 Historial"}
+        <div style={{background:C.blueDk,border:`1px solid ${C.blue}33`,borderRadius:"12px",padding:"12px",marginBottom:"16px"}}>
+          <p style={{color:C.blue,fontSize:"12px",fontWeight:"700",marginBottom:"6px"}}>📦 Equipo en tránsito</p>
+          <Row label="Enviado por" value={registro.ingeniero}/>
+          {registro.guia_paqueteria&&<Row label="Guía" value={registro.guia_paqueteria}/>}
+          <Row label="Salida" value={fmt(registro.fecha_retiro)} last/>
+        </div>
+
+        <p style={{color:"#aaa",fontSize:"13px",marginBottom:"12px",fontWeight:"700"}}>
+          ¿Dónde estás recibiendo el equipo?
+        </p>
+        <div style={{marginBottom:"14px"}}>
+          <EstadoCiudad estado={estado} ciudad={ciudad} onEstado={setEstado} onCiudad={setCiudad}/>
+        </div>
+
+        <p style={{color:"#aaa",fontSize:"13px",marginBottom:"4px"}}>
+          📸 <strong style={{color:C.text}}>Foto obligatoria</strong> — confirma que lo recibiste en buen estado.
+        </p>
+        <p style={{color:C.muted,fontSize:"11px",marginBottom:"14px"}}>Esta foto es evidencia de la recepción.</p>
+
+        {!foto?(
+          <button onClick={()=>setShowCam(true)}
+            style={{width:"100%",aspectRatio:"16/9",background:"#12121f",border:`2px dashed ${C.border}`,
+              borderRadius:"14px",color:C.muted,cursor:"pointer",display:"flex",flexDirection:"column",
+              alignItems:"center",justifyContent:"center",gap:"8px",marginBottom:"14px"}}>
+            <span style={{fontSize:"36px"}}>📷</span>
+            <span style={{fontSize:"13px"}}>Foto de recepción</span>
+            <span style={{fontSize:"11px",color:C.red,fontWeight:"700"}}>REQUERIDA</span>
+          </button>
+        ):(
+          <div style={{marginBottom:"14px",position:"relative"}}>
+            <img src={foto} alt="ev" style={{width:"100%",borderRadius:"14px",display:"block"}}/>
+            <button onClick={()=>{setFoto(null);setShowCam(true);}}
+              style={{position:"absolute",top:"8px",right:"8px",background:"rgba(0,0,0,0.7)",
+                border:"none",borderRadius:"20px",color:"#fff",padding:"5px 11px",fontSize:"11px",cursor:"pointer"}}>
+              🔄 Repetir
+            </button>
+          </div>
+        )}
+
+        <button onClick={confirmar} disabled={!foto||!estado||!ciudad||loading}
+          style={{...btnP(!foto||!estado||!ciudad||loading),
+            background:(!foto||!estado||!ciudad||loading)?C.subtle:`linear-gradient(135deg,${C.blue},#2266cc)`}}>
+          {loading?"Guardando…":"📦 Confirmar recepción"}
+        </button>
+      </div>
+    </div>
+  </>);
+}
+
+// ─── MODAL CHECKIN ────────────────────────────────────────────────────────────
+function ModalCheckin({equipo,registro,token,onConfirmar,onCerrar}){
+  const [foto,setFoto]=useState(null),[showCam,setShowCam]=useState(false);
+  const [loading,setLoading]=useState(false),[listo,setListo]=useState(false);
+
+  async function confirmar(){
+    if(!foto)return;setLoading(true);
+    try{
+      await supa("historial",{method:"POST",token,body:{
+        equipo_id:equipo.id,equipo_nombre:equipo.nombre,
+        ingeniero:registro.ingeniero,estado:registro.estado,ciudad:registro.ciudad,
+        fecha_retiro:registro.fecha_retiro,fecha_devolucion:new Date().toISOString(),
+        foto_retiro:registro.foto_retiro,foto_devolucion:foto,
+        dias:getDias(registro.fecha_retiro),tipo:registro.tipo,
+        guia_paqueteria:registro.guia_paqueteria,
+      }});
+      await supa(`registros?equipo_id=eq.${equipo.id}`,{method:"DELETE",token});
+      setListo(true);
+      setTimeout(()=>{onConfirmar(`📦 ${equipo.nombre} devuelto correctamente`);onCerrar();},1800);
+    }catch(ex){alert("Error: "+ex.message);}
+    finally{setLoading(false);}
+  }
+
+  if(listo)return(
+    <div style={{position:"fixed",inset:0,zIndex:900,background:"rgba(0,0,0,0.92)",
+      display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:"12px"}}>
+      <div style={{fontSize:"70px"}}>✅</div>
+      <p style={{color:C.green,fontSize:"20px",fontWeight:"800"}}>¡Equipo devuelto!</p>
+    </div>
+  );
+
+  return(<>
+    {showCam&&<CamaraModal titulo="Foto de DEVOLUCIÓN" onCaptura={img=>{setFoto(img);setShowCam(false);}} onCerrar={()=>setShowCam(false)}/>}
+    <div style={{position:"fixed",inset:0,zIndex:900,background:"rgba(0,0,0,0.85)",
+      display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+      <div style={{background:C.card,border:`1px solid ${C.border}`,
+        borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
+        padding:"24px 20px",width:"100%",maxWidth:"520px",maxHeight:"92vh",overflowY:"auto"}}>
+
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:"16px"}}>
+          <div>
+            <p style={{color:C.orange,fontSize:"11px",letterSpacing:"0.15em",textTransform:"uppercase",margin:"0 0 3px"}}>
+              CHECK-IN · {equipo.id}
+            </p>
+            <h2 style={{color:C.text,margin:0,fontSize:"17px",fontWeight:"800"}}>{equipo.nombre}</h2>
+          </div>
+          <button onClick={onCerrar} style={{background:"none",border:"none",color:C.muted,fontSize:"22px",cursor:"pointer"}}>✕</button>
+        </div>
+
+        <div style={{background:"#12121f",border:`1px solid ${C.border}`,borderRadius:"13px",padding:"14px",marginBottom:"16px"}}>
+          <Row label="Ingeniero" value={registro.ingeniero}/>
+          <Row label="Ciudad" value={`${registro.ciudad}, ${registro.estado}`}/>
+          <Row label="Tiempo en uso" value={getDias(registro.fecha_retiro)}/>
+          <Row label="Retiro" value={fmt(registro.fecha_retiro)} last/>
+        </div>
+
+        <p style={{color:"#aaa",fontSize:"13px",marginBottom:"4px"}}>
+          📸 <strong style={{color:C.text}}>Foto obligatoria</strong> — estado al devolver.
+        </p>
+        <p style={{color:C.muted,fontSize:"11px",marginBottom:"14px"}}>Evidencia del estado de devolución.</p>
+
+        {!foto?(
+          <button onClick={()=>setShowCam(true)}
+            style={{width:"100%",aspectRatio:"16/9",background:"#12121f",border:`2px dashed ${C.border}`,
+              borderRadius:"14px",color:C.muted,cursor:"pointer",display:"flex",flexDirection:"column",
+              alignItems:"center",justifyContent:"center",gap:"8px",marginBottom:"14px"}}>
+            <span style={{fontSize:"36px"}}>📷</span>
+            <span style={{fontSize:"13px"}}>Foto de devolución</span>
+            <span style={{fontSize:"11px",color:C.red,fontWeight:"700"}}>REQUERIDA</span>
+          </button>
+        ):(
+          <div style={{marginBottom:"14px",position:"relative"}}>
+            <img src={foto} alt="ev" style={{width:"100%",borderRadius:"14px",display:"block"}}/>
+            <button onClick={()=>{setFoto(null);setShowCam(true);}}
+              style={{position:"absolute",top:"8px",right:"8px",background:"rgba(0,0,0,0.7)",
+                border:"none",borderRadius:"20px",color:"#fff",padding:"5px 11px",fontSize:"11px",cursor:"pointer"}}>
+              🔄 Repetir
+            </button>
+          </div>
+        )}
+
+        <button onClick={confirmar} disabled={!foto||loading} style={btnP(!foto||loading)}>
+          {loading?"Guardando…":foto?"📦 Confirmar devolución":"📷 Foto requerida"}
+        </button>
+      </div>
+    </div>
+  </>);
+}
+
+// ─── PANEL ADMIN ──────────────────────────────────────────────────────────────
+function AdminPanel({token,onClose,onEquipoCreado}){
+  const [tab,setTab]=useState("equipos"); // equipos | categorias | ingenieros
+  // Equipo form
+  const [nombre,setNombre]=useState(""),[serie,setSerie]=useState("");
+  const [cat,setCat]=useState(""),[estadoB,setEstadoB]=useState("");
+  const [ciudadB,setCiudadB]=useState(""),[sitio,setSitio]=useState("");
+  const [loading,setLoading]=useState(false),[err,setErr]=useState("");
+  const [nuevoEq,setNuevoEq]=useState(null); // para mostrar QR
+  // Categorias
+  const [cats,setCats]=useState([]),[nuevaCat,setNuevaCat]=useState("");
+  const [loadCat,setLoadCat]=useState(false);
+  // Perfiles
+  const [perfiles,setPerfiles]=useState([]),[nuevoNombre,setNuevoNombre]=useState("");
+  const [editPerfil,setEditPerfil]=useState(null);
+
+  useEffect(()=>{
+    if(tab==="categorias")cargarCats();
+    if(tab==="ingenieros")cargarPerfiles();
+  },[tab]);
+
+  async function cargarCats(){
+    setLoadCat(true);
+    try{const r=await supa("categorias",{token,params:{order:"nombre.asc"}});setCats(r||[]);}
+    catch{}finally{setLoadCat(false);}
+  }
+
+  async function crearCat(){
+    if(!nuevaCat.trim())return;
+    try{
+      await supa("categorias",{method:"POST",token,body:{nombre:nuevaCat.trim()}});
+      setNuevaCat("");cargarCats();
+    }catch(ex){alert("Error: "+ex.message);}
+  }
+
+  async function borrarCat(id){
+    if(!confirm("¿Eliminar esta categoría?"))return;
+    try{await supa(`categorias?id=eq.${id}`,{method:"DELETE",token});cargarCats();}
+    catch(ex){alert("Error: "+ex.message);}
+  }
+
+  async function cargarPerfiles(){
+    try{const r=await supa("perfiles",{token,params:{order:"nombre.asc"}});setPerfiles(r||[]);}catch{}
+  }
+
+  async function guardarNombre(perfil){
+    if(!nuevoNombre.trim())return;
+    try{
+      await supa(`perfiles?id=eq.${perfil.id}`,{method:"PATCH",token,body:{nombre:nuevoNombre.trim()}});
+      setEditPerfil(null);setNuevoNombre("");cargarPerfiles();
+    }catch(ex){alert("Error: "+ex.message);}
+  }
+
+  async function crearEquipo(){
+    if(!nombre||!serie||!cat||!estadoB||!ciudadB||!sitio){setErr("Todos los campos son requeridos");return;}
+    setLoading(true);setErr("");
+    try{
+      const existentes=await supa("equipos",{token,params:{select:"id",order:"created_at.desc",limit:"1"}});
+      let next=1;
+      if(existentes&&existentes.length>0){
+        const num=parseInt(existentes[0].id.replace("EQ-",""))||0;next=num+1;
+      }
+      const id=`EQ-${String(next).padStart(3,"0")}`;
+      const eq={id,nombre,serie,categoria:cat,estado_base:estadoB,ciudad_base:ciudadB,sitio_base:sitio,activo:true};
+      await supa("equipos",{method:"POST",token,body:eq});
+      setNuevoEq(eq);
+      onEquipoCreado();
+      setNombre("");setSerie("");setCat("");setEstadoB("");setCiudadB("");setSitio("");
+    }catch(ex){setErr(ex.message);}
+    finally{setLoading(false);}
+  }
+
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:2000,background:"rgba(0,0,0,0.88)",
+      display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+      {nuevoEq&&<QRLabel equipo={nuevoEq} onCerrar={()=>setNuevoEq(null)}/>}
+      <div style={{background:C.card,border:`1px solid ${C.border}`,
+        borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
+        padding:"24px 20px",width:"100%",maxWidth:"520px",maxHeight:"94vh",overflowY:"auto"}}>
+
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:"18px"}}>
+          <div>
+            <p style={{color:C.blue,fontSize:"11px",letterSpacing:"0.15em",textTransform:"uppercase",margin:"0 0 3px"}}>
+              PANEL ADMINISTRADOR
+            </p>
+            <h2 style={{color:C.text,margin:0,fontSize:"18px",fontWeight:"800"}}>Gestión</h2>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",color:C.muted,fontSize:"22px",cursor:"pointer"}}>✕</button>
+        </div>
+
+        {/* Tabs admin */}
+        <div style={{display:"flex",gap:"6px",marginBottom:"20px"}}>
+          {[{k:"equipos",l:"⚡ Equipos"},{k:"categorias",l:"🏷 Categorías"},{k:"ingenieros",l:"👤 Ingenieros"}].map(t=>(
+            <button key={t.k} onClick={()=>setTab(t.k)}
+              style={{flex:1,padding:"8px 4px",background:tab===t.k?C.subtle:"transparent",
+                border:`1px solid ${tab===t.k?C.border:"transparent"}`,
+                borderRadius:"9px",color:tab===t.k?C.text:C.muted,
+                fontWeight:"700",fontSize:"11px",cursor:"pointer",fontFamily:"inherit"}}>
+              {t.l}
             </button>
           ))}
         </div>
 
-        {/* Lista equipos */}
-        {vista === "equipos" && (
-          loading ? <Spinner /> :
-          <div style={{ padding:"0 20px", display:"flex", flexDirection:"column", gap:"11px" }}>
-            {equiposFiltrados.length === 0 && (
-              <div style={{ textAlign:"center", padding:"50px 20px", color:C.muted }}>
-                <div style={{ fontSize:"38px", marginBottom:"10px" }}>🔍</div>
-                <p style={{ fontSize:"14px" }}>Sin resultados</p>
-              </div>
-            )}
-            {equiposFiltrados.map((equipo, i) => {
-              const reg = registros[equipo.id];
-              const alerta = reg && parseInt(getDias(reg.fecha_retiro)) > 7;
-              return (
-                <div key={equipo.id} className="eq-card" onClick={()=>abrirEquipo(equipo)}
-                  style={{ background:C.card,
-                    border:`1px solid ${alerta?"#ff3b3b33":reg?"#ff950022":C.border}`,
-                    borderRadius:"17px", padding:"17px", cursor:"pointer",
-                    animation:`slideUp 0.3s ease ${i*0.04}s both`, position:"relative", overflow:"hidden" }}>
-                  {alerta && <div style={{ position:"absolute", top:0, left:0, right:0, height:"2px",
-                    background:`linear-gradient(90deg,${C.red},${C.orange})` }} />}
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-                    <div style={{ flex:1 }}>
-                      <div style={{ display:"flex", alignItems:"center", gap:"7px", marginBottom:"6px", flexWrap:"wrap" }}>
-                        <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"10px", color:C.muted,
-                          background:"#12121f", padding:"2px 7px", borderRadius:"5px" }}>{equipo.id}</span>
-                        <Badge registro={reg} />
-                      </div>
-                      <h3 style={{ fontSize:"14px", fontWeight:"700", marginBottom:"3px", color:"#eee" }}>
-                        {equipo.nombre}
-                      </h3>
-                      <p style={{ fontSize:"11px", color:C.muted }}>
-                        {equipo.categoria} · Base: {equipo.sitio_base}, {equipo.ciudad_base}
-                      </p>
-                      {reg && (
-                        <div style={{ marginTop:"11px", paddingTop:"11px", borderTop:`1px solid ${C.border}` }}>
-                          <p style={{ fontSize:"13px", color:"#aaa" }}>
-                            👤 <strong style={{ color:"#ddd" }}>{reg.ingeniero}</strong>
-                          </p>
-                          <p style={{ fontSize:"11px", color:C.muted, marginTop:"2px" }}>
-                            📍 {reg.ciudad}, {reg.estado} · desde {fmt(reg.fecha_retiro)}
-                          </p>
-                          {reg.tipo === "paqueteria" && <p style={{ fontSize:"11px", color:C.blue, marginTop:"3px" }}>
-                            📦 En tránsito{reg.guia_paqueteria ? ` · ${reg.guia_paqueteria}` : ""}
-                          </p>}
-                          {alerta && <p style={{ fontSize:"11px", color:C.red, marginTop:"5px", fontWeight:"700" }}>
-                            ⚠️ Más de 7 días — requiere atención
-                          </p>}
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ width:"42px", height:"42px", background: reg ? C.orangeDark : C.greenDark,
-                      borderRadius:"11px", flexShrink:0, marginLeft:"11px",
-                      display:"flex", alignItems:"center", justifyContent:"center", fontSize:"18px" }}>
-                      {reg ? "📤" : "📥"}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+        {/* Tab: Nuevo equipo */}
+        {tab==="equipos"&&<div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
+          <div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+              NOMBRE DEL EQUIPO <span style={{color:C.red}}>*</span>
+            </label>
+            <input value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Ej. Multímetro Fluke 87V" style={inp}/>
           </div>
+          <div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+              NÚMERO DE SERIE <span style={{color:C.red}}>*</span>
+            </label>
+            <input value={serie} onChange={e=>setSerie(e.target.value)} placeholder="Ej. FL87V-2024-001" style={inp}/>
+          </div>
+          <div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+              CATEGORÍA <span style={{color:C.red}}>*</span>
+            </label>
+            <CatSelect token={token} value={cat} onChange={setCat}/>
+          </div>
+          <div style={{borderTop:`1px solid ${C.border}`,paddingTop:"14px"}}>
+            <p style={{color:C.blue,fontSize:"11px",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"10px"}}>
+              📍 UBICACIÓN BASE
+            </p>
+            <EstadoCiudad estado={estadoB} ciudad={ciudadB} onEstado={setEstadoB} onCiudad={setCiudadB}/>
+          </div>
+          <div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+              SITIO / EDIFICIO BASE <span style={{color:C.red}}>*</span>
+            </label>
+            <input value={sitio} onChange={e=>setSitio(e.target.value)} placeholder="Ej. Puente de Vigas — Piso 3" style={inp}/>
+          </div>
+          {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",padding:"10px 14px",borderRadius:"9px"}}>⚠️ {err}</p>}
+          <button onClick={crearEquipo} disabled={loading} style={btnP(loading)}>
+            {loading?"Creando…":"✅ Crear equipo"}
+          </button>
+          <p style={{color:C.muted,fontSize:"11px",textAlign:"center"}}>
+            Al crear el equipo se genera automáticamente su etiqueta QR para imprimir.
+          </p>
+        </div>}
+
+        {/* Tab: Categorías */}
+        {tab==="categorias"&&<div>
+          <div style={{display:"flex",gap:"8px",marginBottom:"16px"}}>
+            <input value={nuevaCat} onChange={e=>setNuevaCat(e.target.value)}
+              placeholder="Nueva categoría…" style={{...inp,flex:1}}
+              onKeyDown={e=>e.key==="Enter"&&crearCat()}/>
+            <button onClick={crearCat}
+              style={{padding:"13px 18px",background:`linear-gradient(135deg,${C.green},#00c066)`,
+                border:"none",borderRadius:"11px",color:"#001a0d",fontWeight:"800",
+                cursor:"pointer",fontFamily:"inherit",fontSize:"20px"}}>+</button>
+          </div>
+          {loadCat?<Spin/>:(
+            <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
+              {cats.map(c=>(
+                <div key={c.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+                  background:"#12121f",border:`1px solid ${C.border}`,borderRadius:"11px",padding:"12px 14px"}}>
+                  <span style={{fontSize:"14px",color:C.text}}>🏷 {c.nombre}</span>
+                  <button onClick={()=>borrarCat(c.id)}
+                    style={{background:"transparent",border:`1px solid ${C.red}33`,borderRadius:"8px",
+                      color:C.red,padding:"4px 10px",cursor:"pointer",fontSize:"12px",fontFamily:"inherit"}}>
+                    Borrar
+                  </button>
+                </div>
+              ))}
+              {cats.length===0&&<p style={{textAlign:"center",color:C.muted,padding:"20px",fontSize:"13px"}}>
+                Sin categorías aún
+              </p>}
+            </div>
+          )}
+        </div>}
+
+        {/* Tab: Ingenieros */}
+        {tab==="ingenieros"&&<div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
+          <p style={{color:C.muted,fontSize:"12px",marginBottom:"4px"}}>
+            Aquí puedes editar el nombre visible de cada ingeniero registrado.
+          </p>
+          {perfiles.map(p=>(
+            <div key={p.id} style={{background:"#12121f",border:`1px solid ${C.border}`,
+              borderRadius:"11px",padding:"12px 14px"}}>
+              {editPerfil===p.id?(
+                <div style={{display:"flex",gap:"8px"}}>
+                  <input value={nuevoNombre} onChange={e=>setNuevoNombre(e.target.value)}
+                    style={{...inp,flex:1,padding:"9px 12px",fontSize:"13px"}}
+                    placeholder="Nombre completo"/>
+                  <button onClick={()=>guardarNombre(p)}
+                    style={{padding:"9px 14px",background:`linear-gradient(135deg,${C.green},#00c066)`,
+                      border:"none",borderRadius:"9px",color:"#001a0d",fontWeight:"800",
+                      cursor:"pointer",fontFamily:"inherit"}}>✓</button>
+                  <button onClick={()=>{setEditPerfil(null);setNuevoNombre("");}}
+                    style={{padding:"9px 12px",background:"transparent",border:`1px solid ${C.border}`,
+                      borderRadius:"9px",color:C.muted,cursor:"pointer",fontFamily:"inherit"}}>✕</button>
+                </div>
+              ):(
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                  <div>
+                    <p style={{fontSize:"14px",fontWeight:"700",color:C.text,margin:0}}>{p.nombre}</p>
+                    <p style={{fontSize:"11px",color:C.muted,margin:"2px 0 0"}}>{p.email}</p>
+                  </div>
+                  <button onClick={()=>{setEditPerfil(p.id);setNuevoNombre(p.nombre);}}
+                    style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:"8px",
+                      color:C.muted,padding:"4px 10px",cursor:"pointer",fontSize:"12px",fontFamily:"inherit"}}>
+                    Editar
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+          {perfiles.length===0&&<p style={{textAlign:"center",color:C.muted,padding:"20px",fontSize:"13px"}}>
+            Sin ingenieros registrados aún
+          </p>}
+        </div>}
+      </div>
+    </div>
+  );
+}
+
+// Selector de categoría con carga dinámica desde Supabase
+function CatSelect({token,value,onChange}){
+  const [cats,setCats]=useState([]);
+  useEffect(()=>{
+    supa("categorias",{token,params:{order:"nombre.asc"}}).then(r=>setCats(r||[])).catch(()=>{});
+  },[]);
+  return(
+    <select value={value} onChange={e=>onChange(e.target.value)}
+      style={{...inp,cursor:"pointer",color:value?C.text:C.muted}}>
+      <option value="">Selecciona categoría…</option>
+      {cats.map(c=><option key={c.id} value={c.nombre}>{c.nombre}</option>)}
+    </select>
+  );
+}
+
+// ─── MAPA ─────────────────────────────────────────────────────────────────────
+function MapaModal({registros,equipos,onCerrar}){
+  const mapRef=useRef(),mapInst=useRef();
+  useEffect(()=>{
+    if(!document.getElementById("lf-css")){
+      const l=document.createElement("link");
+      l.id="lf-css";l.rel="stylesheet";
+      l.href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
+      document.head.appendChild(l);
+    }
+    function init(){
+      if(mapInst.current||!mapRef.current)return;
+      const L=window.L;
+      // Centro en México, zoom 5
+      mapInst.current=L.map(mapRef.current,{zoomControl:true}).setView([23.5,-102],5);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {attribution:"© OpenStreetMap",maxZoom:18}).addTo(mapInst.current);
+
+      // Equipos disponibles — pin verde en su estado base
+      equipos.filter(eq=>!registros[eq.id]).forEach(eq=>{
+        const coords=COORDS_ESTADO[eq.estado_base];if(!coords)return;
+        const icon=L.divIcon({className:"",
+          html:`<div style="background:${C.green};color:#001a0d;border-radius:50%;width:28px;height:28px;
+            display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid #fff;
+            box-shadow:0 2px 8px rgba(0,0,0,0.3)">✓</div>`,
+          iconSize:[28,28],iconAnchor:[14,14]});
+        L.marker(coords,{icon}).addTo(mapInst.current)
+          .bindPopup(`<div style="font-size:13px;font-family:sans-serif;min-width:160px">
+            <b style="color:#00aa55">✅ Disponible</b><hr style="margin:5px 0">
+            <b>${eq.nombre}</b><br>${eq.sitio_base}<br>${eq.ciudad_base}, ${eq.estado_base}</div>`);
+      });
+
+      // Equipos en uso — agrupar por estado
+      const porEstado={};
+      equipos.filter(eq=>registros[eq.id]).forEach(eq=>{
+        const reg=registros[eq.id];
+        const key=reg.estado;
+        if(!porEstado[key])porEstado[key]=[];
+        porEstado[key].push({eq,reg});
+      });
+
+      Object.entries(porEstado).forEach(([estado,items])=>{
+        const coords=COORDS_ESTADO[estado];if(!coords)return;
+        const tienePaq=items.some(({reg})=>reg.tipo==="paqueteria");
+        const alerta=items.some(({reg})=>parseInt(getDias(reg.fecha_retiro))>7);
+        const color=tienePaq?C.blue:alerta?C.red:C.orange;
+        const icon=L.divIcon({className:"",
+          html:`<div style="background:${color};color:#fff;border-radius:50%;width:34px;height:34px;
+            display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;
+            border:3px solid #fff;box-shadow:0 2px 12px rgba(0,0,0,0.4)">${items.length}</div>`,
+          iconSize:[34,34],iconAnchor:[17,17]});
+        const popup=items.map(({eq,reg})=>
+          `<b>${eq.nombre}</b><br>👤 ${reg.ingeniero}<br>📍 ${reg.ciudad}
+           <br>⏱ ${getDias(reg.fecha_retiro)}${reg.tipo==="paqueteria"?"<br>📦 En tránsito":""}`
+        ).join("<hr style='margin:5px 0'>");
+        L.marker(coords,{icon}).addTo(mapInst.current)
+          .bindPopup(`<div style="font-size:13px;font-family:sans-serif;min-width:180px">
+            <b style="color:${C.orange}">📍 ${estado}</b><hr style="margin:5px 0">${popup}</div>`);
+      });
+    }
+    if(window.L)init();
+    else{
+      const s=document.createElement("script");
+      s.src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
+      s.onload=init;document.head.appendChild(s);
+    }
+    return()=>{mapInst.current?.remove();mapInst.current=null;};
+  },[]);
+
+  const enUso=Object.keys(registros).length;
+  const disponibles=equipos.length-enUso;
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:1500,background:C.bg,display:"flex",flexDirection:"column"}}>
+      <div style={{padding:"18px 20px 10px",display:"flex",justifyContent:"space-between",alignItems:"center",
+        background:`linear-gradient(180deg,${C.card},transparent)`}}>
+        <div>
+          <h2 style={{margin:0,fontSize:"17px",fontWeight:"800",color:C.text}}>🗺 Mapa de equipos</h2>
+          <p style={{color:C.muted,fontSize:"11px",margin:"2px 0 0",fontFamily:"'JetBrains Mono',monospace"}}>
+            {enUso} en campo · {disponibles} disponibles · OpenStreetMap (sin costo)
+          </p>
+        </div>
+        <button onClick={onCerrar} style={{background:"#12121f",border:`1px solid ${C.border}`,
+          borderRadius:"11px",color:"#aaa",padding:"8px 14px",cursor:"pointer",fontSize:"13px",fontFamily:"inherit"}}>
+          ✕ Cerrar
+        </button>
+      </div>
+      <div style={{display:"flex",gap:"10px",padding:"0 20px 10px",flexWrap:"wrap"}}>
+        {[{c:C.green,l:"✓ Disponible"},{c:C.orange,l:"En uso"},{c:C.red,l:"+7 días"},{c:C.blue,l:"📦 Tránsito"}].map(x=>(
+          <div key={x.l} style={{display:"flex",alignItems:"center",gap:"5px"}}>
+            <div style={{width:"12px",height:"12px",borderRadius:"50%",background:x.c}}/>
+            <span style={{fontSize:"10px",color:C.muted}}>{x.l}</span>
+          </div>
+        ))}
+      </div>
+      <div ref={mapRef} style={{flex:1}}/>
+    </div>
+  );
+}
+
+// ─── APP ──────────────────────────────────────────────────────────────────────
+export default function App(){
+  const [session,setSession]=useState(null);
+  const [equipos,setEquipos]=useState([]);
+  const [regsArr,setRegsArr]=useState([]);
+  const [historial,setHistorial]=useState([]);
+  const [perfiles,setPerfiles]=useState([]);
+  const [loading,setLoading]=useState(false);
+  const [sel,setSel]=useState(null);
+  const [modo,setModo]=useState(null); // checkout|checkin|recepcion
+  const [showAdmin,setShowAdmin]=useState(false);
+  const [showMapa,setShowMapa]=useState(false);
+  const [vista,setVista]=useState("equipos");
+  const [filtro,setFiltro]=useState("todas");
+  const [busq,setBusq]=useState("");
+  const [toast,setToast]=useState(null);
+
+  const isAdmin=session&&ADMIN_EMAILS.includes(session.email);
+  const registros={};
+  regsArr.forEach(r=>{registros[r.equipo_id]=r;});
+
+  function showToast(msg,ok=true){setToast({msg,ok});setTimeout(()=>setToast(null),3200);}
+
+  async function cargar(token){
+    setLoading(true);
+    try{
+      const [eqs,regs,hist,prfs]=await Promise.all([
+        supa("equipos",{token,params:{order:"created_at.asc",activo:"eq.true"}}),
+        supa("registros",{token,params:{order:"fecha_retiro.desc"}}),
+        supa("historial",{token,params:{order:"fecha_devolucion.desc",limit:"50"}}),
+        supa("perfiles",{token,params:{order:"nombre.asc"}}),
+      ]);
+      setEquipos(eqs||[]);setRegsArr(regs||[]);setHistorial(hist||[]);setPerfiles(prfs||[]);
+    }catch(ex){showToast("Error cargando datos",false);}
+    finally{setLoading(false);}
+  }
+
+  function handleLogin(s){
+    setSession(s);
+    if(!s.necesitaNombre) cargar(s.token);
+  }
+  function cerrar(){setSel(null);setModo(null);}
+  function onAccion(msg){showToast(msg);cargar(session.token);cerrar();}
+
+  function abrir(eq){
+    setSel(eq);
+    const reg=registros[eq.id];
+    if(!reg){setModo("checkout");return;}
+    if(reg.tipo==="paqueteria"){setModo("recepcion");return;}
+    setModo("checkin");
+  }
+
+  const ciudadesEnUso=[...new Set(regsArr.map(r=>r.ciudad))].sort();
+  const filtrados=equipos.filter(eq=>{
+    const mb=eq.nombre.toLowerCase().includes(busq.toLowerCase())||eq.id.toLowerCase().includes(busq.toLowerCase());
+    const reg=registros[eq.id];
+    const mc=filtro==="todas"||(filtro==="disponibles"&&!reg)||(reg&&reg.ciudad===filtro);
+    return mb&&mc;
+  });
+
+  const enUso=regsArr.length, disponibles=equipos.length-enUso;
+
+  if(!session)return <Login onLogin={handleLogin}/>;
+  if(session.necesitaNombre)return <RegistroNombre sessionTemp={session}
+    onComplete={s=>{ setSession({...s,necesitaNombre:false}); cargar(s.token); }}/>;
+
+  return(<>
+    <style>{`
+      @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+      *{box-sizing:border-box;margin:0;padding:0}
+      html,body{background:${C.bg};-webkit-text-size-adjust:100%}
+      ::-webkit-scrollbar{width:4px}
+      ::-webkit-scrollbar-thumb{background:${C.border};border-radius:4px}
+      input::placeholder,textarea::placeholder{color:${C.muted}}
+      select option{background:#12121f;color:#fff}
+      @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+      @keyframes slideUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+      @keyframes spin{to{transform:rotate(360deg)}}
+      .eq-card{transition:transform 0.1s}
+      .eq-card:active{transform:scale(0.985)}
+    `}</style>
+
+    <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'Sora',sans-serif",
+      color:C.text,
+      maxWidth:"480px", // Más estrecho para móvil
+      margin:"0 auto",paddingBottom:"80px"}}>
+
+      {toast&&<Toast {...toast}/>}
+
+      {/* ── Header ── */}
+      <div style={{padding:"env(safe-area-inset-top, 16px) 16px 0",
+        paddingTop:"max(env(safe-area-inset-top), 16px)",
+        background:`linear-gradient(180deg,${C.card} 60%,transparent)`,
+        position:"sticky",top:0,zIndex:100,backdropFilter:"blur(20px)"}}>
+
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"14px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
+            <div style={{width:"38px",height:"38px",background:`linear-gradient(135deg,${C.green},#00c066)`,
+              borderRadius:"11px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"18px"}}>⚡</div>
+            <div>
+              <h1 style={{fontSize:"17px",fontWeight:"800",lineHeight:1}}>EquipoTrack</h1>
+              <p style={{fontSize:"10px",color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>
+                {session.nombre}
+                {isAdmin&&<span style={{color:C.blue,marginLeft:"6px"}}>· ADMIN</span>}
+              </p>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:"6px"}}>
+            {isAdmin&&(
+              <button onClick={()=>setShowAdmin(true)}
+                style={{background:"#0a0a20",border:`1px solid ${C.blue}44`,borderRadius:"10px",
+                  padding:"8px 12px",cursor:"pointer",color:C.blue,
+                  fontFamily:"'Sora',sans-serif",fontSize:"12px",fontWeight:"700"}}>
+                ⚙️
+              </button>
+            )}
+            <button onClick={()=>setShowMapa(true)}
+              style={{display:"flex",alignItems:"center",gap:"5px",
+                background:enUso>0?"#12121f":C.card,border:`1px solid ${C.border}`,
+                borderRadius:"10px",padding:"8px 12px",cursor:"pointer",
+                color:enUso>0?C.text:C.muted,fontFamily:"'Sora',sans-serif",fontSize:"12px",fontWeight:"700"}}>
+              🗺
+              {enUso>0&&<span style={{background:C.orange,color:"#1a0a00",borderRadius:"10px",
+                padding:"1px 6px",fontSize:"10px",fontWeight:"800"}}>{enUso}</span>}
+            </button>
+            <button onClick={()=>setSession(null)}
+              style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:"10px",
+                padding:"8px 10px",cursor:"pointer",color:C.muted,fontSize:"13px"}}>↩</button>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
+          {[{label:"Disponibles",val:disponibles,color:C.green},
+            {label:"En uso",val:enUso,color:C.orange},
+            {label:"Total",val:equipos.length,color:"#888"}].map(s=>(
+            <div key={s.label} style={{flex:1,background:C.card,border:`1px solid ${C.border}`,
+              borderRadius:"12px",padding:"10px",textAlign:"center"}}>
+              <div style={{fontSize:"20px",fontWeight:"800",color:s.color}}>{s.val}</div>
+              <div style={{fontSize:"9px",color:C.muted,letterSpacing:"0.08em",
+                textTransform:"uppercase",marginTop:"2px"}}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Búsqueda */}
+        {vista==="equipos"&&(
+          <input value={busq} onChange={e=>setBusq(e.target.value)}
+            placeholder="Buscar equipo o código…"
+            style={{...inp,marginBottom:"10px",fontSize:"14px"}}/>
         )}
 
-        {/* Historial */}
-        {vista === "historial" && (
-          loading ? <Spinner /> :
-          <div style={{ padding:"0 20px" }}>
-            {historial.length === 0 ? (
-              <div style={{ textAlign:"center", padding:"60px 20px", color:C.muted }}>
-                <div style={{ fontSize:"46px", marginBottom:"12px" }}>📋</div>
-                <p style={{ fontSize:"14px" }}>Aún no hay devoluciones registradas</p>
-              </div>
-            ) : (
-              <div style={{ display:"flex", flexDirection:"column", gap:"11px" }}>
-                {historial.map((h, i) => (
-                  <div key={h.id} style={{ background:C.card, border:`1px solid ${C.border}`,
-                    borderRadius:"15px", overflow:"hidden", animation:`slideUp 0.3s ease ${i*0.04}s both` }}>
-                    <div style={{ padding:"15px" }}>
-                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"9px" }}>
-                        <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"10px", color:C.muted,
-                          background:"#12121f", padding:"2px 7px", borderRadius:"5px" }}>{h.equipo_id}</span>
-                        <span style={{ fontSize:"10px", color:C.green, background:C.greenDark,
-                          padding:"2px 9px", borderRadius:"20px", fontWeight:"700" }}>{h.dias} en uso</span>
-                      </div>
-                      <p style={{ fontWeight:"700", fontSize:"14px", marginBottom:"8px" }}>{h.equipo_nombre}</p>
-                      <Row label="Ingeniero"   value={h.ingeniero} />
-                      <Row label="Ciudad"      value={`${h.ciudad}, ${h.estado}`} />
-                      {h.guia_paqueteria && <Row label="Guía" value={h.guia_paqueteria} />}
-                      <Row label="Retiro"      value={fmt(h.fecha_retiro)} />
-                      <Row label="Devolución"  value={fmt(h.fecha_devolucion)} last />
-                    </div>
-                    {(h.foto_retiro || h.foto_devolucion) && (
-                      <div style={{ display:"flex", gap:"2px" }}>
-                        {h.foto_retiro && <div style={{ flex:1, position:"relative" }}>
-                          <img src={h.foto_retiro} alt="retiro"
-                            style={{ width:"100%", height:"80px", objectFit:"cover", display:"block" }} />
-                          <span style={{ position:"absolute", bottom:"5px", left:"5px",
-                            background:"rgba(0,0,0,0.75)", fontSize:"9px", color:"#aaa",
-                            padding:"2px 5px", borderRadius:"4px" }}>📤 Retiro</span>
-                        </div>}
-                        {h.foto_devolucion && <div style={{ flex:1, position:"relative" }}>
-                          <img src={h.foto_devolucion} alt="dev"
-                            style={{ width:"100%", height:"80px", objectFit:"cover", display:"block" }} />
-                          <span style={{ position:"absolute", bottom:"5px", left:"5px",
-                            background:"rgba(0,0,0,0.75)", fontSize:"9px", color:"#aaa",
-                            padding:"2px 5px", borderRadius:"4px" }}>📦 Dev.</span>
-                        </div>}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+        {/* Filtros */}
+        {vista==="equipos"&&(
+          <div style={{display:"flex",gap:"6px",overflowX:"auto",paddingBottom:"12px",scrollbarWidth:"none"}}>
+            {[{key:"todas",label:"Todos"},{key:"disponibles",label:"Disponibles"},
+              ...ciudadesEnUso.map(c=>({key:c,label:c}))].map(f=>(
+              <button key={f.key} onClick={()=>setFiltro(f.key)}
+                style={{flexShrink:0,padding:"6px 12px",
+                  background:filtro===f.key?C.green:C.card,
+                  border:`1px solid ${filtro===f.key?C.green:C.border}`,
+                  borderRadius:"20px",cursor:"pointer",whiteSpace:"nowrap",
+                  color:filtro===f.key?"#001a0d":C.muted,
+                  fontWeight:filtro===f.key?"700":"500",
+                  fontSize:"11px",fontFamily:"'Sora',sans-serif"}}>
+                {f.label}
+              </button>
+            ))}
           </div>
         )}
       </div>
 
-      {/* Modales */}
-      {showAdmin && <AdminPanel token={session.token}
-        onClose={() => setShowAdmin(false)}
-        onEquipoCreado={() => { cargar(session.token); mostrarToast("✅ Equipo creado en Supabase"); }} />}
+      {/* Tabs */}
+      <div style={{display:"flex",padding:"0 16px 16px"}}>
+        {["equipos","historial"].map(v=>(
+          <button key={v} onClick={()=>setVista(v)}
+            style={{flex:1,padding:"10px",background:vista===v?C.card:"transparent",
+              border:"1px solid",borderColor:vista===v?C.border:"transparent",
+              borderRadius:v==="equipos"?"10px 0 0 10px":"0 10px 10px 0",
+              color:vista===v?C.green:C.muted,fontWeight:"700",fontSize:"12px",
+              cursor:"pointer",letterSpacing:"0.05em",textTransform:"uppercase",
+              fontFamily:"'Sora',sans-serif",transition:"all 0.2s"}}>
+            {v==="equipos"?"⚡ Equipos":"📋 Historial"}
+          </button>
+        ))}
+      </div>
 
-      {modoModal === "checkout" && seleccionado && (
-        <ModalCheckout equipo={seleccionado} token={session.token}
-          onConfirmar={() => onAccion(`✅ ${seleccionado.nombre} asignado`)}
-          onCerrar={cerrarModal} />
+      {/* Lista equipos */}
+      {vista==="equipos"&&(loading?<Spin/>:
+        <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:"10px"}}>
+          {filtrados.length===0&&(
+            <div style={{textAlign:"center",padding:"50px 20px",color:C.muted}}>
+              <div style={{fontSize:"36px",marginBottom:"10px"}}>🔍</div>
+              <p style={{fontSize:"14px"}}>Sin resultados</p>
+            </div>
+          )}
+          {filtrados.map((eq,i)=>{
+            const reg=registros[eq.id];
+            const alerta=reg&&parseInt(getDias(reg.fecha_retiro))>7;
+            const esPaq=reg&&reg.tipo==="paqueteria";
+            return(
+              <div key={eq.id} className="eq-card" onClick={()=>abrir(eq)}
+                style={{background:C.card,
+                  border:`1px solid ${alerta?"#ff3b3b33":esPaq?"#4a9eff22":reg?"#ff950022":C.border}`,
+                  borderRadius:"16px",padding:"15px",cursor:"pointer",
+                  animation:`slideUp 0.3s ease ${i*0.04}s both`,
+                  position:"relative",overflow:"hidden"}}>
+                {alerta&&<div style={{position:"absolute",top:0,left:0,right:0,height:"2px",
+                  background:`linear-gradient(90deg,${C.red},${C.orange})`}}/>}
+                {esPaq&&<div style={{position:"absolute",top:0,left:0,right:0,height:"2px",
+                  background:`linear-gradient(90deg,${C.blue},#2266cc)`}}/>}
+
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",alignItems:"center",gap:"6px",marginBottom:"5px",flexWrap:"wrap"}}>
+                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",color:C.muted,
+                        background:"#12121f",padding:"2px 6px",borderRadius:"5px",flexShrink:0}}>{eq.id}</span>
+                      <Badge reg={reg}/>
+                    </div>
+                    <h3 style={{fontSize:"14px",fontWeight:"700",marginBottom:"2px",color:"#eee",
+                      overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{eq.nombre}</h3>
+                    <p style={{fontSize:"11px",color:C.muted}}>{eq.categoria} · Base: {eq.ciudad_base}</p>
+                    {reg&&(
+                      <div style={{marginTop:"10px",paddingTop:"10px",borderTop:`1px solid ${C.border}`}}>
+                        <p style={{fontSize:"13px",color:"#aaa"}}>
+                          👤 <strong style={{color:"#ddd"}}>{reg.ingeniero}</strong>
+                        </p>
+                        <p style={{fontSize:"11px",color:C.muted,marginTop:"2px"}}>
+                          📍 {reg.ciudad}, {reg.estado} · {getDias(reg.fecha_retiro)}
+                        </p>
+                        {esPaq&&<p style={{fontSize:"11px",color:C.blue,marginTop:"3px",fontWeight:"700"}}>
+                          📦 En tránsito{reg.guia_paqueteria?` · ${reg.guia_paqueteria}`:""} — Toca para confirmar recepción
+                        </p>}
+                        {alerta&&!esPaq&&<p style={{fontSize:"11px",color:C.red,marginTop:"4px",fontWeight:"700"}}>
+                          ⚠️ +7 días — requiere atención
+                        </p>}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{width:"40px",height:"40px",
+                    background:esPaq?C.blueDk:reg?C.orangeDk:C.greenDk,
+                    borderRadius:"10px",flexShrink:0,marginLeft:"10px",
+                    display:"flex",alignItems:"center",justifyContent:"center",fontSize:"18px"}}>
+                    {esPaq?"📦":reg?"📤":"📥"}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
-      {modoModal === "checkin" && seleccionado && (
-        <ModalCheckin equipo={seleccionado} registro={registros[seleccionado.id]} token={session.token}
-          onConfirmar={() => onAccion(`📦 ${seleccionado.nombre} devuelto`)}
-          onCerrar={cerrarModal} />
+
+      {/* Historial */}
+      {vista==="historial"&&(loading?<Spin/>:
+        <div style={{padding:"0 16px"}}>
+          {historial.length===0?(
+            <div style={{textAlign:"center",padding:"60px 20px",color:C.muted}}>
+              <div style={{fontSize:"44px",marginBottom:"12px"}}>📋</div>
+              <p style={{fontSize:"14px"}}>Aún no hay devoluciones</p>
+            </div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
+              {historial.map((h,i)=>(
+                <div key={h.id} style={{background:C.card,border:`1px solid ${C.border}`,
+                  borderRadius:"14px",overflow:"hidden",
+                  animation:`slideUp 0.3s ease ${i*0.04}s both`}}>
+                  <div style={{padding:"14px"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:"8px"}}>
+                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",color:C.muted,
+                        background:"#12121f",padding:"2px 6px",borderRadius:"5px"}}>{h.equipo_id}</span>
+                      <span style={{fontSize:"10px",color:C.green,background:C.greenDk,
+                        padding:"2px 8px",borderRadius:"20px",fontWeight:"700"}}>{h.dias} en uso</span>
+                    </div>
+                    <p style={{fontWeight:"700",fontSize:"13px",marginBottom:"8px"}}>{h.equipo_nombre}</p>
+                    <Row label="Ingeniero" value={h.ingeniero}/>
+                    <Row label="Ciudad" value={`${h.ciudad}, ${h.estado}`}/>
+                    {h.guia_paqueteria&&<Row label="Guía" value={h.guia_paqueteria}/>}
+                    <Row label="Retiro" value={fmt(h.fecha_retiro)}/>
+                    <Row label="Devolución" value={fmt(h.fecha_devolucion)} last/>
+                  </div>
+                  {(h.foto_retiro||h.foto_devolucion)&&(
+                    <div style={{display:"flex",gap:"2px"}}>
+                      {h.foto_retiro&&<div style={{flex:1,position:"relative"}}>
+                        <img src={h.foto_retiro} alt="r" style={{width:"100%",height:"72px",objectFit:"cover",display:"block"}}/>
+                        <span style={{position:"absolute",bottom:"4px",left:"4px",background:"rgba(0,0,0,0.75)",
+                          fontSize:"9px",color:"#aaa",padding:"2px 5px",borderRadius:"4px"}}>📤 Retiro</span>
+                      </div>}
+                      {h.foto_devolucion&&<div style={{flex:1,position:"relative"}}>
+                        <img src={h.foto_devolucion} alt="d" style={{width:"100%",height:"72px",objectFit:"cover",display:"block"}}/>
+                        <span style={{position:"absolute",bottom:"4px",left:"4px",background:"rgba(0,0,0,0.75)",
+                          fontSize:"9px",color:"#aaa",padding:"2px 5px",borderRadius:"4px"}}>📦 Dev.</span>
+                      </div>}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
-      {showMapa && <MapaModal registros={registros} equipos={equipos} onCerrar={() => setShowMapa(false)} />}
-    </>
-  );
+    </div>
+
+    {/* Modales */}
+    {showAdmin&&<AdminPanel token={session.token}
+      onClose={()=>setShowAdmin(false)}
+      onEquipoCreado={()=>cargar(session.token)}/>}
+
+    {modo==="checkout"&&sel&&<ModalCheckout equipo={sel} token={session.token}
+      session={session} perfiles={perfiles}
+      onConfirmar={onAccion} onCerrar={cerrar}/>}
+
+    {modo==="recepcion"&&sel&&<ModalRecepcion equipo={sel} registro={registros[sel.id]}
+      token={session.token} session={session}
+      onConfirmar={onAccion} onCerrar={cerrar}/>}
+
+    {modo==="checkin"&&sel&&<ModalCheckin equipo={sel} registro={registros[sel.id]}
+      token={session.token}
+      onConfirmar={onAccion} onCerrar={cerrar}/>}
+
+    {showMapa&&<MapaModal registros={registros} equipos={equipos} onCerrar={()=>setShowMapa(false)}/>}
+  </>);
 }
-

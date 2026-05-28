@@ -371,7 +371,94 @@ function QRLabel({equipo,onCerrar}){
   );
 }
 
-// ─── PANTALLA REGISTRO DE NOMBRE ─────────────────────────────────────────────
+// ─── RESET CONTRASEÑA ─────────────────────────────────────────────────────────
+function ResetPassword({onVolver}){
+  const [email,setEmail]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [enviado,setEnviado]=useState(false);
+  const [err,setErr]=useState("");
+
+  async function enviar(e){
+    e.preventDefault();
+    setLoading(true);setErr("");
+    try{
+      const res=await fetch(`${SUPA_URL}/auth/v1/recover`,{
+        method:"POST",
+        headers:{"apikey":SUPA_KEY,"Content-Type":"application/json"},
+        body:JSON.stringify({email}),
+      });
+      if(!res.ok){const d=await res.json();throw new Error(d.error_description||d.msg||"Error");}
+      setEnviado(true);
+    }catch(ex){setErr(ex.message);}
+    finally{setLoading(false);}
+  }
+
+  if(enviado) return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
+      justifyContent:"center",padding:"20px",fontFamily:"'Sora',sans-serif"}}>
+      <div style={{width:"100%",maxWidth:"360px",textAlign:"center"}}>
+        <div style={{fontSize:"64px",marginBottom:"16px"}}>📬</div>
+        <h2 style={{fontSize:"20px",fontWeight:"800",color:C.text,marginBottom:"10px"}}>
+          Revisa tu correo
+        </h2>
+        <p style={{color:C.muted,fontSize:"13px",lineHeight:1.6,marginBottom:"24px"}}>
+          Si el correo <strong style={{color:C.text}}>{email}</strong> está registrado,
+          recibirás un enlace para restablecer tu contraseña en los próximos minutos.
+        </p>
+        <p style={{color:C.muted,fontSize:"12px",marginBottom:"24px"}}>
+          Revisa también tu carpeta de spam.
+        </p>
+        <button onClick={onVolver}
+          style={{...btnP(false),maxWidth:"200px",margin:"0 auto"}}>
+          ← Volver al login
+        </button>
+      </div>
+    </div>
+  );
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
+      justifyContent:"center",padding:"20px",fontFamily:"'Sora',sans-serif"}}>
+      <div style={{width:"100%",maxWidth:"360px"}}>
+        <div style={{textAlign:"center",marginBottom:"32px"}}>
+          <div style={{width:"64px",height:"64px",margin:"0 auto 14px",
+            background:`linear-gradient(135deg,${C.orange},#cc7700)`,
+            borderRadius:"20px",display:"flex",alignItems:"center",
+            justifyContent:"center",fontSize:"28px"}}>🔑</div>
+          <h1 style={{fontSize:"22px",fontWeight:"800",margin:"0 0 8px",color:C.text}}>
+            Restablecer contraseña
+          </h1>
+          <p style={{color:C.muted,fontSize:"13px",lineHeight:1.5}}>
+            Ingresa tu correo y te enviaremos un enlace para crear una nueva contraseña.
+          </p>
+        </div>
+
+        <form onSubmit={enviar} style={{display:"flex",flexDirection:"column",gap:"12px"}}>
+          <div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+              CORREO ELECTRÓNICO
+            </label>
+            <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
+              placeholder="nombre@axtel.com.mx" style={inp} required autoFocus/>
+          </div>
+          {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",
+            padding:"10px 14px",borderRadius:"9px",margin:0}}>⚠️ {err}</p>}
+          <button type="submit" disabled={loading||!email} style={btnP(loading||!email)}>
+            {loading?"Enviando…":"Enviar enlace de reset"}
+          </button>
+        </form>
+
+        <button onClick={onVolver}
+          style={{width:"100%",marginTop:"14px",padding:"11px",background:"transparent",
+            border:"none",color:C.muted,cursor:"pointer",fontSize:"13px",fontFamily:"inherit"}}>
+          ← Volver al login
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── REGISTRO DE NOMBRE ───────────────────────────────────────────────────────
 function RegistroNombre({sessionTemp,onComplete}){
   const [nombre,setNombre]=useState("");
   const [loading,setLoading]=useState(false);
@@ -449,6 +536,10 @@ function RegistroNombre({sessionTemp,onComplete}){
 function Login({onLogin}){
   const [email,setEmail]=useState(""),[pass,setPass]=useState("");
   const [loading,setLoading]=useState(false),[err,setErr]=useState("");
+  const [showReset,setShowReset]=useState(false);
+
+  if(showReset) return <ResetPassword onVolver={()=>setShowReset(false)}/>;
+
   async function login(e){
     e.preventDefault();setLoading(true);setErr("");
     try{
@@ -476,7 +567,7 @@ function Login({onLogin}){
             borderRadius:"20px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"28px"}}>⚡</div>
           <h1 style={{fontSize:"26px",fontWeight:"800",margin:"0 0 4px",color:C.text}}>EquipoTrack</h1>
           <p style={{color:C.muted,fontSize:"12px",letterSpacing:"0.08em",fontFamily:"'JetBrains Mono',monospace"}}>
-            CONTROL DE EQUIPOS
+            CONTROL DE INSTRUMENTOS
           </p>
         </div>
         <form onSubmit={login} style={{display:"flex",flexDirection:"column",gap:"12px"}}>
@@ -499,9 +590,15 @@ function Login({onLogin}){
           <button type="submit" disabled={loading} style={{...btnP(loading),marginTop:"6px"}}>
             {loading?"Entrando…":"Iniciar sesión"}
           </button>
+          <button type="button" onClick={()=>setShowReset(true)}
+            style={{background:"transparent",border:"none",color:C.muted,
+              cursor:"pointer",fontSize:"12px",fontFamily:"inherit",
+              padding:"4px",textDecoration:"underline",textAlign:"center"}}>
+            ¿Olvidaste tu contraseña?
+          </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador arodriguezr@axtel.com.mx.
+          ¿Sin acceso? Contacta al administrador.
         </p>
       </div>
     </div>
@@ -1354,61 +1451,13 @@ export default function App(){
   return(<>
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
-
-      /* ── Reset base ── */
       *{box-sizing:border-box;margin:0;padding:0}
-
-      /* ── Mobile-first: fijar viewport real incluyendo barra del navegador ── */
-      /* Funciona en Chrome/Safari/Firefox en iPhone y Android */
-      html{
-        background:${C.bg};
-        -webkit-text-size-adjust:100%;
-        text-size-adjust:100%;
-        height:100%;
-        height:-webkit-fill-available;
-      }
-      body{
-        background:${C.bg};
-        min-height:100vh;
-        min-height:-webkit-fill-available;
-        min-height:100dvh;
-        overscroll-behavior-y:none;
-        -webkit-tap-highlight-color:transparent;
-      }
-      #root{
-        min-height:100vh;
-        min-height:100dvh;
-      }
-
-      /* ── Modales: usar dvh para respetar barra dinámica del navegador ── */
-      .modal-sheet{
-        position:fixed;
-        top:0; left:0; right:0; bottom:0;
-        /* Fallback para browsers sin dvh */
-        height:100vh;
-        /* Valor real incluyendo barra dinámica */
-        height:100dvh;
-      }
-      .modal-inner{
-        max-height:85vh;
-        max-height:85dvh;
-        overflow-y:auto;
-        -webkit-overflow-scrolling:touch;
-        overscroll-behavior:contain;
-      }
-
-      /* ── Inputs: prevenir zoom automático en iOS al enfocar ── */
-      input, select, textarea{
-        font-size:16px !important;
-      }
-
-      /* ── Scrollbar ── */
+      html,body{background:${C.bg};-webkit-text-size-adjust:100%;text-size-adjust:100%}
+      input,select,textarea{font-size:16px !important}
       ::-webkit-scrollbar{width:4px}
       ::-webkit-scrollbar-thumb{background:${C.border};border-radius:4px}
       input::placeholder,textarea::placeholder{color:${C.muted}}
       select option{background:#12121f;color:#fff}
-
-      /* ── Animaciones ── */
       @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
       @keyframes slideUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
       @keyframes spin{to{transform:rotate(360deg)}}
@@ -1424,10 +1473,10 @@ export default function App(){
       {toast&&<Toast {...toast}/>}
 
       {/* ── Header ── */}
-      <div style={{padding:"env(safe-area-inset-top, 16px) 16px 0",
-        paddingTop:"max(env(safe-area-inset-top), 16px)",
-        background:`linear-gradient(180deg,${C.card} 60%,transparent)`,
-        position:"sticky",top:0,zIndex:100,backdropFilter:"blur(20px)"}}>
+      <div style={{padding:"16px 16px 0",
+        background:C.card,
+        position:"sticky",top:0,zIndex:100,
+        borderBottom:`1px solid ${C.border}`}}>
 
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"14px"}}>
           <div style={{display:"flex",alignItems:"center",gap:"10px"}}>

@@ -633,11 +633,12 @@ function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
 
   return(<>
     {showCam&&<CamaraModal titulo="Foto de RETIRO" onCaptura={img=>{setFoto(img);setShowCam(false);}} onCerrar={()=>setShowCam(false)}/>}
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10000,background:"rgba(0,0,0,0.85)",
-      display:"flex",alignItems:"flex-end",justifyContent:"center",touchAction:"none"}}>
-      <div style={{background:C.card,border:`1px solid ${C.border}`,
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10000,background:"rgba(0,0,0,0.55)",touchAction:"none"}}>
+      <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:10000,
+        background:C.card,border:`1px solid ${C.border}`,
         borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
-        padding:"24px 20px",width:"100%",maxWidth:"520px",maxHeight:"80vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+        padding:"24px 20px",width:"100%",maxWidth:"520px",margin:"0 auto",
+        maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
 
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:"16px"}}>
           <div>
@@ -779,11 +780,12 @@ function ModalRecepcion({equipo,registro,token,session,onConfirmar,onCerrar}){
 
   return(<>
     {showCam&&<CamaraModal titulo="Foto de RECEPCIÓN" onCaptura={img=>{setFoto(img);setShowCam(false);}} onCerrar={()=>setShowCam(false)}/>}
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10000,background:"rgba(0,0,0,0.85)",
-      display:"flex",alignItems:"flex-end",justifyContent:"center",touchAction:"none"}}>
-      <div style={{background:C.card,border:`1px solid ${C.border}`,
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10000,background:"rgba(0,0,0,0.55)",touchAction:"none"}}>
+      <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:10000,
+        background:C.card,border:`1px solid ${C.border}`,
         borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
-        padding:"24px 20px",width:"100%",maxWidth:"520px",maxHeight:"80vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+        padding:"24px 20px",width:"100%",maxWidth:"520px",margin:"0 auto",
+        maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
 
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:"16px"}}>
           <div>
@@ -877,11 +879,12 @@ function ModalCheckin({equipo,registro,token,onConfirmar,onCerrar}){
 
   return(<>
     {showCam&&<CamaraModal titulo="Foto de DEVOLUCIÓN" onCaptura={img=>{setFoto(img);setShowCam(false);}} onCerrar={()=>setShowCam(false)}/>}
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10000,background:"rgba(0,0,0,0.85)",
-      display:"flex",alignItems:"flex-end",justifyContent:"center",touchAction:"none"}}>
-      <div style={{background:C.card,border:`1px solid ${C.border}`,
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10000,background:"rgba(0,0,0,0.55)",touchAction:"none"}}>
+      <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:10000,
+        background:C.card,border:`1px solid ${C.border}`,
         borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
-        padding:"24px 20px",width:"100%",maxWidth:"520px",maxHeight:"80vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+        padding:"24px 20px",width:"100%",maxWidth:"520px",margin:"0 auto",
+        maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
 
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:"16px"}}>
           <div>
@@ -1031,12 +1034,13 @@ function AdminPanel({token,onClose,onEquipoCreado}){
   }
 
   return(
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10000,background:"rgba(0,0,0,0.88)",
-      display:"flex",alignItems:"flex-end",justifyContent:"center",touchAction:"none"}}>
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10000,background:"rgba(0,0,0,0.55)",touchAction:"none"}}>
       {nuevoEq&&<QRLabel equipo={nuevoEq} onCerrar={()=>setNuevoEq(null)}/>}
-      <div style={{background:C.card,border:`1px solid ${C.border}`,
+      <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:10000,
+        background:C.card,border:`1px solid ${C.border}`,
         borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
-        padding:"24px 20px",width:"100%",maxWidth:"520px",maxHeight:"80vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+        padding:"24px 20px",width:"100%",maxWidth:"520px",margin:"0 auto",
+        maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
 
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:"18px"}}>
           <div>
@@ -1715,3 +1719,4 @@ export default function App(){
     {showMapa&&<MapaModal registros={registros} equipos={equipos} onCerrar={()=>setShowMapa(false)}/>}
   </>);
 }
+

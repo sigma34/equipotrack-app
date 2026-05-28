@@ -211,7 +211,7 @@ function CamaraModal({titulo,onCaptura,onCerrar}){
     }
   }
   return(
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:3000,background:"rgba(0,0,0,0.95)",
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10001,background:"rgba(0,0,0,0.95)",
       display:"flex",alignItems:"center",justifyContent:"center",padding:"16px",touchAction:"none"}}>
       <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"20px",
         padding:"20px",width:"100%",maxWidth:"440px"}}>
@@ -322,7 +322,7 @@ function QRLabel({equipo,onCerrar}){
   }
 
   return(
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:4000,background:"rgba(0,0,0,0.92)",
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10002,background:"rgba(0,0,0,0.92)",
       display:"flex",alignItems:"center",justifyContent:"center",padding:"16px",touchAction:"none"}}>
       <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"20px",
         padding:"24px",width:"100%",maxWidth:"380px"}}>
@@ -439,7 +439,7 @@ function ResetPassword({onVolver}){
               CORREO ELECTRÓNICO
             </label>
             <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
-              placeholder="nombre@axtel.com.mx" style={inp} required autoFocus/>
+              placeholder="ingeniero@empresa.com" style={inp} required autoFocus/>
           </div>
           {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",
             padding:"10px 14px",borderRadius:"9px",margin:0}}>⚠️ {err}</p>}
@@ -576,7 +576,7 @@ function Login({onLogin}){
               CORREO ELECTRÓNICO
             </label>
             <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
-              placeholder="nombre@axtel.com.mx" style={inp} required/>
+              placeholder="ingeniero@empresa.com" style={inp} required/>
           </div>
           <div>
             <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
@@ -633,11 +633,11 @@ function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
 
   return(<>
     {showCam&&<CamaraModal titulo="Foto de RETIRO" onCaptura={img=>{setFoto(img);setShowCam(false);}} onCerrar={()=>setShowCam(false)}/>}
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:900,background:"rgba(0,0,0,0.85)",
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10000,background:"rgba(0,0,0,0.85)",
       display:"flex",alignItems:"flex-end",justifyContent:"center",touchAction:"none"}}>
       <div style={{background:C.card,border:`1px solid ${C.border}`,
         borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
-        padding:"24px 20px",width:"100%",maxWidth:"520px",maxHeight:"85dvh",overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain"}}>
+        padding:"24px 20px",width:"100%",maxWidth:"520px",maxHeight:"80vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
 
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:"16px"}}>
           <div>
@@ -779,11 +779,11 @@ function ModalRecepcion({equipo,registro,token,session,onConfirmar,onCerrar}){
 
   return(<>
     {showCam&&<CamaraModal titulo="Foto de RECEPCIÓN" onCaptura={img=>{setFoto(img);setShowCam(false);}} onCerrar={()=>setShowCam(false)}/>}
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:900,background:"rgba(0,0,0,0.85)",
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10000,background:"rgba(0,0,0,0.85)",
       display:"flex",alignItems:"flex-end",justifyContent:"center",touchAction:"none"}}>
       <div style={{background:C.card,border:`1px solid ${C.border}`,
         borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
-        padding:"24px 20px",width:"100%",maxWidth:"520px",maxHeight:"85dvh",overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain"}}>
+        padding:"24px 20px",width:"100%",maxWidth:"520px",maxHeight:"80vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
 
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:"16px"}}>
           <div>
@@ -868,7 +868,7 @@ function ModalCheckin({equipo,registro,token,onConfirmar,onCerrar}){
   }
 
   if(listo)return(
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:900,background:"rgba(0,0,0,0.92)",
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10000,background:"rgba(0,0,0,0.92)",
       display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:"12px"}}>
       <div style={{fontSize:"70px"}}>✅</div>
       <p style={{color:C.green,fontSize:"20px",fontWeight:"800"}}>¡Equipo devuelto!</p>
@@ -877,11 +877,11 @@ function ModalCheckin({equipo,registro,token,onConfirmar,onCerrar}){
 
   return(<>
     {showCam&&<CamaraModal titulo="Foto de DEVOLUCIÓN" onCaptura={img=>{setFoto(img);setShowCam(false);}} onCerrar={()=>setShowCam(false)}/>}
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:900,background:"rgba(0,0,0,0.85)",
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10000,background:"rgba(0,0,0,0.85)",
       display:"flex",alignItems:"flex-end",justifyContent:"center",touchAction:"none"}}>
       <div style={{background:C.card,border:`1px solid ${C.border}`,
         borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
-        padding:"24px 20px",width:"100%",maxWidth:"520px",maxHeight:"85dvh",overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain"}}>
+        padding:"24px 20px",width:"100%",maxWidth:"520px",maxHeight:"80vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
 
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:"16px"}}>
           <div>
@@ -1031,12 +1031,12 @@ function AdminPanel({token,onClose,onEquipoCreado}){
   }
 
   return(
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:2000,background:"rgba(0,0,0,0.88)",
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10000,background:"rgba(0,0,0,0.88)",
       display:"flex",alignItems:"flex-end",justifyContent:"center",touchAction:"none"}}>
       {nuevoEq&&<QRLabel equipo={nuevoEq} onCerrar={()=>setNuevoEq(null)}/>}
       <div style={{background:C.card,border:`1px solid ${C.border}`,
         borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
-        padding:"24px 20px",width:"100%",maxWidth:"520px",maxHeight:"85dvh",overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain"}}>
+        padding:"24px 20px",width:"100%",maxWidth:"520px",maxHeight:"80vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
 
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:"18px"}}>
           <div>
@@ -1355,7 +1355,7 @@ function MapaModal({registros,equipos,onCerrar}){
   const enUso=Object.keys(registros).length;
   const disponibles=equipos.length-enUso;
   return(
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:1500,background:C.bg,display:"flex",flexDirection:"column"}}>
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10000,background:C.bg,display:"flex",flexDirection:"column"}}>
       <div style={{padding:"18px 20px 10px",display:"flex",justifyContent:"space-between",alignItems:"center",
         background:`linear-gradient(180deg,${C.card},transparent)`}}>
         <div>
@@ -1468,14 +1468,13 @@ export default function App(){
     <div style={{minHeight:"100vh",minHeight:"100dvh",background:C.bg,fontFamily:"'Sora',sans-serif",
       color:C.text,
       maxWidth:"480px",
-      margin:"0 auto",paddingBottom:"env(safe-area-inset-bottom, 80px)"}}>
+      margin:"0 auto",paddingBottom:"80px"}}>
 
       {toast&&<Toast {...toast}/>}
 
       {/* ── Header ── */}
       <div style={{padding:"16px 16px 0",
         background:C.card,
-        position:"sticky",top:0,zIndex:100,
         borderBottom:`1px solid ${C.border}`}}>
 
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"14px"}}>

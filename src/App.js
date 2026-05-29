@@ -28,7 +28,7 @@ async function authReq(path, body) {
     body: JSON.stringify(body),
   });
   const data = await res.json();
-  if (data.error || data.error_description) throw new Error(data.error_description || data.error?.message || "Error");
+  if (data.error || data.error_description) throw new Error(data.error_description || (data.error && data.error.message) || "Error");
   return data;
 }
 
@@ -88,6 +88,9 @@ function getDias(iso) {
   const diff = new Date() - new Date(iso);
   const d = Math.floor(diff/86400000), h = Math.floor((diff%86400000)/3600000);
   return d===0?`${h}h`:`${d}d ${h}h`;
+}
+function getDiasNum(iso) {
+  return Math.floor((new Date() - new Date(iso)) / 86400000);
 }
 function fmt(iso) {
   if (!iso) return "—";
@@ -193,7 +196,7 @@ function CamaraModal({titulo,onCaptura,onCerrar}){
       if(vRef.current){vRef.current.srcObject=s;vRef.current.play();setLive(true);}
     }catch{setErr(true);}
   }
-  function stop(){sRef.current?.getTracks().forEach(t=>t.stop());}
+  function stop(){sRef.current && sRef.current.getTracks().forEach(function(t){t.stop();});}
   function capturar(){
     if(live&&vRef.current&&cRef.current){
       const cv=cRef.current,ctx=cv.getContext("2d");
@@ -211,8 +214,8 @@ function CamaraModal({titulo,onCaptura,onCerrar}){
     }
   }
   return(
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10001,background:"rgba(0,0,0,0.95)",
-      display:"flex",alignItems:"center",justifyContent:"center",padding:"16px",touchAction:"none"}}>
+    <div style={{position:"fixed",inset:0,zIndex:3000,background:"rgba(0,0,0,0.95)",
+      display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
       <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"20px",
         padding:"20px",width:"100%",maxWidth:"440px"}}>
         <h3 style={{color:C.green,margin:"0 0 12px",fontSize:"12px",letterSpacing:"0.12em",textTransform:"uppercase"}}>
@@ -274,7 +277,7 @@ function QRLabel({equipo,onCerrar}){
 
   function imprimir(){
     const w=window.open("","_blank");
-    const qrHtml=qrRef.current?.innerHTML||"";
+    const qrHtml=(qrRef.current ? qrRef.current.innerHTML : "");
     w.document.write(`<!DOCTYPE html><html><head>
       <meta charset="UTF-8">
       <style>
@@ -322,8 +325,8 @@ function QRLabel({equipo,onCerrar}){
   }
 
   return(
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10002,background:"rgba(0,0,0,0.92)",
-      display:"flex",alignItems:"center",justifyContent:"center",padding:"16px",touchAction:"none"}}>
+    <div style={{position:"fixed",inset:0,zIndex:4000,background:"rgba(0,0,0,0.92)",
+      display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
       <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"20px",
         padding:"24px",width:"100%",maxWidth:"380px"}}>
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:"18px"}}>
@@ -371,94 +374,7 @@ function QRLabel({equipo,onCerrar}){
   );
 }
 
-// ─── RESET CONTRASEÑA ─────────────────────────────────────────────────────────
-function ResetPassword({onVolver}){
-  const [email,setEmail]=useState("");
-  const [loading,setLoading]=useState(false);
-  const [enviado,setEnviado]=useState(false);
-  const [err,setErr]=useState("");
-
-  async function enviar(e){
-    e.preventDefault();
-    setLoading(true);setErr("");
-    try{
-      const res=await fetch(`${SUPA_URL}/auth/v1/recover`,{
-        method:"POST",
-        headers:{"apikey":SUPA_KEY,"Content-Type":"application/json"},
-        body:JSON.stringify({email}),
-      });
-      if(!res.ok){const d=await res.json();throw new Error(d.error_description||d.msg||"Error");}
-      setEnviado(true);
-    }catch(ex){setErr(ex.message);}
-    finally{setLoading(false);}
-  }
-
-  if(enviado) return(
-    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
-      justifyContent:"center",padding:"20px",fontFamily:"'Sora',sans-serif"}}>
-      <div style={{width:"100%",maxWidth:"360px",textAlign:"center"}}>
-        <div style={{fontSize:"64px",marginBottom:"16px"}}>📬</div>
-        <h2 style={{fontSize:"20px",fontWeight:"800",color:C.text,marginBottom:"10px"}}>
-          Revisa tu correo
-        </h2>
-        <p style={{color:C.muted,fontSize:"13px",lineHeight:1.6,marginBottom:"24px"}}>
-          Si el correo <strong style={{color:C.text}}>{email}</strong> está registrado,
-          recibirás un enlace para restablecer tu contraseña en los próximos minutos.
-        </p>
-        <p style={{color:C.muted,fontSize:"12px",marginBottom:"24px"}}>
-          Revisa también tu carpeta de spam.
-        </p>
-        <button onClick={onVolver}
-          style={{...btnP(false),maxWidth:"200px",margin:"0 auto"}}>
-          ← Volver al login
-        </button>
-      </div>
-    </div>
-  );
-
-  return(
-    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
-      justifyContent:"center",padding:"20px",fontFamily:"'Sora',sans-serif"}}>
-      <div style={{width:"100%",maxWidth:"360px"}}>
-        <div style={{textAlign:"center",marginBottom:"32px"}}>
-          <div style={{width:"64px",height:"64px",margin:"0 auto 14px",
-            background:`linear-gradient(135deg,${C.orange},#cc7700)`,
-            borderRadius:"20px",display:"flex",alignItems:"center",
-            justifyContent:"center",fontSize:"28px"}}>🔑</div>
-          <h1 style={{fontSize:"22px",fontWeight:"800",margin:"0 0 8px",color:C.text}}>
-            Restablecer contraseña
-          </h1>
-          <p style={{color:C.muted,fontSize:"13px",lineHeight:1.5}}>
-            Ingresa tu correo y te enviaremos un enlace para crear una nueva contraseña.
-          </p>
-        </div>
-
-        <form onSubmit={enviar} style={{display:"flex",flexDirection:"column",gap:"12px"}}>
-          <div>
-            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
-              CORREO ELECTRÓNICO
-            </label>
-            <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
-              placeholder="ingeniero@empresa.com" style={inp} required autoFocus/>
-          </div>
-          {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",
-            padding:"10px 14px",borderRadius:"9px",margin:0}}>⚠️ {err}</p>}
-          <button type="submit" disabled={loading||!email} style={btnP(loading||!email)}>
-            {loading?"Enviando…":"Enviar enlace de reset"}
-          </button>
-        </form>
-
-        <button onClick={onVolver}
-          style={{width:"100%",marginTop:"14px",padding:"11px",background:"transparent",
-            border:"none",color:C.muted,cursor:"pointer",fontSize:"13px",fontFamily:"inherit"}}>
-          ← Volver al login
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── REGISTRO DE NOMBRE ───────────────────────────────────────────────────────
+// ─── PANTALLA REGISTRO DE NOMBRE ─────────────────────────────────────────────
 function RegistroNombre({sessionTemp,onComplete}){
   const [nombre,setNombre]=useState("");
   const [loading,setLoading]=useState(false);
@@ -477,7 +393,11 @@ function RegistroNombre({sessionTemp,onComplete}){
         await supa(`perfiles?id=eq.${sessionTemp.user.id}`,{method:"PATCH",token:sessionTemp.token,
           body:{nombre:nombre.trim()}});
       }
-      onComplete({...sessionTemp,nombre:nombre.trim()});
+      const updated = {};
+      for(const k in sessionTemp) updated[k] = sessionTemp[k];
+      updated.nombre = nombre.trim();
+      updated.necesitaNombre = false;
+      onComplete(updated);
     }catch(ex){setErr(ex.message);}
     finally{setLoading(false);}
   }
@@ -532,14 +452,82 @@ function RegistroNombre({sessionTemp,onComplete}){
   );
 }
 
+// ─── RESET CONTRASEÑA ─────────────────────────────────────────────────────────
+function ResetPassword({onVolver}){
+  const [email,setEmail]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [enviado,setEnviado]=useState(false);
+  const [err,setErr]=useState("");
+  async function enviar(e){
+    e.preventDefault();setLoading(true);setErr("");
+    try{
+      const res=await fetch(SUPA_URL+"/auth/v1/recover",{
+        method:"POST",
+        headers:{"apikey":SUPA_KEY,"Content-Type":"application/json"},
+        body:JSON.stringify({email:email}),
+      });
+      if(!res.ok){const d=await res.json();throw new Error(d.error_description||d.msg||"Error");}
+      setEnviado(true);
+    }catch(ex){setErr(ex.message);}
+    finally{setLoading(false);}
+  }
+  if(enviado) return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
+      justifyContent:"center",padding:"20px",fontFamily:"'Sora',sans-serif"}}>
+      <div style={{width:"100%",maxWidth:"360px",textAlign:"center"}}>
+        <div style={{fontSize:"64px",marginBottom:"16px"}}>📬</div>
+        <h2 style={{fontSize:"20px",fontWeight:"800",color:C.text,marginBottom:"10px"}}>Revisa tu correo</h2>
+        <p style={{color:C.muted,fontSize:"13px",lineHeight:1.6,marginBottom:"20px"}}>
+          Si el correo <strong style={{color:C.text}}>{email}</strong> está registrado,
+          recibirás un enlace para restablecer tu contraseña. Revisa también spam.
+        </p>
+        <button onClick={onVolver} style={btnP(false)}>← Volver al login</button>
+      </div>
+    </div>
+  );
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
+      justifyContent:"center",padding:"20px",fontFamily:"'Sora',sans-serif"}}>
+      <div style={{width:"100%",maxWidth:"360px"}}>
+        <div style={{textAlign:"center",marginBottom:"28px"}}>
+          <div style={{width:"64px",height:"64px",margin:"0 auto 14px",
+            background:"linear-gradient(135deg,#ff9500,#cc7700)",
+            borderRadius:"20px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"28px"}}>🔑</div>
+          <h1 style={{fontSize:"22px",fontWeight:"800",margin:"0 0 8px",color:C.text}}>Restablecer contraseña</h1>
+          <p style={{color:C.muted,fontSize:"13px",lineHeight:1.5}}>
+            Ingresa tu correo y te enviaremos un enlace para crear una nueva contraseña.
+          </p>
+        </div>
+        <form onSubmit={enviar} style={{display:"flex",flexDirection:"column",gap:"12px"}}>
+          <div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+              CORREO ELECTRÓNICO
+            </label>
+            <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
+              placeholder="ingeniero@empresa.com" style={inp} required/>
+          </div>
+          {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",
+            padding:"10px 14px",borderRadius:"9px",margin:0}}>⚠️ {err}</p>}
+          <button type="submit" disabled={loading||!email} style={btnP(loading||!email)}>
+            {loading?"Enviando…":"Enviar enlace"}
+          </button>
+        </form>
+        <button onClick={onVolver}
+          style={{width:"100%",marginTop:"14px",padding:"11px",background:"transparent",
+            border:"none",color:C.muted,cursor:"pointer",fontSize:"13px",fontFamily:"inherit"}}>
+          ← Volver al login
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
 function Login({onLogin}){
   const [email,setEmail]=useState(""),[pass,setPass]=useState("");
   const [loading,setLoading]=useState(false),[err,setErr]=useState("");
   const [showReset,setShowReset]=useState(false);
-
-  if(showReset) return <ResetPassword onVolver={()=>setShowReset(false)}/>;
-
+  if(showReset) return React.createElement(ResetPassword,{onVolver:function(){setShowReset(false);}});
   async function login(e){
     e.preventDefault();setLoading(true);setErr("");
     try{
@@ -551,8 +539,9 @@ function Login({onLogin}){
           params:{id:`eq.${data.user.id}`,limit:"1"}});
         perfil=p&&p[0]?p[0]:null;
       }catch{}
+      const pNombre = perfil && perfil.nombre ? perfil.nombre : null;
       const sessionData={token:data.access_token,email:data.user.email,
-        user:data.user,nombre:perfil?.nombre||null,necesitaNombre:!perfil?.nombre};
+        user:data.user,nombre:pNombre,necesitaNombre:!pNombre};
       onLogin(sessionData);
     }catch(ex){setErr(ex.message);}
     finally{setLoading(false);}
@@ -590,10 +579,10 @@ function Login({onLogin}){
           <button type="submit" disabled={loading} style={{...btnP(loading),marginTop:"6px"}}>
             {loading?"Entrando…":"Iniciar sesión"}
           </button>
-          <button type="button" onClick={()=>setShowReset(true)}
+          <button type="button" onClick={function(){setShowReset(true);}}
             style={{background:"transparent",border:"none",color:C.muted,
-              cursor:"pointer",fontSize:"12px",fontFamily:"inherit",
-              padding:"4px",textDecoration:"underline",textAlign:"center"}}>
+              cursor:"pointer",fontSize:"13px",fontFamily:"inherit",
+              padding:"6px",textDecoration:"underline"}}>
             ¿Olvidaste tu contraseña?
           </button>
         </form>
@@ -624,7 +613,7 @@ function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
         equipo_id:equipo.id,ingeniero,estado,ciudad,
         tipo,guia_paqueteria:guia||null,
         foto_retiro:foto,fecha_retiro:new Date().toISOString(),
-        enviado_por:session.nombre, // quien estaba logueado al hacer el checkout
+        enviado_por:session.nombre,
       }});
       onConfirmar(`✅ ${equipo.nombre} asignado a ${ingeniero}`);
     }catch(ex){alert("Error: "+ex.message);}
@@ -633,12 +622,12 @@ function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
 
   return(<>
     {showCam&&<CamaraModal titulo="Foto de RETIRO" onCaptura={img=>{setFoto(img);setShowCam(false);}} onCerrar={()=>setShowCam(false)}/>}
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10000,background:"rgba(0,0,0,0.55)",touchAction:"none"}}>
-      <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:10000,
-        background:C.card,border:`1px solid ${C.border}`,
-        borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
-        padding:"24px 20px",width:"100%",maxWidth:"520px",margin:"0 auto",
-        maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+    <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.6)"}} onClick={onCerrar}/>
+    <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:10000,
+      background:C.card,border:`1px solid ${C.border}`,
+      borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
+      padding:"24px 20px",maxHeight:"80vh",overflowY:"auto",
+      WebkitOverflowScrolling:"touch"}}>
 
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:"16px"}}>
           <div>
@@ -751,7 +740,6 @@ function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
             {loading?"Guardando…":"✅ Confirmar retiro"}
           </button>
         </div>}
-      </div>
     </div>
   </>);
 }
@@ -780,12 +768,12 @@ function ModalRecepcion({equipo,registro,token,session,onConfirmar,onCerrar}){
 
   return(<>
     {showCam&&<CamaraModal titulo="Foto de RECEPCIÓN" onCaptura={img=>{setFoto(img);setShowCam(false);}} onCerrar={()=>setShowCam(false)}/>}
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10000,background:"rgba(0,0,0,0.55)",touchAction:"none"}}>
-      <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:10000,
-        background:C.card,border:`1px solid ${C.border}`,
-        borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
-        padding:"24px 20px",width:"100%",maxWidth:"520px",margin:"0 auto",
-        maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+    <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.6)"}} onClick={onCerrar}/>
+    <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:10000,
+      background:C.card,border:`1px solid ${C.border}`,
+      borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
+      padding:"24px 20px",maxHeight:"80vh",overflowY:"auto",
+      WebkitOverflowScrolling:"touch"}}>
 
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:"16px"}}>
           <div>
@@ -841,7 +829,6 @@ function ModalRecepcion({equipo,registro,token,session,onConfirmar,onCerrar}){
             background:(!foto||!estado||!ciudad||loading)?C.subtle:`linear-gradient(135deg,${C.blue},#2266cc)`}}>
           {loading?"Guardando…":"📦 Confirmar recepción"}
         </button>
-      </div>
     </div>
   </>);
 }
@@ -870,7 +857,7 @@ function ModalCheckin({equipo,registro,token,onConfirmar,onCerrar}){
   }
 
   if(listo)return(
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10000,background:"rgba(0,0,0,0.92)",
+    <div style={{position:"fixed",inset:0,zIndex:900,background:"rgba(0,0,0,0.92)",
       display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:"12px"}}>
       <div style={{fontSize:"70px"}}>✅</div>
       <p style={{color:C.green,fontSize:"20px",fontWeight:"800"}}>¡Equipo devuelto!</p>
@@ -879,12 +866,12 @@ function ModalCheckin({equipo,registro,token,onConfirmar,onCerrar}){
 
   return(<>
     {showCam&&<CamaraModal titulo="Foto de DEVOLUCIÓN" onCaptura={img=>{setFoto(img);setShowCam(false);}} onCerrar={()=>setShowCam(false)}/>}
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10000,background:"rgba(0,0,0,0.55)",touchAction:"none"}}>
-      <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:10000,
-        background:C.card,border:`1px solid ${C.border}`,
-        borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
-        padding:"24px 20px",width:"100%",maxWidth:"520px",margin:"0 auto",
-        maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+    <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.6)"}} onClick={onCerrar}/>
+    <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:10000,
+      background:C.card,border:`1px solid ${C.border}`,
+      borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
+      padding:"24px 20px",maxHeight:"80vh",overflowY:"auto",
+      WebkitOverflowScrolling:"touch"}}>
 
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:"16px"}}>
           <div>
@@ -931,7 +918,6 @@ function ModalCheckin({equipo,registro,token,onConfirmar,onCerrar}){
         <button onClick={confirmar} disabled={!foto||loading} style={btnP(!foto||loading)}>
           {loading?"Guardando…":foto?"📦 Confirmar devolución":"📷 Foto requerida"}
         </button>
-      </div>
     </div>
   </>);
 }
@@ -952,35 +938,10 @@ function AdminPanel({token,onClose,onEquipoCreado}){
   const [perfiles,setPerfiles]=useState([]),[nuevoNombre,setNuevoNombre]=useState("");
   const [editPerfil,setEditPerfil]=useState(null);
 
-  const [listaEqs,setListaEqs]=useState([]),[loadEqs,setLoadEqs]=useState(false);
-  const [subTab,setSubTab]=useState("lista"); // lista | nuevo
-
   useEffect(()=>{
     if(tab==="categorias")cargarCats();
     if(tab==="ingenieros")cargarPerfiles();
-    if(tab==="equipos")cargarEquipos();
   },[tab]);
-
-  async function cargarEquipos(){
-    setLoadEqs(true);
-    try{const r=await supa("equipos",{token,params:{order:"created_at.asc"}});setListaEqs(r||[]);}
-    catch{}finally{setLoadEqs(false);}
-  }
-
-  async function cambiarEstatus(eq,nuevoEstatus){
-    try{
-      await supa(`equipos?id=eq.${eq.id}`,{method:"PATCH",token,body:{estatus:nuevoEstatus}});
-      cargarEquipos(); onEquipoCreado();
-    }catch(ex){alert("Error: "+ex.message);}
-  }
-
-  async function eliminarEquipo(eq){
-    if(!confirm(`¿Eliminar "${eq.nombre}"?\n\nEsta acción no se puede deshacer.`))return;
-    try{
-      await supa(`equipos?id=eq.${eq.id}`,{method:"PATCH",token,body:{activo:false}});
-      cargarEquipos(); onEquipoCreado();
-    }catch(ex){alert("Error: "+ex.message);}
-  }
 
   async function cargarCats(){
     setLoadCat(true);
@@ -1034,13 +995,12 @@ function AdminPanel({token,onClose,onEquipoCreado}){
   }
 
   return(
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10000,background:"rgba(0,0,0,0.55)",touchAction:"none"}}>
+    <div style={{position:"fixed",inset:0,zIndex:2000,background:"rgba(0,0,0,0.88)",
+      display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
       {nuevoEq&&<QRLabel equipo={nuevoEq} onCerrar={()=>setNuevoEq(null)}/>}
-      <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:10000,
-        background:C.card,border:`1px solid ${C.border}`,
+      <div style={{background:C.card,border:`1px solid ${C.border}`,
         borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
-        padding:"24px 20px",width:"100%",maxWidth:"520px",margin:"0 auto",
-        maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+        padding:"24px 20px",width:"100%",maxWidth:"520px",maxHeight:"94vh",overflowY:"auto"}}>
 
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:"18px"}}>
           <div>
@@ -1065,135 +1025,45 @@ function AdminPanel({token,onClose,onEquipoCreado}){
           ))}
         </div>
 
-        {/* Tab: Equipos — subtabs lista / nuevo */}
-        {tab==="equipos"&&<div>
-          {/* Sub-tabs */}
-          <div style={{display:"flex",gap:"6px",marginBottom:"16px"}}>
-            {[{k:"lista",l:"📋 Lista"},{k:"nuevo",l:"➕ Nuevo equipo"}].map(t=>(
-              <button key={t.k} onClick={()=>setSubTab(t.k)}
-                style={{flex:1,padding:"9px",background:subTab===t.k?C.green:"transparent",
-                  border:`1px solid ${subTab===t.k?C.green:C.border}`,borderRadius:"10px",
-                  color:subTab===t.k?"#001a0d":C.muted,fontWeight:"700",fontSize:"12px",
-                  cursor:"pointer",fontFamily:"inherit"}}>
-                {t.l}
-              </button>
-            ))}
+        {/* Tab: Nuevo equipo */}
+        {tab==="equipos"&&<div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
+          <div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+              NOMBRE DEL EQUIPO <span style={{color:C.red}}>*</span>
+            </label>
+            <input value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Ej. Multímetro Fluke 87V" style={inp}/>
           </div>
-
-          {/* Sub-tab: Lista de equipos */}
-          {subTab==="lista"&&(loadEqs?<Spin/>:
-            <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
-              {listaEqs.length===0&&<p style={{textAlign:"center",color:C.muted,padding:"20px",fontSize:"13px"}}>
-                Sin equipos registrados
-              </p>}
-              {listaEqs.map(eq=>{
-                const enReparacion=eq.estatus==="reparacion";
-                const inactivo=!eq.activo;
-                return(
-                  <div key={eq.id} style={{background:"#12121f",
-                    border:`1px solid ${enReparacion?"#ff950044":inactivo?"#ff3b3b33":C.border}`,
-                    borderRadius:"12px",padding:"12px 14px"}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"8px"}}>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{display:"flex",alignItems:"center",gap:"6px",marginBottom:"4px",flexWrap:"wrap"}}>
-                          <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",color:C.muted,
-                            background:"#0a0a18",padding:"2px 6px",borderRadius:"4px"}}>{eq.id}</span>
-                          {enReparacion&&<span style={{fontSize:"10px",color:C.orange,background:C.orangeDk,
-                            padding:"2px 8px",borderRadius:"20px",fontWeight:"700"}}>🔧 En reparación</span>}
-                          {inactivo&&<span style={{fontSize:"10px",color:C.red,background:"#1a0000",
-                            padding:"2px 8px",borderRadius:"20px",fontWeight:"700"}}>❌ Eliminado</span>}
-                          {!enReparacion&&!inactivo&&<span style={{fontSize:"10px",color:C.green,background:C.greenDk,
-                            padding:"2px 8px",borderRadius:"20px",fontWeight:"700"}}>✓ Activo</span>}
-                        </div>
-                        <p style={{fontSize:"13px",fontWeight:"700",color:C.text,margin:"0 0 2px",
-                          overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{eq.nombre}</p>
-                        <p style={{fontSize:"11px",color:C.muted,margin:0}}>
-                          {eq.categoria} · {eq.ciudad_base}
-                        </p>
-                        <p style={{fontSize:"10px",color:C.muted,margin:"2px 0 0",
-                          fontFamily:"'JetBrains Mono',monospace"}}>S/N: {eq.serie}</p>
-                      </div>
-                    </div>
-                    {/* Acciones */}
-                    {eq.activo&&<div style={{display:"flex",gap:"6px",marginTop:"10px",paddingTop:"10px",
-                      borderTop:`1px solid ${C.border}`}}>
-                      {!enReparacion?(
-                        <button onClick={()=>cambiarEstatus(eq,"reparacion")}
-                          style={{flex:1,padding:"8px",background:"transparent",
-                            border:`1px solid ${C.orange}44`,borderRadius:"8px",
-                            color:C.orange,cursor:"pointer",fontSize:"11px",
-                            fontWeight:"700",fontFamily:"inherit"}}>
-                          🔧 Reparación
-                        </button>
-                      ):(
-                        <button onClick={()=>cambiarEstatus(eq,"activo")}
-                          style={{flex:1,padding:"8px",background:"transparent",
-                            border:`1px solid ${C.green}44`,borderRadius:"8px",
-                            color:C.green,cursor:"pointer",fontSize:"11px",
-                            fontWeight:"700",fontFamily:"inherit"}}>
-                          ✓ Reactivar
-                        </button>
-                      )}
-                      <button onClick={()=>eliminarEquipo(eq)}
-                        style={{flex:1,padding:"8px",background:"transparent",
-                          border:`1px solid ${C.red}44`,borderRadius:"8px",
-                          color:C.red,cursor:"pointer",fontSize:"11px",
-                          fontWeight:"700",fontFamily:"inherit"}}>
-                        🗑 Eliminar
-                      </button>
-                      <button onClick={()=>setNuevoEq(eq)}
-                        style={{padding:"8px 10px",background:"transparent",
-                          border:`1px solid ${C.border}`,borderRadius:"8px",
-                          color:C.muted,cursor:"pointer",fontSize:"13px",fontFamily:"inherit"}}>
-                        QR
-                      </button>
-                    </div>}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Sub-tab: Nuevo equipo */}
-          {subTab==="nuevo"&&<div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
-            <div>
-              <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
-                NOMBRE DEL EQUIPO <span style={{color:C.red}}>*</span>
-              </label>
-              <input value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Ej. Multímetro Fluke 87V" style={inp}/>
-            </div>
-            <div>
-              <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
-                NÚMERO DE SERIE <span style={{color:C.red}}>*</span>
-              </label>
-              <input value={serie} onChange={e=>setSerie(e.target.value)} placeholder="Ej. FL87V-2024-001" style={inp}/>
-            </div>
-            <div>
-              <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
-                CATEGORÍA <span style={{color:C.red}}>*</span>
-              </label>
-              <CatSelect token={token} value={cat} onChange={setCat}/>
-            </div>
-            <div style={{borderTop:`1px solid ${C.border}`,paddingTop:"14px"}}>
-              <p style={{color:C.blue,fontSize:"11px",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"10px"}}>
-                📍 UBICACIÓN BASE
-              </p>
-              <EstadoCiudad estado={estadoB} ciudad={ciudadB} onEstado={setEstadoB} onCiudad={setCiudadB}/>
-            </div>
-            <div>
-              <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
-                SITIO / EDIFICIO BASE <span style={{color:C.red}}>*</span>
-              </label>
-              <input value={sitio} onChange={e=>setSitio(e.target.value)} placeholder="Ej. Puente de Vigas — Piso 3" style={inp}/>
-            </div>
-            {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",padding:"10px 14px",borderRadius:"9px"}}>⚠️ {err}</p>}
-            <button onClick={crearEquipo} disabled={loading} style={btnP(loading)}>
-              {loading?"Creando…":"✅ Crear equipo"}
-            </button>
-            <p style={{color:C.muted,fontSize:"11px",textAlign:"center"}}>
-              Al crear el equipo se genera automáticamente su etiqueta QR.
+          <div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+              NÚMERO DE SERIE <span style={{color:C.red}}>*</span>
+            </label>
+            <input value={serie} onChange={e=>setSerie(e.target.value)} placeholder="Ej. FL87V-2024-001" style={inp}/>
+          </div>
+          <div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+              CATEGORÍA <span style={{color:C.red}}>*</span>
+            </label>
+            <CatSelect token={token} value={cat} onChange={setCat}/>
+          </div>
+          <div style={{borderTop:`1px solid ${C.border}`,paddingTop:"14px"}}>
+            <p style={{color:C.blue,fontSize:"11px",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"10px"}}>
+              📍 UBICACIÓN BASE
             </p>
-          </div>}
+            <EstadoCiudad estado={estadoB} ciudad={ciudadB} onEstado={setEstadoB} onCiudad={setCiudadB}/>
+          </div>
+          <div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+              SITIO / EDIFICIO BASE <span style={{color:C.red}}>*</span>
+            </label>
+            <input value={sitio} onChange={e=>setSitio(e.target.value)} placeholder="Ej. Puente de Vigas — Piso 3" style={inp}/>
+          </div>
+          {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",padding:"10px 14px",borderRadius:"9px"}}>⚠️ {err}</p>}
+          <button onClick={crearEquipo} disabled={loading} style={btnP(loading)}>
+            {loading?"Creando…":"✅ Crear equipo"}
+          </button>
+          <p style={{color:C.muted,fontSize:"11px",textAlign:"center"}}>
+            Al crear el equipo se genera automáticamente su etiqueta QR para imprimir.
+          </p>
         </div>}
 
         {/* Tab: Categorías */}
@@ -1331,7 +1201,7 @@ function MapaModal({registros,equipos,onCerrar}){
       Object.entries(porEstado).forEach(([estado,items])=>{
         const coords=COORDS_ESTADO[estado];if(!coords)return;
         const tienePaq=items.some(({reg})=>reg.tipo==="paqueteria");
-        const alerta=items.some(({reg})=>parseInt(getDias(reg.fecha_retiro))>7);
+        const alerta=items.some(({reg})=>getDiasNum(reg.fecha_retiro)>5);
         const color=tienePaq?C.blue:alerta?C.red:C.orange;
         const icon=L.divIcon({className:"",
           html:`<div style="background:${color};color:#fff;border-radius:50%;width:34px;height:34px;
@@ -1353,13 +1223,13 @@ function MapaModal({registros,equipos,onCerrar}){
       s.src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
       s.onload=init;document.head.appendChild(s);
     }
-    return()=>{mapInst.current?.remove();mapInst.current=null;};
+    return()=>{if(mapInst.current){mapInst.current.remove();}mapInst.current=null;};
   },[]);
 
   const enUso=Object.keys(registros).length;
   const disponibles=equipos.length-enUso;
   return(
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:10000,background:C.bg,display:"flex",flexDirection:"column"}}>
+    <div style={{position:"fixed",inset:0,zIndex:1500,background:C.bg,display:"flex",flexDirection:"column"}}>
       <div style={{padding:"18px 20px 10px",display:"flex",justifyContent:"space-between",alignItems:"center",
         background:`linear-gradient(180deg,${C.card},transparent)`}}>
         <div>
@@ -1374,7 +1244,7 @@ function MapaModal({registros,equipos,onCerrar}){
         </button>
       </div>
       <div style={{display:"flex",gap:"10px",padding:"0 20px 10px",flexWrap:"wrap"}}>
-        {[{c:C.green,l:"✓ Disponible"},{c:C.orange,l:"En uso"},{c:C.red,l:"+7 días"},{c:C.blue,l:"📦 Tránsito"}].map(x=>(
+        {[{c:C.green,l:"✓ Disponible"},{c:C.orange,l:"En uso"},{c:C.red,l:"+5 días"},{c:C.blue,l:"📦 Tránsito"}].map(x=>(
           <div key={x.l} style={{display:"flex",alignItems:"center",gap:"5px"}}>
             <div style={{width:"12px",height:"12px",borderRadius:"50%",background:x.c}}/>
             <span style={{fontSize:"10px",color:C.muted}}>{x.l}</span>
@@ -1450,7 +1320,7 @@ export default function App(){
 
   if(!session)return <Login onLogin={handleLogin}/>;
   if(session.necesitaNombre)return <RegistroNombre sessionTemp={session}
-    onComplete={s=>{ setSession({...s,necesitaNombre:false}); cargar(s.token); }}/>;
+    onComplete={function(s){ setSession(s); cargar(s.token); }}/>;
 
   return(<>
     <style>{`
@@ -1465,13 +1335,13 @@ export default function App(){
       @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
       @keyframes slideUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
       @keyframes spin{to{transform:rotate(360deg)}}
-      .eq-card{transition:transform 0.1s;-webkit-tap-highlight-color:transparent}
+      .eq-card{transition:transform 0.1s}
       .eq-card:active{transform:scale(0.985)}
     `}</style>
 
-    <div style={{minHeight:"100vh",minHeight:"100dvh",background:C.bg,fontFamily:"'Sora',sans-serif",
+    <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'Sora',sans-serif",
       color:C.text,
-      maxWidth:"480px",
+      maxWidth:"480px", // Más estrecho para móvil
       margin:"0 auto",paddingBottom:"80px"}}>
 
       {toast&&<Toast {...toast}/>}
@@ -1479,8 +1349,8 @@ export default function App(){
       {/* ── Header ── */}
       <div style={{padding:"16px 16px 0",
         background:C.card,
+        position:"sticky",top:0,zIndex:100,
         borderBottom:`1px solid ${C.border}`}}>
-
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"14px"}}>
           <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
             <div style={{width:"38px",height:"38px",background:`linear-gradient(135deg,${C.green},#00c066)`,
@@ -1584,25 +1454,19 @@ export default function App(){
           )}
           {filtrados.map((eq,i)=>{
             const reg=registros[eq.id];
-            const alerta=reg&&parseInt(getDias(reg.fecha_retiro))>7;
+            const alerta=reg&&getDiasNum(reg.fecha_retiro)>5;
             const esPaq=reg&&reg.tipo==="paqueteria";
-            const enReparacion=eq.estatus==="reparacion";
             return(
-              <div key={eq.id} className={enReparacion?"":"eq-card"}
-                onClick={()=>!enReparacion&&abrir(eq)}
+              <div key={eq.id} className="eq-card" onClick={()=>abrir(eq)}
                 style={{background:C.card,
-                  border:`1px solid ${enReparacion?"#ff950055":alerta?"#ff3b3b33":esPaq?"#4a9eff22":reg?"#ff950022":C.border}`,
-                  borderRadius:"16px",padding:"15px",
-                  cursor:enReparacion?"not-allowed":"pointer",
+                  border:`1px solid ${alerta?"#ff3b3b33":esPaq?"#4a9eff22":reg?"#ff950022":C.border}`,
+                  borderRadius:"16px",padding:"15px",cursor:"pointer",
                   animation:`slideUp 0.3s ease ${i*0.04}s both`,
-                  position:"relative",overflow:"hidden",
-                  opacity:enReparacion?0.7:1}}>
-                {alerta&&!enReparacion&&<div style={{position:"absolute",top:0,left:0,right:0,height:"2px",
+                  position:"relative",overflow:"hidden"}}>
+                {alerta&&<div style={{position:"absolute",top:0,left:0,right:0,height:"2px",
                   background:`linear-gradient(90deg,${C.red},${C.orange})`}}/>}
                 {esPaq&&<div style={{position:"absolute",top:0,left:0,right:0,height:"2px",
                   background:`linear-gradient(90deg,${C.blue},#2266cc)`}}/>}
-                {enReparacion&&<div style={{position:"absolute",top:0,left:0,right:0,height:"2px",
-                  background:`linear-gradient(90deg,${C.orange},#ffcc00)`}}/>}
 
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                   <div style={{flex:1,minWidth:0}}>
@@ -1610,8 +1474,6 @@ export default function App(){
                       <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",color:C.muted,
                         background:"#12121f",padding:"2px 6px",borderRadius:"5px",flexShrink:0}}>{eq.id}</span>
                       <Badge reg={reg}/>
-                      {enReparacion&&<span style={{fontSize:"10px",color:C.orange,background:C.orangeDk,
-                        padding:"2px 8px",borderRadius:"20px",fontWeight:"700",flexShrink:0}}>🔧 En reparación</span>}
                     </div>
                     <h3 style={{fontSize:"14px",fontWeight:"700",marginBottom:"2px",color:"#eee",
                       overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{eq.nombre}</h3>
@@ -1627,12 +1489,9 @@ export default function App(){
                         {esPaq&&<p style={{fontSize:"11px",color:C.blue,marginTop:"3px",fontWeight:"700"}}>
                           📦 En tránsito{reg.guia_paqueteria?` · ${reg.guia_paqueteria}`:""} — Toca para confirmar recepción
                         </p>}
-                        {enReparacion&&<p style={{fontSize:"11px",color:C.orange,marginTop:"6px",fontWeight:"700"}}>
-                      🔧 No disponible — en reparación
-                    </p>}
-                    {alerta&&!esPaq&&!enReparacion&&<p style={{fontSize:"11px",color:C.red,marginTop:"4px",fontWeight:"700"}}>
-                      ⚠️ +7 días — requiere atención
-                    </p>}
+                        {alerta&&!esPaq&&<p style={{fontSize:"11px",color:C.red,marginTop:"4px",fontWeight:"700"}}>
+                          ⚠️ +5 días — requiere atención
+                        </p>}
                       </div>
                     )}
                   </div>
@@ -1719,3 +1578,4 @@ export default function App(){
     {showMapa&&<MapaModal registros={registros} equipos={equipos} onCerrar={()=>setShowMapa(false)}/>}
   </>);
 }
+

@@ -938,10 +938,36 @@ function AdminPanel({token,onClose,onEquipoCreado}){
   const [perfiles,setPerfiles]=useState([]),[nuevoNombre,setNuevoNombre]=useState("");
   const [editPerfil,setEditPerfil]=useState(null);
 
+  // Lista de equipos
+  const [listaEqs,setListaEqs]=useState([]),[loadEqs,setLoadEqs]=useState(false);
+  const [subTab,setSubTab]=useState("lista"); // lista | nuevo
+
   useEffect(()=>{
     if(tab==="categorias")cargarCats();
     if(tab==="ingenieros")cargarPerfiles();
+    if(tab==="equipos"){cargarEquipos();}
   },[tab]);
+
+  async function cargarEquipos(){
+    setLoadEqs(true);
+    try{const r=await supa("equipos",{token,params:{order:"created_at.asc"}});setListaEqs(r||[]);}
+    catch{}finally{setLoadEqs(false);}
+  }
+
+  async function cambiarEstatus(eq,nuevoEstatus){
+    try{
+      await supa("equipos?id=eq."+eq.id,{method:"PATCH",token,body:{estatus:nuevoEstatus}});
+      cargarEquipos();onEquipoCreado();
+    }catch(ex){alert("Error: "+ex.message);}
+  }
+
+  async function eliminarEquipo(eq){
+    if(!confirm("¿Eliminar \""+eq.nombre+"\"?\nEsta acción no se puede deshacer."))return;
+    try{
+      await supa("equipos?id=eq."+eq.id,{method:"PATCH",token,body:{activo:false}});
+      cargarEquipos();onEquipoCreado();
+    }catch(ex){alert("Error: "+ex.message);}
+  }
 
   async function cargarCats(){
     setLoadCat(true);
@@ -1025,45 +1051,133 @@ function AdminPanel({token,onClose,onEquipoCreado}){
           ))}
         </div>
 
-        {/* Tab: Nuevo equipo */}
-        {tab==="equipos"&&<div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
-          <div>
-            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
-              NOMBRE DEL EQUIPO <span style={{color:C.red}}>*</span>
-            </label>
-            <input value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Ej. Multímetro Fluke 87V" style={inp}/>
+        {/* Tab: Equipos — sub-tabs */}
+        {tab==="equipos"&&<div>
+          <div style={{display:"flex",gap:"6px",marginBottom:"14px"}}>
+            {[{k:"lista",l:"📋 Lista"},{k:"nuevo",l:"➕ Nuevo"}].map(t=>(
+              <button key={t.k} onClick={()=>setSubTab(t.k)}
+                style={{flex:1,padding:"9px",
+                  background:subTab===t.k?C.green:"transparent",
+                  border:"1px solid "+(subTab===t.k?C.green:C.border),
+                  borderRadius:"10px",
+                  color:subTab===t.k?"#001a0d":C.muted,
+                  fontWeight:"700",fontSize:"12px",cursor:"pointer",fontFamily:"inherit"}}>
+                {t.l}
+              </button>
+            ))}
           </div>
-          <div>
-            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
-              NÚMERO DE SERIE <span style={{color:C.red}}>*</span>
-            </label>
-            <input value={serie} onChange={e=>setSerie(e.target.value)} placeholder="Ej. FL87V-2024-001" style={inp}/>
-          </div>
-          <div>
-            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
-              CATEGORÍA <span style={{color:C.red}}>*</span>
-            </label>
-            <CatSelect token={token} value={cat} onChange={setCat}/>
-          </div>
-          <div style={{borderTop:`1px solid ${C.border}`,paddingTop:"14px"}}>
-            <p style={{color:C.blue,fontSize:"11px",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"10px"}}>
-              📍 UBICACIÓN BASE
+
+          {/* Sub-tab: Lista */}
+          {subTab==="lista"&&(loadEqs?<Spin/>:
+            <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
+              {listaEqs.length===0&&<p style={{textAlign:"center",color:C.muted,padding:"20px",fontSize:"13px"}}>
+                Sin equipos registrados
+              </p>}
+              {listaEqs.map(function(eq){
+                var enRep=eq.estatus==="reparacion";
+                var inactivo=!eq.activo;
+                return(
+                  <div key={eq.id} style={{background:"#12121f",
+                    border:"1px solid "+(enRep?"#ff950044":inactivo?"#ff3b3b33":C.border),
+                    borderRadius:"12px",padding:"12px 14px"}}>
+                    <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:"8px"}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:"flex",alignItems:"center",gap:"6px",marginBottom:"4px",flexWrap:"wrap"}}>
+                          <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",color:C.muted,
+                            background:"#0a0a18",padding:"2px 6px",borderRadius:"4px"}}>{eq.id}</span>
+                          {enRep&&<span style={{fontSize:"10px",color:C.orange,background:C.orangeDk,
+                            padding:"2px 8px",borderRadius:"20px",fontWeight:"700"}}>🔧 Reparación</span>}
+                          {inactivo&&<span style={{fontSize:"10px",color:C.red,background:"#1a0000",
+                            padding:"2px 8px",borderRadius:"20px",fontWeight:"700"}}>❌ Eliminado</span>}
+                          {!enRep&&!inactivo&&<span style={{fontSize:"10px",color:C.green,background:C.greenDk,
+                            padding:"2px 8px",borderRadius:"20px",fontWeight:"700"}}>✓ Activo</span>}
+                        </div>
+                        <p style={{fontSize:"13px",fontWeight:"700",color:C.text,margin:"0 0 2px",
+                          overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{eq.nombre}</p>
+                        <p style={{fontSize:"11px",color:C.muted,margin:0}}>{eq.categoria}</p>
+                        <p style={{fontSize:"10px",color:C.muted,margin:"2px 0 0",
+                          fontFamily:"'JetBrains Mono',monospace"}}>Base: {eq.ciudad_base} · {eq.sitio_base}</p>
+                      </div>
+                    </div>
+                    {eq.activo&&<div style={{display:"flex",gap:"6px",marginTop:"10px",
+                      paddingTop:"10px",borderTop:"1px solid "+C.border}}>
+                      {!enRep?(
+                        <button onClick={function(){cambiarEstatus(eq,"reparacion");}}
+                          style={{flex:1,padding:"8px",background:"transparent",
+                            border:"1px solid "+C.orange+"44",borderRadius:"8px",
+                            color:C.orange,cursor:"pointer",fontSize:"11px",
+                            fontWeight:"700",fontFamily:"inherit"}}>
+                          🔧 Reparación
+                        </button>
+                      ):(
+                        <button onClick={function(){cambiarEstatus(eq,"activo");}}
+                          style={{flex:1,padding:"8px",background:"transparent",
+                            border:"1px solid "+C.green+"44",borderRadius:"8px",
+                            color:C.green,cursor:"pointer",fontSize:"11px",
+                            fontWeight:"700",fontFamily:"inherit"}}>
+                          ✓ Reactivar
+                        </button>
+                      )}
+                      <button onClick={function(){eliminarEquipo(eq);}}
+                        style={{flex:1,padding:"8px",background:"transparent",
+                          border:"1px solid "+C.red+"44",borderRadius:"8px",
+                          color:C.red,cursor:"pointer",fontSize:"11px",
+                          fontWeight:"700",fontFamily:"inherit"}}>
+                        🗑 Eliminar
+                      </button>
+                      <button onClick={function(){setNuevoEq(eq);}}
+                        style={{padding:"8px 12px",background:"transparent",
+                          border:"1px solid "+C.border,borderRadius:"8px",
+                          color:C.muted,cursor:"pointer",fontSize:"12px",fontFamily:"inherit"}}>
+                        QR
+                      </button>
+                    </div>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Sub-tab: Nuevo equipo */}
+          {subTab==="nuevo"&&<div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
+            <div>
+              <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+                NOMBRE DEL EQUIPO <span style={{color:C.red}}>*</span>
+              </label>
+              <input value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Ej. Multímetro Fluke 87V" style={inp}/>
+            </div>
+            <div>
+              <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+                NÚMERO DE SERIE <span style={{color:C.red}}>*</span>
+              </label>
+              <input value={serie} onChange={e=>setSerie(e.target.value)} placeholder="Ej. FL87V-2024-001" style={inp}/>
+            </div>
+            <div>
+              <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+                CATEGORÍA <span style={{color:C.red}}>*</span>
+              </label>
+              <CatSelect token={token} value={cat} onChange={setCat}/>
+            </div>
+            <div style={{borderTop:"1px solid "+C.border,paddingTop:"14px"}}>
+              <p style={{color:C.blue,fontSize:"11px",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"10px"}}>
+                📍 UBICACIÓN BASE
+              </p>
+              <EstadoCiudad estado={estadoB} ciudad={ciudadB} onEstado={setEstadoB} onCiudad={setCiudadB}/>
+            </div>
+            <div>
+              <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+                SITIO / EDIFICIO BASE <span style={{color:C.red}}>*</span>
+              </label>
+              <input value={sitio} onChange={e=>setSitio(e.target.value)} placeholder="Ej. Puente de Vigas — Piso 3" style={inp}/>
+            </div>
+            {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",padding:"10px 14px",borderRadius:"9px"}}>⚠️ {err}</p>}
+            <button onClick={crearEquipo} disabled={loading} style={btnP(loading)}>
+              {loading?"Creando…":"✅ Crear equipo"}
+            </button>
+            <p style={{color:C.muted,fontSize:"11px",textAlign:"center"}}>
+              Al crear el equipo se genera automáticamente su etiqueta QR.
             </p>
-            <EstadoCiudad estado={estadoB} ciudad={ciudadB} onEstado={setEstadoB} onCiudad={setCiudadB}/>
-          </div>
-          <div>
-            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
-              SITIO / EDIFICIO BASE <span style={{color:C.red}}>*</span>
-            </label>
-            <input value={sitio} onChange={e=>setSitio(e.target.value)} placeholder="Ej. Puente de Vigas — Piso 3" style={inp}/>
-          </div>
-          {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",padding:"10px 14px",borderRadius:"9px"}}>⚠️ {err}</p>}
-          <button onClick={crearEquipo} disabled={loading} style={btnP(loading)}>
-            {loading?"Creando…":"✅ Crear equipo"}
-          </button>
-          <p style={{color:C.muted,fontSize:"11px",textAlign:"center"}}>
-            Al crear el equipo se genera automáticamente su etiqueta QR para imprimir.
-          </p>
+          </div>}
         </div>}
 
         {/* Tab: Categorías */}
@@ -1456,17 +1570,23 @@ export default function App(){
             const reg=registros[eq.id];
             const alerta=reg&&getDiasNum(reg.fecha_retiro)>5;
             const esPaq=reg&&reg.tipo==="paqueteria";
+            const enRep=eq.estatus==="reparacion";
             return(
-              <div key={eq.id} className="eq-card" onClick={()=>abrir(eq)}
+              <div key={eq.id} className={enRep?"":"eq-card"}
+                onClick={function(){if(!enRep)abrir(eq);}}
                 style={{background:C.card,
-                  border:`1px solid ${alerta?"#ff3b3b33":esPaq?"#4a9eff22":reg?"#ff950022":C.border}`,
-                  borderRadius:"16px",padding:"15px",cursor:"pointer",
-                  animation:`slideUp 0.3s ease ${i*0.04}s both`,
+                  border:"1px solid "+(enRep?"#ff950055":alerta?"#ff3b3b33":esPaq?"#4a9eff22":reg?"#ff950022":C.border),
+                  borderRadius:"16px",padding:"15px",
+                  cursor:enRep?"default":"pointer",
+                  opacity:enRep?0.7:1,
+                  animation:"slideUp 0.3s ease "+(i*0.04)+"s both",
                   position:"relative",overflow:"hidden"}}>
-                {alerta&&<div style={{position:"absolute",top:0,left:0,right:0,height:"2px",
-                  background:`linear-gradient(90deg,${C.red},${C.orange})`}}/>}
+                {enRep&&<div style={{position:"absolute",top:0,left:0,right:0,height:"2px",
+                  background:"linear-gradient(90deg,"+C.orange+",#ffcc00)"}}/>}
+                {alerta&&!enRep&&<div style={{position:"absolute",top:0,left:0,right:0,height:"2px",
+                  background:"linear-gradient(90deg,"+C.red+","+C.orange+")"}}/>}
                 {esPaq&&<div style={{position:"absolute",top:0,left:0,right:0,height:"2px",
-                  background:`linear-gradient(90deg,${C.blue},#2266cc)`}}/>}
+                  background:"linear-gradient(90deg,"+C.blue+",#2266cc)"}}/>}
 
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                   <div style={{flex:1,minWidth:0}}>
@@ -1474,6 +1594,8 @@ export default function App(){
                       <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",color:C.muted,
                         background:"#12121f",padding:"2px 6px",borderRadius:"5px",flexShrink:0}}>{eq.id}</span>
                       <Badge reg={reg}/>
+                      {enRep&&<span style={{fontSize:"10px",color:C.orange,background:C.orangeDk,
+                        padding:"2px 8px",borderRadius:"20px",fontWeight:"700",flexShrink:0}}>🔧 Reparación</span>}
                     </div>
                     <h3 style={{fontSize:"14px",fontWeight:"700",marginBottom:"2px",color:"#eee",
                       overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{eq.nombre}</h3>
@@ -1494,6 +1616,9 @@ export default function App(){
                         </p>}
                       </div>
                     )}
+                    {enRep&&<p style={{fontSize:"11px",color:C.orange,marginTop:"6px",fontWeight:"700"}}>
+                      🔧 En reparación — no disponible
+                    </p>}
                   </div>
                   <div style={{width:"40px",height:"40px",
                     background:esPaq?C.blueDk:reg?C.orangeDk:C.greenDk,
@@ -1578,4 +1703,3 @@ export default function App(){
     {showMapa&&<MapaModal registros={registros} equipos={equipos} onCerrar={()=>setShowMapa(false)}/>}
   </>);
 }
-

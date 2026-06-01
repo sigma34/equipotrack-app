@@ -214,7 +214,7 @@ function CamaraModal({titulo,onCaptura,onCerrar}){
     }
   }
   return(
-    <div style={{position:"fixed",inset:0,zIndex:3000,background:"rgba(0,0,0,0.95)",
+    <div style={{position:"fixed",inset:0,zIndex:20000,background:"rgba(0,0,0,0.97)",
       display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
       <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"20px",
         padding:"20px",width:"100%",maxWidth:"440px"}}>
@@ -325,7 +325,7 @@ function QRLabel({equipo,onCerrar}){
   }
 
   return(
-    <div style={{position:"fixed",inset:0,zIndex:4000,background:"rgba(0,0,0,0.92)",
+    <div style={{position:"fixed",inset:0,zIndex:20000,background:"rgba(0,0,0,0.97)",
       display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
       <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"20px",
         padding:"24px",width:"100%",maxWidth:"380px"}}>
@@ -447,6 +447,96 @@ function RegistroNombre({sessionTemp,onComplete}){
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
           El administrador puede modificar tu nombre si es necesario.
         </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── NUEVA CONTRASEÑA (desde link de email) ──────────────────────────────────
+function NuevaContrasena({token}){
+  const [pass,setPass]=useState("");
+  const [pass2,setPass2]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [listo,setListo]=useState(false);
+  const [err,setErr]=useState("");
+
+  async function guardar(e){
+    e.preventDefault();
+    if(pass.length<6){setErr("Mínimo 6 caracteres");return;}
+    if(pass!==pass2){setErr("Las contraseñas no coinciden");return;}
+    setLoading(true);setErr("");
+    try{
+      const res=await fetch(SUPA_URL+"/auth/v1/user",{
+        method:"PUT",
+        headers:{
+          "apikey":SUPA_KEY,
+          "Content-Type":"application/json",
+          "Authorization":"Bearer "+token,
+        },
+        body:JSON.stringify({password:pass}),
+      });
+      if(!res.ok){const d=await res.json();throw new Error(d.error_description||d.msg||"Error");}
+      if(window.history&&window.history.replaceState){
+        window.history.replaceState(null,null," ");
+      }
+      setListo(true);
+    }catch(ex){setErr(ex.message);}
+    finally{setLoading(false);}
+  }
+
+  if(listo) return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
+      justifyContent:"center",padding:"20px",fontFamily:"'Sora',sans-serif"}}>
+      <div style={{width:"100%",maxWidth:"360px",textAlign:"center"}}>
+        <div style={{fontSize:"64px",marginBottom:"16px"}}>✅</div>
+        <h2 style={{fontSize:"20px",fontWeight:"800",color:C.text,marginBottom:"10px"}}>
+          ¡Contraseña actualizada!
+        </h2>
+        <p style={{color:C.muted,fontSize:"13px",marginBottom:"24px"}}>
+          Ya puedes iniciar sesión con tu nueva contraseña.
+        </p>
+        <button onClick={function(){window.location.href=window.location.pathname;}}
+          style={btnP(false)}>Ir al login</button>
+      </div>
+    </div>
+  );
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
+      justifyContent:"center",padding:"20px",fontFamily:"'Sora',sans-serif"}}>
+      <div style={{width:"100%",maxWidth:"360px"}}>
+        <div style={{textAlign:"center",marginBottom:"28px"}}>
+          <div style={{width:"64px",height:"64px",margin:"0 auto 14px",
+            background:"linear-gradient(135deg,"+C.green+",#00c066)",
+            borderRadius:"20px",display:"flex",alignItems:"center",
+            justifyContent:"center",fontSize:"28px"}}>🔐</div>
+          <h1 style={{fontSize:"22px",fontWeight:"800",margin:"0 0 8px",color:C.text}}>
+            Nueva contraseña
+          </h1>
+          <p style={{color:C.muted,fontSize:"13px",lineHeight:1.5}}>
+            Elige una contraseña segura para tu cuenta.
+          </p>
+        </div>
+        <form onSubmit={guardar} style={{display:"flex",flexDirection:"column",gap:"12px"}}>
+          <div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",
+              display:"block",marginBottom:"6px"}}>NUEVA CONTRASEÑA</label>
+            <input type="password" value={pass} onChange={e=>setPass(e.target.value)}
+              placeholder="Mínimo 6 caracteres" style={inp} required/>
+          </div>
+          <div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",
+              display:"block",marginBottom:"6px"}}>CONFIRMAR CONTRASEÑA</label>
+            <input type="password" value={pass2} onChange={e=>setPass2(e.target.value)}
+              placeholder="Repite la contraseña" style={inp} required/>
+          </div>
+          {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",
+            padding:"10px 14px",borderRadius:"9px",margin:0}}>⚠️ {err}</p>}
+          <button type="submit" disabled={loading||!pass||!pass2}
+            style={btnP(loading||!pass||!pass2)}>
+            {loading?"Guardando…":"Guardar contraseña"}
+          </button>
+        </form>
       </div>
     </div>
   );
@@ -1431,6 +1521,16 @@ export default function App(){
   });
 
   const enUso=regsArr.length, disponibles=equipos.length-enUso;
+
+  // Detectar link de reset de contraseña en URL
+  var urlHash=typeof window!=="undefined"?window.location.hash:"";
+  var isRecovery=urlHash.indexOf("type=recovery")!==-1;
+  var recoveryToken=(function(){
+    if(!isRecovery)return null;
+    var m=urlHash.match(/access_token=([^&]+)/);
+    return m?m[1]:null;
+  })();
+  if(isRecovery&&recoveryToken)return <NuevaContrasena token={recoveryToken}/>;
 
   if(!session)return <Login onLogin={handleLogin}/>;
   if(session.necesitaNombre)return <RegistroNombre sessionTemp={session}

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+// QRCode via npm (instalar: npm install qrcode)
+// Se importa dinámicamente para compatibilidad con React build
 
 // ─── Supabase ─────────────────────────────────────────────────────────────────
 const SUPA_URL = "https://tawgfibmeymxjgwkgnsc.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRhd2dmaWJtZXlteGpnd2tnbnNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MzIzODcsImV4cCI6MjA5NTMwODM4N30.iWVX276PbFNt8rC2ZGO58Kc8nOuEjVcahhMh7vzZk3Q";
-const ADMIN_EMAILS = ["arodriguezr@axtel.com.mx"];
 
 async function supa(path, opts = {}) {
   const { method = "GET", body, token, params } = opts;
@@ -200,8 +201,18 @@ function CamaraModal({titulo,onCaptura,onCerrar}){
   function capturar(){
     if(live&&vRef.current&&cRef.current){
       const cv=cRef.current,ctx=cv.getContext("2d");
-      cv.width=vRef.current.videoWidth;cv.height=vRef.current.videoHeight;
-      ctx.drawImage(vRef.current,0,0);setCap(cv.toDataURL("image/jpeg",0.8));stop();
+      // Limitar resolución máxima a 1280px para controlar tamaño
+      const maxW=1280, ratio=vRef.current.videoWidth/vRef.current.videoHeight;
+      cv.width=Math.min(vRef.current.videoWidth,maxW);
+      cv.height=Math.round(cv.width/ratio);
+      ctx.drawImage(vRef.current,0,0,cv.width,cv.height);
+      const dataUrl=cv.toDataURL("image/jpeg",0.7);
+      // Validar tamaño máximo 4MB en base64
+      if(dataUrl.length > 4*1024*1024){
+        alert("La imagen es demasiado grande. Intenta de nuevo.");
+        return;
+      }
+      setCap(dataUrl);stop();
     }else{
       const cv=document.createElement("canvas");cv.width=400;cv.height=300;
       const ctx=cv.getContext("2d");
@@ -255,6 +266,17 @@ function CamaraModal({titulo,onCaptura,onCerrar}){
 }
 
 // ─── QR Label (inline) ────────────────────────────────────────────────────────
+// Sanitizar strings para uso en HTML (prevención XSS)
+function sanitize(str){
+  if(!str) return "";
+  return String(str)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#x27;");
+}
+
 function QRLabel({equipo,onCerrar}){
   const qrRef=useRef();
   const APP_URL="https://equipotrack-app.vercel.app";
@@ -263,7 +285,7 @@ function QRLabel({equipo,onCerrar}){
   useEffect(()=>{
     function genQR(){
       if(!qrRef.current||!window.QRCode) return;
-      qrRef.current.innerHTML="";
+      while(qrRef.current.firstChild){qrRef.current.removeChild(qrRef.current.firstChild);}
       new window.QRCode(qrRef.current,{text:url,width:140,height:140,
         colorDark:"#111",colorLight:"#fff",correctLevel:window.QRCode.CorrectLevel.H});
     }
@@ -271,57 +293,86 @@ function QRLabel({equipo,onCerrar}){
     else{
       const s=document.createElement("script");
       s.src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+      s.integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSQX0FslNhTDadL0zmtzHiTgB794n6jz4Ifw==";
+      s.crossOrigin="anonymous";
       s.onload=genQR;document.head.appendChild(s);
     }
   },[]);
 
   function imprimir(){
-    const w=window.open("","_blank");
-    const qrHtml=(qrRef.current ? qrRef.current.innerHTML : "");
-    w.document.write(`<!DOCTYPE html><html><head>
-      <meta charset="UTF-8">
-      <style>
-        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@700;800&family=JetBrains+Mono:wght@500&display=swap');
-        body{margin:0;padding:20px;font-family:'Sora',sans-serif;background:#fff;}
-        .et{border:2px solid #111;border-radius:8px;overflow:hidden;max-width:280px;margin:0 auto;}
-        .eh{background:#111;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;}
-        .el{display:flex;align-items:center;gap:6px;}
-        .ei{width:22px;height:22px;background:#00e87a;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;}
-        .et-txt{color:#fff;font-size:13px;font-weight:800;}
-        .eid{font-family:'JetBrains Mono',monospace;color:#00e87a;font-size:12px;font-weight:700;}
-        .eb{padding:14px;display:flex;gap:14px;align-items:flex-start;}
-        .qr{width:140px;height:140px;flex-shrink:0;}
-        .qr canvas,.qr img{width:140px!important;height:140px!important;}
-        .en{font-size:14px;font-weight:800;color:#111;line-height:1.3;margin-bottom:4px;}
-        .es{font-family:'JetBrains Mono',monospace;font-size:10px;color:#888;}
-        .ec{font-size:10px;color:#555;background:#f5f5f5;padding:2px 8px;border-radius:20px;display:inline-block;margin-top:4px;}
-        .ef{background:#f8f8f8;border-top:1px solid #eee;padding:7px 12px;display:flex;align-items:center;justify-content:space-between;}
-        .es2{font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.08em;font-weight:600;}
-        .eu{font-family:'JetBrains Mono',monospace;font-size:7px;color:#bbb;}
-        @media print{body{padding:0;}}
-      </style>
-    </head><body>
-      <div class="et">
-        <div class="eh">
-          <div class="el"><div class="ei">⚡</div><span class="et-txt">EquipoTrack</span></div>
-          <span class="eid">${equipo.id}</span>
-        </div>
-        <div class="eb">
-          <div class="qr">${qrHtml}</div>
-          <div>
-            <div class="en">${equipo.nombre}</div>
-            <div class="es">S/N: ${equipo.serie}</div>
-            <div class="ec">${equipo.categoria}</div>
-          </div>
-        </div>
-        <div class="ef">
-          <span class="es2">📱 Escanea para registrar</span>
-          <span class="eu">${APP_URL}</span>
-        </div>
-      </div>
-      <script>window.onload=()=>setTimeout(()=>{window.print();window.close();},500);<\/script>
-    </body></html>`);
-    w.document.close();
+    // Extraer QR como imagen PNG desde canvas (sin innerHTML)
+    var qrCanvas=qrRef.current?qrRef.current.querySelector("canvas"):null;
+    var qrDataUrl=qrCanvas?qrCanvas.toDataURL("image/png"):"";
+
+    // Construir HTML de impresión con createElement (sin document.write)
+    var w=window.open("","_blank");
+    if(!w)return;
+    var doc=w.document;
+    doc.open();
+    var style=doc.createElement("style");
+    style.textContent=[
+      "body{margin:0;padding:20px;font-family:sans-serif;background:#fff;}",
+      ".et{border:2px solid #111;border-radius:8px;overflow:hidden;max-width:280px;margin:0 auto;}",
+      ".eh{background:#111;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;}",
+      ".logo{display:flex;align-items:center;gap:6px;}",
+      ".icon{width:22px;height:22px;background:#00e87a;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;}",
+      ".brand{color:#fff;font-size:13px;font-weight:800;}",
+      ".eid{color:#00e87a;font-size:12px;font-weight:700;font-family:monospace;}",
+      ".eb{padding:14px;display:flex;gap:14px;align-items:flex-start;}",
+      ".qrimg{width:140px;height:140px;flex-shrink:0;}",
+      ".name{font-size:14px;font-weight:800;color:#111;margin-bottom:4px;}",
+      ".serie{font-size:10px;color:#888;font-family:monospace;}",
+      ".cat{font-size:10px;color:#555;background:#f5f5f5;padding:2px 8px;border-radius:20px;display:inline-block;margin-top:4px;}",
+      ".ef{background:#f8f8f8;border-top:1px solid #eee;padding:7px 12px;}",
+      ".scan{font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.08em;font-weight:600;}",
+      "@media print{body{padding:0;}}"
+    ].join("");
+
+    var html=doc.createElement("html");
+    var head=doc.createElement("head");
+    var meta=doc.createElement("meta");
+    meta.setAttribute("charset","UTF-8");
+    head.appendChild(meta);
+    head.appendChild(style);
+    html.appendChild(head);
+
+    var body=doc.createElement("body");
+
+    // Construir etiqueta con textContent (seguro, sin XSS)
+    var et=doc.createElement("div"); et.className="et";
+    var eh=doc.createElement("div"); eh.className="eh";
+    var logo=doc.createElement("div"); logo.className="logo";
+    var icon=doc.createElement("div"); icon.className="icon"; icon.textContent="⚡";
+    var brand=doc.createElement("span"); brand.className="brand"; brand.textContent="EquipoTrack";
+    logo.appendChild(icon); logo.appendChild(brand);
+    var eid=doc.createElement("span"); eid.className="eid"; eid.textContent=equipo.id;
+    eh.appendChild(logo); eh.appendChild(eid);
+
+    var eb=doc.createElement("div"); eb.className="eb";
+    var qrDiv=doc.createElement("div");
+    if(qrDataUrl){
+      var img=doc.createElement("img");
+      img.className="qrimg"; img.src=qrDataUrl; img.alt="QR";
+      qrDiv.appendChild(img);
+    }
+    var info=doc.createElement("div");
+    var name=doc.createElement("div"); name.className="name"; name.textContent=equipo.nombre;
+    var serie=doc.createElement("div"); serie.className="serie"; serie.textContent="S/N: "+equipo.serie;
+    var cat=doc.createElement("div"); cat.className="cat"; cat.textContent=equipo.categoria;
+    info.appendChild(name); info.appendChild(serie); info.appendChild(cat);
+    eb.appendChild(qrDiv); eb.appendChild(info);
+
+    var ef=doc.createElement("div"); ef.className="ef";
+    var scan=doc.createElement("span"); scan.className="scan"; scan.textContent="📱 Escanea para registrar";
+    ef.appendChild(scan);
+
+    et.appendChild(eh); et.appendChild(eb); et.appendChild(ef);
+    body.appendChild(et);
+    html.appendChild(body);
+    doc.appendChild(html);
+    doc.close();
+
+    setTimeout(function(){w.print();},600);
   }
 
   return(
@@ -630,8 +681,9 @@ function Login({onLogin}){
         perfil=p&&p[0]?p[0]:null;
       }catch{}
       const pNombre = perfil && perfil.nombre ? perfil.nombre : null;
+      const pRol = perfil && perfil.rol ? perfil.rol : "ingeniero";
       const sessionData={token:data.access_token,email:data.user.email,
-        user:data.user,nombre:pNombre,necesitaNombre:!pNombre};
+        user:data.user,nombre:pNombre,rol:pRol,necesitaNombre:!pNombre};
       onLogin(sessionData);
     }catch(ex){setErr(ex.message);}
     finally{setLoading(false);}
@@ -686,7 +738,7 @@ function Login({onLogin}){
 
 // ─── MODAL CHECKOUT ───────────────────────────────────────────────────────────
 function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
-  const isAdmin=ADMIN_EMAILS.includes(session.email);
+  const isAdmin=session&&session.rol==="admin";
   const [paso,setPaso]=useState(1);
   const [ingeniero,setIng]=useState(isAdmin?"":session.nombre);
   const [estado,setEstado]=useState(""),[ciudad,setCiudad]=useState("");
@@ -1369,6 +1421,8 @@ function MapaModal({registros,equipos,onCerrar}){
       const l=document.createElement("link");
       l.id="lf-css";l.rel="stylesheet";
       l.href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
+      l.integrity="sha512-Zcn6bjR/8RZbLEpLIeOwNtzREBAJnUKESxces60Mpoj+2okopSAcSUIUOseddDm0cxnGQzxIR7vJgsLZbdLE3Q==";
+      l.crossOrigin="anonymous";
       document.head.appendChild(l);
     }
     function init(){
@@ -1425,6 +1479,8 @@ function MapaModal({registros,equipos,onCerrar}){
     else{
       const s=document.createElement("script");
       s.src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
+      s.integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWoFvtwXjgFDGkk9e1Q7A2Kw6Y4kJIvwbQMnAGJQzqPOgKv7gSow==";
+      s.crossOrigin="anonymous";
       s.onload=init;document.head.appendChild(s);
     }
     return()=>{if(mapInst.current){mapInst.current.remove();}mapInst.current=null;};
@@ -1462,6 +1518,16 @@ function MapaModal({registros,equipos,onCerrar}){
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App(){
+  // Detectar token de recovery ANTES del primer render usando lazy useState
+  const [recoveryToken] = useState(function(){
+    try{
+      var h = window.location.hash;
+      if(h.indexOf("type=recovery")===-1) return null;
+      var m = h.match(/access_token=([^&]+)/);
+      return m ? decodeURIComponent(m[1]) : null;
+    }catch(e){ return null; }
+  });
+
   const [session,setSession]=useState(null);
   const [equipos,setEquipos]=useState([]);
   const [regsArr,setRegsArr]=useState([]);
@@ -1477,7 +1543,7 @@ export default function App(){
   const [busq,setBusq]=useState("");
   const [toast,setToast]=useState(null);
 
-  const isAdmin=session&&ADMIN_EMAILS.includes(session.email);
+  const isAdmin=session&&session.rol==="admin";
   const registros={};
   regsArr.forEach(r=>{registros[r.equipo_id]=r;});
 
@@ -1522,15 +1588,8 @@ export default function App(){
 
   const enUso=regsArr.length, disponibles=equipos.length-enUso;
 
-  // Detectar link de reset de contraseña en URL
-  var urlHash=typeof window!=="undefined"?window.location.hash:"";
-  var isRecovery=urlHash.indexOf("type=recovery")!==-1;
-  var recoveryToken=(function(){
-    if(!isRecovery)return null;
-    var m=urlHash.match(/access_token=([^&]+)/);
-    return m?m[1]:null;
-  })();
-  if(isRecovery&&recoveryToken)return <NuevaContrasena token={recoveryToken}/>;
+  // Si hay token de recovery, mostrar pantalla de nueva contraseña
+  if(recoveryToken) return <NuevaContrasena token={recoveryToken}/>;
 
   if(!session)return <Login onLogin={handleLogin}/>;
   if(session.necesitaNombre)return <RegistroNombre sessionTemp={session}

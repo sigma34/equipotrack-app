@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+// QRCode via npm (instalar: npm install qrcode)
+// Se importa dinámicamente para compatibilidad con React build
 
 // ─── Supabase ─────────────────────────────────────────────────────────────────
 const SUPA_URL = "https://tawgfibmeymxjgwkgnsc.supabase.co";
@@ -200,8 +202,18 @@ function CamaraModal({titulo,onCaptura,onCerrar}){
   function capturar(){
     if(live&&vRef.current&&cRef.current){
       const cv=cRef.current,ctx=cv.getContext("2d");
-      cv.width=vRef.current.videoWidth;cv.height=vRef.current.videoHeight;
-      ctx.drawImage(vRef.current,0,0);setCap(cv.toDataURL("image/jpeg",0.8));stop();
+      // Limitar resolución máxima a 1280px para controlar tamaño
+      const maxW=1280, ratio=vRef.current.videoWidth/vRef.current.videoHeight;
+      cv.width=Math.min(vRef.current.videoWidth,maxW);
+      cv.height=Math.round(cv.width/ratio);
+      ctx.drawImage(vRef.current,0,0,cv.width,cv.height);
+      const dataUrl=cv.toDataURL("image/jpeg",0.7);
+      // Validar tamaño máximo 4MB en base64
+      if(dataUrl.length > 4*1024*1024){
+        alert("La imagen es demasiado grande. Intenta de nuevo.");
+        return;
+      }
+      setCap(dataUrl);stop();
     }else{
       const cv=document.createElement("canvas");cv.width=400;cv.height=300;
       const ctx=cv.getContext("2d");
@@ -255,6 +267,17 @@ function CamaraModal({titulo,onCaptura,onCerrar}){
 }
 
 // ─── QR Label (inline) ────────────────────────────────────────────────────────
+// Sanitizar strings para uso en HTML (prevención XSS)
+function sanitize(str){
+  if(!str) return "";
+  return String(str)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#x27;");
+}
+
 function QRLabel({equipo,onCerrar}){
   const qrRef=useRef();
   const APP_URL="https://equipotrack-app.vercel.app";
@@ -271,6 +294,8 @@ function QRLabel({equipo,onCerrar}){
     else{
       const s=document.createElement("script");
       s.src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+      s.integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSQX0FslNhTDadL0zmtzHiTgB794n6jz4Ifw==";
+      s.crossOrigin="anonymous";
       s.onload=genQR;document.head.appendChild(s);
     }
   },[]);
@@ -304,14 +329,14 @@ function QRLabel({equipo,onCerrar}){
       <div class="et">
         <div class="eh">
           <div class="el"><div class="ei">⚡</div><span class="et-txt">EquipoTrack</span></div>
-          <span class="eid">${equipo.id}</span>
+          <span class="eid">${sanitize(equipo.id)}</span>
         </div>
         <div class="eb">
           <div class="qr">${qrHtml}</div>
           <div>
-            <div class="en">${equipo.nombre}</div>
-            <div class="es">S/N: ${equipo.serie}</div>
-            <div class="ec">${equipo.categoria}</div>
+            <div class="en">${sanitize(equipo.nombre)}</div>
+            <div class="es">S/N: ${sanitize(equipo.serie)}</div>
+            <div class="ec">${sanitize(equipo.categoria)}</div>
           </div>
         </div>
         <div class="ef">
@@ -630,8 +655,9 @@ function Login({onLogin}){
         perfil=p&&p[0]?p[0]:null;
       }catch{}
       const pNombre = perfil && perfil.nombre ? perfil.nombre : null;
+      const pRol = perfil && perfil.rol ? perfil.rol : "ingeniero";
       const sessionData={token:data.access_token,email:data.user.email,
-        user:data.user,nombre:pNombre,necesitaNombre:!pNombre};
+        user:data.user,nombre:pNombre,rol:pRol,necesitaNombre:!pNombre};
       onLogin(sessionData);
     }catch(ex){setErr(ex.message);}
     finally{setLoading(false);}
@@ -1369,6 +1395,8 @@ function MapaModal({registros,equipos,onCerrar}){
       const l=document.createElement("link");
       l.id="lf-css";l.rel="stylesheet";
       l.href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
+      l.integrity="sha512-Zcn6bjR/8RZbLEpLIeOwNtzREBAJnUKESxces60Mpoj+2okopSAcSUIUOseddDm0cxnGQzxIR7vJgsLZbdLE3Q==";
+      l.crossOrigin="anonymous";
       document.head.appendChild(l);
     }
     function init(){
@@ -1425,6 +1453,8 @@ function MapaModal({registros,equipos,onCerrar}){
     else{
       const s=document.createElement("script");
       s.src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
+      s.integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWoFvtwXjgFDGkk9e1Q7A2Kw6Y4kJIvwbQMnAGJQzqPOgKv7gSow==";
+      s.crossOrigin="anonymous";
       s.onload=init;document.head.appendChild(s);
     }
     return()=>{if(mapInst.current){mapInst.current.remove();}mapInst.current=null;};
@@ -1462,6 +1492,16 @@ function MapaModal({registros,equipos,onCerrar}){
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App(){
+  // Detectar token de recovery ANTES del primer render usando lazy useState
+  const [recoveryToken] = useState(function(){
+    try{
+      var h = window.location.hash;
+      if(h.indexOf("type=recovery")===-1) return null;
+      var m = h.match(/access_token=([^&]+)/);
+      return m ? decodeURIComponent(m[1]) : null;
+    }catch(e){ return null; }
+  });
+
   const [session,setSession]=useState(null);
   const [equipos,setEquipos]=useState([]);
   const [regsArr,setRegsArr]=useState([]);
@@ -1477,7 +1517,7 @@ export default function App(){
   const [busq,setBusq]=useState("");
   const [toast,setToast]=useState(null);
 
-  const isAdmin=session&&ADMIN_EMAILS.includes(session.email);
+  const isAdmin=session&&(ADMIN_EMAILS.includes(session.email)||session.rol==="admin");
   const registros={};
   regsArr.forEach(r=>{registros[r.equipo_id]=r;});
 
@@ -1522,15 +1562,8 @@ export default function App(){
 
   const enUso=regsArr.length, disponibles=equipos.length-enUso;
 
-  // Detectar link de reset de contraseña en URL
-  var urlHash=typeof window!=="undefined"?window.location.hash:"";
-  var isRecovery=urlHash.indexOf("type=recovery")!==-1;
-  var recoveryToken=(function(){
-    if(!isRecovery)return null;
-    var m=urlHash.match(/access_token=([^&]+)/);
-    return m?m[1]:null;
-  })();
-  if(isRecovery&&recoveryToken)return <NuevaContrasena token={recoveryToken}/>;
+  // Si hay token de recovery, mostrar pantalla de nueva contraseña
+  if(recoveryToken) return <NuevaContrasena token={recoveryToken}/>;
 
   if(!session)return <Login onLogin={handleLogin}/>;
   if(session.necesitaNombre)return <RegistroNombre sessionTemp={session}

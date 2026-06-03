@@ -5,7 +5,6 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 // ─── Supabase ─────────────────────────────────────────────────────────────────
 const SUPA_URL = "https://tawgfibmeymxjgwkgnsc.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRhd2dmaWJtZXlteGpnd2tnbnNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MzIzODcsImV4cCI6MjA5NTMwODM4N30.iWVX276PbFNt8rC2ZGO58Kc8nOuEjVcahhMh7vzZk3Q";
-const ADMIN_EMAILS = ["arodriguezr@axtel.com.mx"];
 
 async function supa(path, opts = {}) {
   const { method = "GET", body, token, params } = opts;
@@ -286,7 +285,7 @@ function QRLabel({equipo,onCerrar}){
   useEffect(()=>{
     function genQR(){
       if(!qrRef.current||!window.QRCode) return;
-      qrRef.current.innerHTML="";
+      while(qrRef.current.firstChild){qrRef.current.removeChild(qrRef.current.firstChild);}
       new window.QRCode(qrRef.current,{text:url,width:140,height:140,
         colorDark:"#111",colorLight:"#fff",correctLevel:window.QRCode.CorrectLevel.H});
     }
@@ -301,52 +300,79 @@ function QRLabel({equipo,onCerrar}){
   },[]);
 
   function imprimir(){
-    const w=window.open("","_blank");
-    const qrHtml=(qrRef.current ? qrRef.current.innerHTML : "");
-    w.document.write(`<!DOCTYPE html><html><head>
-      <meta charset="UTF-8">
-      <style>
-        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@700;800&family=JetBrains+Mono:wght@500&display=swap');
-        body{margin:0;padding:20px;font-family:'Sora',sans-serif;background:#fff;}
-        .et{border:2px solid #111;border-radius:8px;overflow:hidden;max-width:280px;margin:0 auto;}
-        .eh{background:#111;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;}
-        .el{display:flex;align-items:center;gap:6px;}
-        .ei{width:22px;height:22px;background:#00e87a;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;}
-        .et-txt{color:#fff;font-size:13px;font-weight:800;}
-        .eid{font-family:'JetBrains Mono',monospace;color:#00e87a;font-size:12px;font-weight:700;}
-        .eb{padding:14px;display:flex;gap:14px;align-items:flex-start;}
-        .qr{width:140px;height:140px;flex-shrink:0;}
-        .qr canvas,.qr img{width:140px!important;height:140px!important;}
-        .en{font-size:14px;font-weight:800;color:#111;line-height:1.3;margin-bottom:4px;}
-        .es{font-family:'JetBrains Mono',monospace;font-size:10px;color:#888;}
-        .ec{font-size:10px;color:#555;background:#f5f5f5;padding:2px 8px;border-radius:20px;display:inline-block;margin-top:4px;}
-        .ef{background:#f8f8f8;border-top:1px solid #eee;padding:7px 12px;display:flex;align-items:center;justify-content:space-between;}
-        .es2{font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.08em;font-weight:600;}
-        .eu{font-family:'JetBrains Mono',monospace;font-size:7px;color:#bbb;}
-        @media print{body{padding:0;}}
-      </style>
-    </head><body>
-      <div class="et">
-        <div class="eh">
-          <div class="el"><div class="ei">⚡</div><span class="et-txt">EquipoTrack</span></div>
-          <span class="eid">${sanitize(equipo.id)}</span>
-        </div>
-        <div class="eb">
-          <div class="qr">${qrHtml}</div>
-          <div>
-            <div class="en">${sanitize(equipo.nombre)}</div>
-            <div class="es">S/N: ${sanitize(equipo.serie)}</div>
-            <div class="ec">${sanitize(equipo.categoria)}</div>
-          </div>
-        </div>
-        <div class="ef">
-          <span class="es2">📱 Escanea para registrar</span>
-          <span class="eu">${APP_URL}</span>
-        </div>
-      </div>
-      <script>window.onload=()=>setTimeout(()=>{window.print();window.close();},500);<\/script>
-    </body></html>`);
-    w.document.close();
+    // Extraer QR como imagen PNG desde canvas (sin innerHTML)
+    var qrCanvas=qrRef.current?qrRef.current.querySelector("canvas"):null;
+    var qrDataUrl=qrCanvas?qrCanvas.toDataURL("image/png"):"";
+
+    // Construir HTML de impresión con createElement (sin document.write)
+    var w=window.open("","_blank");
+    if(!w)return;
+    var doc=w.document;
+    doc.open();
+    var style=doc.createElement("style");
+    style.textContent=[
+      "body{margin:0;padding:20px;font-family:sans-serif;background:#fff;}",
+      ".et{border:2px solid #111;border-radius:8px;overflow:hidden;max-width:280px;margin:0 auto;}",
+      ".eh{background:#111;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;}",
+      ".logo{display:flex;align-items:center;gap:6px;}",
+      ".icon{width:22px;height:22px;background:#00e87a;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;}",
+      ".brand{color:#fff;font-size:13px;font-weight:800;}",
+      ".eid{color:#00e87a;font-size:12px;font-weight:700;font-family:monospace;}",
+      ".eb{padding:14px;display:flex;gap:14px;align-items:flex-start;}",
+      ".qrimg{width:140px;height:140px;flex-shrink:0;}",
+      ".name{font-size:14px;font-weight:800;color:#111;margin-bottom:4px;}",
+      ".serie{font-size:10px;color:#888;font-family:monospace;}",
+      ".cat{font-size:10px;color:#555;background:#f5f5f5;padding:2px 8px;border-radius:20px;display:inline-block;margin-top:4px;}",
+      ".ef{background:#f8f8f8;border-top:1px solid #eee;padding:7px 12px;}",
+      ".scan{font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.08em;font-weight:600;}",
+      "@media print{body{padding:0;}}"
+    ].join("");
+
+    var html=doc.createElement("html");
+    var head=doc.createElement("head");
+    var meta=doc.createElement("meta");
+    meta.setAttribute("charset","UTF-8");
+    head.appendChild(meta);
+    head.appendChild(style);
+    html.appendChild(head);
+
+    var body=doc.createElement("body");
+
+    // Construir etiqueta con textContent (seguro, sin XSS)
+    var et=doc.createElement("div"); et.className="et";
+    var eh=doc.createElement("div"); eh.className="eh";
+    var logo=doc.createElement("div"); logo.className="logo";
+    var icon=doc.createElement("div"); icon.className="icon"; icon.textContent="⚡";
+    var brand=doc.createElement("span"); brand.className="brand"; brand.textContent="EquipoTrack";
+    logo.appendChild(icon); logo.appendChild(brand);
+    var eid=doc.createElement("span"); eid.className="eid"; eid.textContent=equipo.id;
+    eh.appendChild(logo); eh.appendChild(eid);
+
+    var eb=doc.createElement("div"); eb.className="eb";
+    var qrDiv=doc.createElement("div");
+    if(qrDataUrl){
+      var img=doc.createElement("img");
+      img.className="qrimg"; img.src=qrDataUrl; img.alt="QR";
+      qrDiv.appendChild(img);
+    }
+    var info=doc.createElement("div");
+    var name=doc.createElement("div"); name.className="name"; name.textContent=equipo.nombre;
+    var serie=doc.createElement("div"); serie.className="serie"; serie.textContent="S/N: "+equipo.serie;
+    var cat=doc.createElement("div"); cat.className="cat"; cat.textContent=equipo.categoria;
+    info.appendChild(name); info.appendChild(serie); info.appendChild(cat);
+    eb.appendChild(qrDiv); eb.appendChild(info);
+
+    var ef=doc.createElement("div"); ef.className="ef";
+    var scan=doc.createElement("span"); scan.className="scan"; scan.textContent="📱 Escanea para registrar";
+    ef.appendChild(scan);
+
+    et.appendChild(eh); et.appendChild(eb); et.appendChild(ef);
+    body.appendChild(et);
+    html.appendChild(body);
+    doc.appendChild(html);
+    doc.close();
+
+    setTimeout(function(){w.print();},600);
   }
 
   return(
@@ -712,7 +738,7 @@ function Login({onLogin}){
 
 // ─── MODAL CHECKOUT ───────────────────────────────────────────────────────────
 function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
-  const isAdmin=ADMIN_EMAILS.includes(session.email);
+  const isAdmin=session&&session.rol==="admin";
   const [paso,setPaso]=useState(1);
   const [ingeniero,setIng]=useState(isAdmin?"":session.nombre);
   const [estado,setEstado]=useState(""),[ciudad,setCiudad]=useState("");
@@ -1517,7 +1543,7 @@ export default function App(){
   const [busq,setBusq]=useState("");
   const [toast,setToast]=useState(null);
 
-  const isAdmin=session&&(ADMIN_EMAILS.includes(session.email)||session.rol==="admin");
+  const isAdmin=session&&session.rol==="admin";
   const registros={};
   regsArr.forEach(r=>{registros[r.equipo_id]=r;});
 
@@ -1836,3 +1862,4 @@ export default function App(){
     {showMapa&&<MapaModal registros={registros} equipos={equipos} onCerrar={()=>setShowMapa(false)}/>}
   </>);
 }
+

@@ -1417,85 +1417,67 @@ function CatSelect({token,value,onChange}){
 function MapaModal({registros,equipos,onCerrar}){
   const mapRef=useRef(),mapInst=useRef();
   useEffect(()=>{
-    function loadLeafletCSS(cb){
-      if(document.getElementById("lf-css")){cb();return;}
+    if(!document.getElementById("lf-css")){
       const l=document.createElement("link");
       l.id="lf-css";l.rel="stylesheet";
       l.href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
-      l.integrity="sha512-Zcn6bjR/8RZbLEpLIeOwNtzREBAJnUKESxces60Mpoj+2okopSAcSUIUOseddDm0cxnGQzxIR7vJgsLZbdLE3Q==";
-      l.crossOrigin="anonymous";
-      l.onload=cb;
       document.head.appendChild(l);
     }
     function init(){
       if(mapInst.current||!mapRef.current)return;
       const L=window.L;
-      // Centro en México, zoom 5
       mapInst.current=L.map(mapRef.current,{zoomControl:true}).setView([23.5,-102],5);
-      // Forzar recálculo de tamaño después de render
-      setTimeout(function(){
-        if(mapInst.current){mapInst.current.invalidateSize();}
-      },200);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
         {attribution:"© OpenStreetMap",maxZoom:18}).addTo(mapInst.current);
 
       // Equipos disponibles — pin verde en su estado base
-      equipos.filter(eq=>!registros[eq.id]).forEach(eq=>{
+      equipos.filter(function(eq){return !registros[eq.id];}).forEach(function(eq){
         const coords=COORDS_ESTADO[eq.estado_base];if(!coords)return;
         const icon=L.divIcon({className:"",
-          html:`<div style="background:${C.green};color:#001a0d;border-radius:50%;width:28px;height:28px;
-            display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid #fff;
-            box-shadow:0 2px 8px rgba(0,0,0,0.3)">✓</div>`,
+          html:'<div style="background:'+C.green+';color:#001a0d;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3)">✓</div>',
           iconSize:[28,28],iconAnchor:[14,14]});
         L.marker(coords,{icon}).addTo(mapInst.current)
-          .bindPopup(`<div style="font-size:13px;font-family:sans-serif;min-width:160px">
-            <b style="color:#00aa55">✅ Disponible</b><hr style="margin:5px 0">
-            <b>${eq.nombre}</b><br>${eq.sitio_base}<br>${eq.ciudad_base}, ${eq.estado_base}</div>`);
+          .bindPopup('<div style="font-size:13px;font-family:sans-serif;min-width:160px"><b style="color:#00aa55">✅ Disponible</b><hr style="margin:5px 0"><b>'+eq.nombre+'</b><br>'+eq.sitio_base+'<br>'+eq.ciudad_base+', '+eq.estado_base+'</div>');
       });
 
       // Equipos en uso — agrupar por estado
       const porEstado={};
-      equipos.filter(eq=>registros[eq.id]).forEach(eq=>{
+      equipos.filter(function(eq){return registros[eq.id];}).forEach(function(eq){
         const reg=registros[eq.id];
         const key=reg.estado;
         if(!porEstado[key])porEstado[key]=[];
-        porEstado[key].push({eq,reg});
+        porEstado[key].push({eq:eq,reg:reg});
       });
 
-      Object.entries(porEstado).forEach(([estado,items])=>{
+      Object.entries(porEstado).forEach(function(entry){
+        const estado=entry[0], items=entry[1];
         const coords=COORDS_ESTADO[estado];if(!coords)return;
-        const tienePaq=items.some(({reg})=>reg.tipo==="paqueteria");
-        const alerta=items.some(({reg})=>getDiasNum(reg.fecha_retiro)>5);
+        const tienePaq=items.some(function(x){return x.reg.tipo==="paqueteria";});
+        const alerta=items.some(function(x){return getDiasNum(x.reg.fecha_retiro)>5;});
         const color=tienePaq?C.blue:alerta?C.red:C.orange;
         const icon=L.divIcon({className:"",
-          html:`<div style="background:${color};color:#fff;border-radius:50%;width:34px;height:34px;
-            display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;
-            border:3px solid #fff;box-shadow:0 2px 12px rgba(0,0,0,0.4)">${items.length}</div>`,
+          html:'<div style="background:'+color+';color:#fff;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;border:3px solid #fff;box-shadow:0 2px 12px rgba(0,0,0,0.4)">'+items.length+'</div>',
           iconSize:[34,34],iconAnchor:[17,17]});
-        const popup=items.map(({eq,reg})=>
-          `<b>${eq.nombre}</b><br>👤 ${reg.ingeniero}<br>📍 ${reg.ciudad}
-           <br>⏱ ${getDias(reg.fecha_retiro)}${reg.tipo==="paqueteria"?"<br>📦 En tránsito":""}`
-        ).join("<hr style='margin:5px 0'>");
+        const popup=items.map(function(x){
+          return '<b>'+x.eq.nombre+'</b><br>👤 '+x.reg.ingeniero+'<br>📍 '+x.reg.ciudad+'<br>⏱ '+getDias(x.reg.fecha_retiro)+(x.reg.tipo==="paqueteria"?"<br>📦 En tránsito":"");
+        }).join("<hr style='margin:5px 0'>");
         L.marker(coords,{icon}).addTo(mapInst.current)
-          .bindPopup(`<div style="font-size:13px;font-family:sans-serif;min-width:180px">
-            <b style="color:${C.orange}">📍 ${estado}</b><hr style="margin:5px 0">${popup}</div>`);
+          .bindPopup('<div style="font-size:13px;font-family:sans-serif;min-width:180px"><b style="color:'+C.orange+'">📍 '+estado+'</b><hr style="margin:5px 0">'+popup+'</div>');
       });
     }
-    loadLeafletCSS(function(){
-      if(window.L){init();return;}
+    if(window.L){init();}
+    else{
       const s=document.createElement("script");
       s.src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
-      s.integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWoFvtwXjgFDGkk9e1Q7A2Kw6Y4kJIvwbQMnAGJQzqPOgKv7gSow==";
-      s.crossOrigin="anonymous";
       s.onload=init;document.head.appendChild(s);
-    });
-    return()=>{if(mapInst.current){mapInst.current.remove();}mapInst.current=null;};
+    }
+    return function(){if(mapInst.current){mapInst.current.remove();}mapInst.current=null;};
   },[]);
 
   const enUso=Object.keys(registros).length;
   const disponibles=equipos.length-enUso;
   return(
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:15000,background:C.bg,display:"flex",flexDirection:"column",height:"100%"}}>
+    <div style={{position:"fixed",inset:0,zIndex:15000,background:C.bg,display:"flex",flexDirection:"column"}}>
       <div style={{padding:"18px 20px 10px",display:"flex",justifyContent:"space-between",alignItems:"center",
         background:`linear-gradient(180deg,${C.card},transparent)`}}>
         <div>
@@ -1510,14 +1492,14 @@ function MapaModal({registros,equipos,onCerrar}){
         </button>
       </div>
       <div style={{display:"flex",gap:"10px",padding:"0 20px 10px",flexWrap:"wrap"}}>
-        {[{c:C.green,l:"✓ Disponible"},{c:C.orange,l:"En uso"},{c:C.red,l:"+5 días"},{c:C.blue,l:"📦 Tránsito"}].map(x=>(
+        {[{c:C.green,l:"✓ Disponible"},{c:C.orange,l:"En uso"},{c:C.red,l:"+5 días"},{c:C.blue,l:"📦 Tránsito"}].map(function(x){return(
           <div key={x.l} style={{display:"flex",alignItems:"center",gap:"5px"}}>
             <div style={{width:"12px",height:"12px",borderRadius:"50%",background:x.c}}/>
             <span style={{fontSize:"10px",color:C.muted}}>{x.l}</span>
           </div>
-        ))}
+        );})}
       </div>
-      <div ref={mapRef} style={{flex:1,minHeight:0,height:"100%",width:"100%"}}/>
+      <div ref={mapRef} style={{flex:1}}/>
     </div>
   );
 }

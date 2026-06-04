@@ -1417,12 +1417,14 @@ function CatSelect({token,value,onChange}){
 function MapaModal({registros,equipos,onCerrar}){
   const mapRef=useRef(),mapInst=useRef();
   useEffect(()=>{
-    if(!document.getElementById("lf-css")){
+    function loadLeafletCSS(cb){
+      if(document.getElementById("lf-css")){cb();return;}
       const l=document.createElement("link");
       l.id="lf-css";l.rel="stylesheet";
       l.href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
       l.integrity="sha512-Zcn6bjR/8RZbLEpLIeOwNtzREBAJnUKESxces60Mpoj+2okopSAcSUIUOseddDm0cxnGQzxIR7vJgsLZbdLE3Q==";
       l.crossOrigin="anonymous";
+      l.onload=cb;
       document.head.appendChild(l);
     }
     function init(){
@@ -1475,21 +1477,21 @@ function MapaModal({registros,equipos,onCerrar}){
             <b style="color:${C.orange}">📍 ${estado}</b><hr style="margin:5px 0">${popup}</div>`);
       });
     }
-    if(window.L)init();
-    else{
+    loadLeafletCSS(function(){
+      if(window.L){init();return;}
       const s=document.createElement("script");
       s.src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
       s.integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWoFvtwXjgFDGkk9e1Q7A2Kw6Y4kJIvwbQMnAGJQzqPOgKv7gSow==";
       s.crossOrigin="anonymous";
       s.onload=init;document.head.appendChild(s);
-    }
+    });
     return()=>{if(mapInst.current){mapInst.current.remove();}mapInst.current=null;};
   },[]);
 
   const enUso=Object.keys(registros).length;
   const disponibles=equipos.length-enUso;
   return(
-    <div style={{position:"fixed",inset:0,zIndex:1500,background:C.bg,display:"flex",flexDirection:"column"}}>
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:15000,background:C.bg,display:"flex",flexDirection:"column"}}>
       <div style={{padding:"18px 20px 10px",display:"flex",justifyContent:"space-between",alignItems:"center",
         background:`linear-gradient(180deg,${C.card},transparent)`}}>
         <div>
@@ -1528,6 +1530,14 @@ export default function App(){
     }catch(e){ return null; }
   });
 
+  // Detectar equipoId en URL (?equipo=EQ-001) para QR
+  const [qrEquipoId] = useState(function(){
+    try{
+      var params = new URLSearchParams(window.location.search);
+      return params.get("equipo") || null;
+    }catch(e){ return null; }
+  });
+
   const [session,setSession]=useState(null);
   const [equipos,setEquipos]=useState([]);
   const [regsArr,setRegsArr]=useState([]);
@@ -1558,7 +1568,21 @@ export default function App(){
         supa("historial",{token,params:{order:"fecha_devolucion.desc",limit:"50"}}),
         supa("perfiles",{token,params:{order:"nombre.asc"}}),
       ]);
-      setEquipos(eqs||[]);setRegsArr(regs||[]);setHistorial(hist||[]);setPerfiles(prfs||[]);
+      const eqList=eqs||[];
+      setEquipos(eqList);setRegsArr(regs||[]);setHistorial(hist||[]);setPerfiles(prfs||[]);
+      // Si venimos de un QR, abrir ese equipo automáticamente
+      if(qrEquipoId){
+        const eq=eqList.find(function(e){return e.id===qrEquipoId;});
+        if(eq){
+          const regsMap={};
+          (regs||[]).forEach(function(r){regsMap[r.equipo_id]=r;});
+          setSel(eq);
+          const reg=regsMap[eq.id];
+          if(!reg){setModo("checkout");}
+          else if(reg.tipo==="paqueteria"){setModo("recepcion");}
+          else{setModo("checkin");}
+        }
+      }
     }catch(ex){showToast("Error cargando datos",false);}
     finally{setLoading(false);}
   }
@@ -1862,4 +1886,3 @@ export default function App(){
     {showMapa&&<MapaModal registros={registros} equipos={equipos} onCerrar={()=>setShowMapa(false)}/>}
   </>);
 }
-

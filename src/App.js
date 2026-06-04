@@ -1432,6 +1432,10 @@ function MapaModal({registros,equipos,onCerrar}){
       const L=window.L;
       // Centro en México, zoom 5
       mapInst.current=L.map(mapRef.current,{zoomControl:true}).setView([23.5,-102],5);
+      // Forzar recálculo de tamaño después de render
+      setTimeout(function(){
+        if(mapInst.current){mapInst.current.invalidateSize();}
+      },200);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
         {attribution:"© OpenStreetMap",maxZoom:18}).addTo(mapInst.current);
 
@@ -1491,7 +1495,7 @@ function MapaModal({registros,equipos,onCerrar}){
   const enUso=Object.keys(registros).length;
   const disponibles=equipos.length-enUso;
   return(
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:15000,background:C.bg,display:"flex",flexDirection:"column"}}>
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:15000,background:C.bg,display:"flex",flexDirection:"column",height:"100%"}}>
       <div style={{padding:"18px 20px 10px",display:"flex",justifyContent:"space-between",alignItems:"center",
         background:`linear-gradient(180deg,${C.card},transparent)`}}>
         <div>
@@ -1513,7 +1517,7 @@ function MapaModal({registros,equipos,onCerrar}){
           </div>
         ))}
       </div>
-      <div ref={mapRef} style={{flex:1}}/>
+      <div ref={mapRef} style={{flex:1,minHeight:0,height:"100%",width:"100%"}}/>
     </div>
   );
 }

@@ -129,11 +129,14 @@ function Row({label,value,last}){
   </div>;
 }
 
-function Badge({reg}){
+function Badge({reg,enRep}){
+  if(enRep) return <span style={{background:"linear-gradient(135deg,#ff9500,#cc7700)",
+    color:"#fff",padding:"3px 10px",borderRadius:"20px",fontSize:"11px",
+    fontWeight:"700",textTransform:"uppercase",letterSpacing:"0.04em"}}>🔧 No disponible</span>;
   if(!reg) return <span style={{background:`linear-gradient(135deg,${C.green},#00c066)`,
     color:"#001a0d",padding:"3px 10px",borderRadius:"20px",fontSize:"11px",
     fontWeight:"700",textTransform:"uppercase",letterSpacing:"0.05em"}}>Disponible</span>;
-  const dias=getDias(reg.fecha_retiro), alerta=parseInt(dias)>7;
+  const dias=getDias(reg.fecha_retiro), alerta=getDiasNum(reg.fecha_retiro)>5;
   if(reg.tipo==="paqueteria") return <span style={{background:`linear-gradient(135deg,${C.blue},#2266cc)`,
     color:"#fff",padding:"3px 10px",borderRadius:"20px",fontSize:"11px",fontWeight:"700",
     textTransform:"uppercase",letterSpacing:"0.04em"}}>📦 Tránsito · {dias}</span>;
@@ -293,8 +296,6 @@ function QRLabel({equipo,onCerrar}){
     else{
       const s=document.createElement("script");
       s.src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
-      s.integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSQX0FslNhTDadL0zmtzHiTgB794n6jz4Ifw==";
-      s.crossOrigin="anonymous";
       s.onload=genQR;document.head.appendChild(s);
     }
   },[]);
@@ -1132,7 +1133,11 @@ function AdminPanel({token,onClose,onEquipoCreado}){
   }
 
   async function cargarPerfiles(){
-    try{const r=await supa("perfiles",{token,params:{order:"nombre.asc"}});setPerfiles(r||[]);}catch{}
+    try{
+      // Cargar todos los perfiles — la política RLS permite al admin ver todos
+      const r=await supa("perfiles",{token,params:{order:"nombre.asc",select:"*"}});
+      setPerfiles(r||[]);
+    }catch(ex){console.error("Error cargando perfiles:",ex.message);}
   }
 
   async function guardarNombre(perfil){
@@ -1430,14 +1435,45 @@ function MapaModal({registros,equipos,onCerrar}){
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
         {attribution:"© OpenStreetMap",maxZoom:18}).addTo(mapInst.current);
 
-      // Equipos disponibles — pin verde en su estado base
+      // Agrupar equipos disponibles y en reparación por estado base
+      var porEstadoBase={};
       equipos.filter(function(eq){return !registros[eq.id];}).forEach(function(eq){
-        const coords=COORDS_ESTADO[eq.estado_base];if(!coords)return;
-        const icon=L.divIcon({className:"",
-          html:'<div style="background:'+C.green+';color:#001a0d;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3)">✓</div>',
-          iconSize:[28,28],iconAnchor:[14,14]});
-        L.marker(coords,{icon}).addTo(mapInst.current)
-          .bindPopup('<div style="font-size:13px;font-family:sans-serif;min-width:160px"><b style="color:#00aa55">✅ Disponible</b><hr style="margin:5px 0"><b>'+eq.nombre+'</b><br>'+eq.sitio_base+'<br>'+eq.ciudad_base+', '+eq.estado_base+'</div>');
+        var key=eq.estado_base;
+        if(!porEstadoBase[key])porEstadoBase[key]={disponibles:[],reparacion:[]};
+        if(eq.estatus==="reparacion"){porEstadoBase[key].reparacion.push(eq);}
+        else{porEstadoBase[key].disponibles.push(eq);}
+      });
+
+      Object.entries(porEstadoBase).forEach(function(entry){
+        var estado=entry[0], grupo=entry[1];
+        var coords=COORDS_ESTADO[estado]; if(!coords)return;
+        var totalDisp=grupo.disponibles.length, totalRep=grupo.reparacion.length;
+
+        // Pin verde si hay disponibles, gris si solo hay en reparación
+        if(totalDisp>0){
+          var iconDisp=L.divIcon({className:"",
+            html:'<div style="background:'+C.green+';color:#001a0d;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3)">'+(totalDisp>1?totalDisp:'✓')+'</div>',
+            iconSize:[28,28],iconAnchor:[14,14]});
+          var popupDisp='<div style="font-size:13px;font-family:sans-serif;min-width:180px"><b style="color:#00aa55">✅ Disponibles en '+estado+'</b><hr style="margin:5px 0">';
+          popupDisp+=grupo.disponibles.map(function(eq){
+            return '<b>'+eq.nombre+'</b><br><small>'+eq.sitio_base+' · '+eq.ciudad_base+'</small>';
+          }).join("<hr style='margin:4px 0'>");
+          popupDisp+='</div>';
+          L.marker([coords[0]-0.05,coords[1]],{icon:iconDisp}).addTo(mapInst.current).bindPopup(popupDisp);
+        }
+
+        // Pin gris para equipos en reparación
+        if(totalRep>0){
+          var iconRep=L.divIcon({className:"",
+            html:'<div style="background:#555;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3)">🔧</div>',
+            iconSize:[28,28],iconAnchor:[14,14]});
+          var popupRep='<div style="font-size:13px;font-family:sans-serif;min-width:180px"><b style="color:#ff9500">🔧 En reparación en '+estado+'</b><hr style="margin:5px 0">';
+          popupRep+=grupo.reparacion.map(function(eq){
+            return '<b>'+eq.nombre+'</b><br><small>'+eq.sitio_base+'</small>';
+          }).join("<hr style='margin:4px 0'>");
+          popupRep+='</div>';
+          L.marker([coords[0]+0.05,coords[1]],{icon:iconRep}).addTo(mapInst.current).bindPopup(popupRep);
+        }
       });
 
       // Equipos en uso — agrupar por estado
@@ -1492,7 +1528,7 @@ function MapaModal({registros,equipos,onCerrar}){
         </button>
       </div>
       <div style={{display:"flex",gap:"10px",padding:"0 20px 10px",flexWrap:"wrap"}}>
-        {[{c:C.green,l:"✓ Disponible"},{c:C.orange,l:"En uso"},{c:C.red,l:"+5 días"},{c:C.blue,l:"📦 Tránsito"}].map(function(x){return(
+        {[{c:C.green,l:"✓ Disponible"},{c:"#555",l:"🔧 Reparación"},{c:C.orange,l:"En uso"},{c:C.red,l:"+5 días"},{c:C.blue,l:"📦 Tránsito"}].map(function(x){return(
           <div key={x.l} style={{display:"flex",alignItems:"center",gap:"5px"}}>
             <div style={{width:"12px",height:"12px",borderRadius:"50%",background:x.c}}/>
             <span style={{fontSize:"10px",color:C.muted}}>{x.l}</span>
@@ -1552,7 +1588,7 @@ export default function App(){
         supa("equipos",{token,params:{order:"created_at.asc",activo:"eq.true"}}),
         supa("registros",{token,params:{order:"fecha_retiro.desc"}}),
         supa("historial",{token,params:{order:"fecha_devolucion.desc",limit:"50"}}),
-        supa("perfiles",{token,params:{order:"nombre.asc"}}),
+        supa("perfiles",{token,params:{order:"nombre.asc",select:"*"}}),
       ]);
       const eqList=eqs||[];
       setEquipos(eqList);setRegsArr(regs||[]);setHistorial(hist||[]);setPerfiles(prfs||[]);
@@ -1762,7 +1798,7 @@ export default function App(){
                     <div style={{display:"flex",alignItems:"center",gap:"6px",marginBottom:"5px",flexWrap:"wrap"}}>
                       <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",color:C.muted,
                         background:"#12121f",padding:"2px 6px",borderRadius:"5px",flexShrink:0}}>{eq.id}</span>
-                      <Badge reg={reg}/>
+                      <Badge reg={reg} enRep={enRep}/>
                       {enRep&&<span style={{fontSize:"10px",color:C.orange,background:C.orangeDk,
                         padding:"2px 8px",borderRadius:"20px",fontWeight:"700",flexShrink:0}}>🔧 Reparación</span>}
                     </div>

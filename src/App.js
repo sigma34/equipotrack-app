@@ -29,7 +29,20 @@ async function authReq(path, body) {
     body: JSON.stringify(body),
   });
   const data = await res.json();
-  if (data.error || data.error_description) throw new Error(data.error_description || (data.error && data.error.message) || "Error");
+  if (data.error || data.error_description) {
+    var msg = data.error_description || (data.error && data.error.message) || "Error";
+    // Mensajes más amigables
+    if(msg.indexOf("Invalid login credentials")!==-1){
+      msg = "Correo o contraseña incorrectos. Verifica tus datos.";
+    } else if(msg.indexOf("Email not confirmed")!==-1){
+      msg = "Debes confirmar tu correo antes de entrar.";
+    } else if(msg.indexOf("User not found")!==-1){
+      msg = "No existe una cuenta con ese correo.";
+    } else if(msg.indexOf("too many requests")!==-1||msg.indexOf("rate limit")!==-1){
+      msg = "Demasiados intentos. Espera unos minutos e intenta de nuevo.";
+    }
+    throw new Error(msg);
+  }
   return data;
 }
 
@@ -1624,15 +1637,33 @@ export default function App(){
     setSession(s);
     if(!s.necesitaNombre) cargar(s.token);
   }
-  function cerrar(){setSel(null);setModo(null);}
+  function cerrar(){
+    setSel(null);setModo(null);
+    // Limpiar ?equipo=XXX de la URL al cerrar modal
+    if(window.history&&window.history.replaceState){
+      window.history.replaceState(null,"",window.location.pathname);
+    }
+  }
   function onAccion(msg){showToast(msg);cargar(session.token);cerrar();}
 
-  function abrir(eq){
-    setSel(eq);
-    const reg=registros[eq.id];
-    if(!reg){setModo("checkout");return;}
-    if(reg.tipo==="paqueteria"){setModo("recepcion");return;}
-    setModo("checkin");
+  async function abrir(eq){
+    // Recargar registros frescos antes de abrir para evitar estado desactualizado
+    try{
+      const regs=await supa("registros",{token:session.token,params:{order:"fecha_retiro.desc"}});
+      setRegsArr(regs||[]);
+      const regFresco=(regs||[]).find(function(r){return r.equipo_id===eq.id;});
+      setSel(eq);
+      if(!regFresco){setModo("checkout");return;}
+      if(regFresco.tipo==="paqueteria"){setModo("recepcion");return;}
+      setModo("checkin");
+    }catch(e){
+      // Si falla la recarga usar estado local
+      setSel(eq);
+      const reg=registros[eq.id];
+      if(!reg){setModo("checkout");return;}
+      if(reg.tipo==="paqueteria"){setModo("recepcion");return;}
+      setModo("checkin");
+    }
   }
 
   const ciudadesEnUso=[...new Set(regsArr.map(r=>r.ciudad))].sort();
@@ -1643,7 +1674,9 @@ export default function App(){
     return mb&&mc;
   });
 
-  const enUso=regsArr.length, disponibles=equipos.length-enUso;
+  const enUso=regsArr.length;
+  const enReparacion=equipos.filter(function(e){return e.estatus==="reparacion"&&!registros[e.id];}).length;
+  const disponibles=equipos.length-enUso-enReparacion;
 
   // Si hay token de recovery, mostrar pantalla de nueva contraseña
   if(recoveryToken) return <NuevaContrasena token={recoveryToken}/>;
@@ -1711,7 +1744,13 @@ export default function App(){
               {enUso>0&&<span style={{background:C.orange,color:"#1a0a00",borderRadius:"10px",
                 padding:"1px 6px",fontSize:"10px",fontWeight:"800"}}>{enUso}</span>}
             </button>
-            <button onClick={()=>setSession(null)}
+            <button onClick={function(){
+              setSession(null);
+              // Limpiar ?equipo=XXX de la URL para que no persista
+              if(window.history&&window.history.replaceState){
+                window.history.replaceState(null,"",window.location.pathname);
+              }
+            }}
               style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:"10px",
                 padding:"8px 10px",cursor:"pointer",color:C.muted,fontSize:"13px"}}>↩</button>
           </div>

@@ -753,13 +753,22 @@ function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
     setLoading(true);
     try{
       await supa("registros",{method:"POST",token,body:{
-        equipo_id:equipo.id,ingeniero,estado,ciudad,
+        equipo_id:equipo.id,
+        user_id:session.user.id,
+        ingeniero,estado,ciudad,
         tipo,guia_paqueteria:guia||null,
-        foto_retiro:foto,fecha_retiro:new Date().toISOString(),
+        foto_retiro:foto,
         enviado_por:session.nombre,
+        // fecha_retiro y user_id los genera el trigger en DB
       }});
       onConfirmar(`✅ ${equipo.nombre} asignado a ${ingeniero}`);
-    }catch(ex){alert("Error: "+ex.message);}
+    }catch(ex){
+      if(ex.message.indexOf("no_duplicate_checkout")!==-1||ex.message.indexOf("unique")!==-1){
+        alert("Este equipo ya está asignado. Recarga la app y verifica.");
+      }else{
+        alert("Error: "+ex.message);
+      }
+    }
     finally{setLoading(false);}
   }
 
@@ -977,7 +986,7 @@ function ModalRecepcion({equipo,registro,token,session,onConfirmar,onCerrar}){
 }
 
 // ─── MODAL CHECKIN ────────────────────────────────────────────────────────────
-function ModalCheckin({equipo,registro,token,onConfirmar,onCerrar}){
+function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
   const [foto,setFoto]=useState(null),[showCam,setShowCam]=useState(false);
   const [loading,setLoading]=useState(false),[listo,setListo]=useState(false);
 
@@ -986,11 +995,13 @@ function ModalCheckin({equipo,registro,token,onConfirmar,onCerrar}){
     try{
       await supa("historial",{method:"POST",token,body:{
         equipo_id:equipo.id,equipo_nombre:equipo.nombre,
+        user_id:session.user.id,
         ingeniero:registro.ingeniero,estado:registro.estado,ciudad:registro.ciudad,
-        fecha_retiro:registro.fecha_retiro,fecha_devolucion:new Date().toISOString(),
+        fecha_retiro:registro.fecha_retiro,
         foto_retiro:registro.foto_retiro,foto_devolucion:foto,
         dias:getDias(registro.fecha_retiro),tipo:registro.tipo,
         guia_paqueteria:registro.guia_paqueteria,
+        // fecha_devolucion la genera el trigger en DB
       }});
       await supa(`registros?equipo_id=eq.${equipo.id}`,{method:"DELETE",token});
       setListo(true);
@@ -1902,7 +1913,7 @@ export default function App(){
       onConfirmar={onAccion} onCerrar={cerrar}/>}
 
     {modo==="checkin"&&sel&&<ModalCheckin equipo={sel} registro={registros[sel.id]}
-      token={session.token}
+      token={session.token} session={session}
       onConfirmar={onAccion} onCerrar={cerrar}/>}
 
     {showMapa&&<MapaModal registros={registros} equipos={equipos} onCerrar={()=>setShowMapa(false)}/>}

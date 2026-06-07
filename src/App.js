@@ -1016,7 +1016,8 @@ function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
         guia_paqueteria:registro.guia_paqueteria,
         // fecha_devolucion la genera el trigger en DB
       }});
-      await supa(`registros?equipo_id=eq.${equipo.id}`,{method:"DELETE",token});
+      // Borrar registro activo - requiere política RLS que permita al usuario borrar su propio registro
+      await supa("registros?equipo_id=eq."+equipo.id,{method:"DELETE",token});
       setListo(true);
       setTimeout(()=>{onConfirmar(`📦 ${equipo.nombre} devuelto correctamente`);onCerrar();},1800);
     }catch(ex){alert("Error: "+ex.message);}
@@ -1535,7 +1536,8 @@ function MapaModal({registros,equipos,onCerrar}){
   },[]);
 
   const enUso=Object.keys(registros).length;
-  const disponibles=equipos.length-enUso;
+  const enRep=equipos.filter(function(e){return e.estatus==="reparacion"&&!registros[e.id];}).length;
+  const disponibles=equipos.length-enUso-enRep;
   return(
     <div style={{position:"fixed",inset:0,zIndex:15000,background:C.bg,display:"flex",flexDirection:"column"}}>
       <div style={{padding:"18px 20px 10px",display:"flex",justifyContent:"space-between",alignItems:"center",
@@ -1670,7 +1672,11 @@ export default function App(){
   const filtrados=equipos.filter(eq=>{
     const mb=eq.nombre.toLowerCase().includes(busq.toLowerCase())||eq.id.toLowerCase().includes(busq.toLowerCase());
     const reg=registros[eq.id];
-    const mc=filtro==="todas"||(filtro==="disponibles"&&!reg)||(reg&&reg.ciudad===filtro);
+    const enRep=eq.estatus==="reparacion";
+    const mc=filtro==="todas"
+      ||(filtro==="disponibles"&&!reg&&!enRep)
+      ||(filtro==="reparacion"&&enRep)
+      ||(reg&&reg.ciudad===filtro);
     return mb&&mc;
   });
 
@@ -1760,7 +1766,7 @@ export default function App(){
         <div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
           {[{label:"Disponibles",val:disponibles,color:C.green},
             {label:"En uso",val:enUso,color:C.orange},
-            {label:"Total",val:equipos.length,color:"#888"}].map(s=>(
+            {label:"Total",val:disponibles+enUso,color:"#888"}].map(s=>(
             <div key={s.label} style={{flex:1,background:C.card,border:`1px solid ${C.border}`,
               borderRadius:"12px",padding:"10px",textAlign:"center"}}>
               <div style={{fontSize:"20px",fontWeight:"800",color:s.color}}>{s.val}</div>
@@ -1781,6 +1787,7 @@ export default function App(){
         {vista==="equipos"&&(
           <div style={{display:"flex",gap:"6px",overflowX:"auto",paddingBottom:"12px",scrollbarWidth:"none"}}>
             {[{key:"todas",label:"Todos"},{key:"disponibles",label:"Disponibles"},
+              {key:"reparacion",label:"🔧 Reparación"},
               ...ciudadesEnUso.map(c=>({key:c,label:c}))].map(f=>(
               <button key={f.key} onClick={()=>setFiltro(f.key)}
                 style={{flexShrink:0,padding:"6px 12px",

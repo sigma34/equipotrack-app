@@ -97,7 +97,24 @@ const COORDS_ESTADO = {
   "Yucatán":[20.97,-89.62],"Zacatecas":[22.77,-102.58],
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+// Leer rol desde JWT app_metadata (no desde perfiles - evita recursión RLS)
+function getRolFromSession(session){
+  if(!session) return "ingeniero";
+  // Primero intentar app_metadata del JWT (fuente más confiable)
+  try{
+    var token=session.token;
+    var parts=token.split(".");
+    if(parts.length===3){
+      var payload=JSON.parse(atob(parts[1].replace(/-/g,"+").replace(/_/g,"/")));
+      if(payload.app_metadata&&payload.app_metadata.rol){
+        return payload.app_metadata.rol;
+      }
+    }
+  }catch(e){}
+  // Fallback: rol guardado en sesión desde perfiles
+  return session.rol||"ingeniero";
+}─
 function getDias(iso) {
   const diff = new Date() - new Date(iso);
   const d = Math.floor(diff/86400000), h = Math.floor((diff%86400000)/3600000);
@@ -696,8 +713,20 @@ function Login({onLogin}){
       }catch{}
       const pNombre = perfil && perfil.nombre ? perfil.nombre : null;
       const pRol = perfil && perfil.rol ? perfil.rol : "ingeniero";
+      // También leer rol desde app_metadata del JWT recién recibido
+      var jwtRol = "ingeniero";
+      try{
+        var parts=data.access_token.split(".");
+        if(parts.length===3){
+          var payload=JSON.parse(atob(parts[1].replace(/-/g,"+").replace(/_/g,"/")));
+          if(payload.app_metadata&&payload.app_metadata.rol){
+            jwtRol=payload.app_metadata.rol;
+          }
+        }
+      }catch(e){}
+      const rolFinal = jwtRol==="admin" ? "admin" : pRol;
       const sessionData={token:data.access_token,email:data.user.email,
-        user:data.user,nombre:pNombre,rol:pRol,necesitaNombre:!pNombre};
+        user:data.user,nombre:pNombre,rol:rolFinal,necesitaNombre:!pNombre};
       onLogin(sessionData);
     }catch(ex){setErr(ex.message);}
     finally{setLoading(false);}
@@ -752,7 +781,7 @@ function Login({onLogin}){
 
 // ─── MODAL CHECKOUT ───────────────────────────────────────────────────────────
 function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
-  const isAdmin=session&&session.rol==="admin";
+  const isAdmin=getRolFromSession(session)==="admin";
   const [paso,setPaso]=useState(1);
   const [ingeniero,setIng]=useState(isAdmin?"":session.nombre);
   const [estado,setEstado]=useState(""),[ciudad,setCiudad]=useState("");
@@ -1601,7 +1630,7 @@ export default function App(){
   const [busq,setBusq]=useState("");
   const [toast,setToast]=useState(null);
 
-  const isAdmin=session&&session.rol==="admin";
+  const isAdmin=getRolFromSession(session)==="admin";
   const registros={};
   regsArr.forEach(r=>{registros[r.equipo_id]=r;});
 

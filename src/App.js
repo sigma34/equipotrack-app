@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 // QRCode via npm (instalar: npm install qrcode)
 // Se importa dinámicamente para compatibilidad con React build
 
-// ─── Supabase ─────────────────────────────────────────────────────────────────
+// - Supabase -
 const SUPA_URL = "https://tawgfibmeymxjgwkgnsc.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRhd2dmaWJtZXlteGpnd2tnbnNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MzIzODcsImV4cCI6MjA5NTMwODM4N30.iWVX276PbFNt8rC2ZGO58Kc8nOuEjVcahhMh7vzZk3Q";
 
@@ -46,7 +46,7 @@ async function authReq(path, body) {
   return data;
 }
 
-// ─── México ───────────────────────────────────────────────────────────────────
+// - México -
 const MEXICO = {
   "Aguascalientes":["Aguascalientes","Jesús María","San Francisco de los Romo"],
   "Baja California":["Tijuana","Mexicali","Ensenada","Rosarito","Tecate"],
@@ -97,7 +97,7 @@ const COORDS_ESTADO = {
   "Yucatán":[20.97,-89.62],"Zacatecas":[22.77,-102.58],
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// - Helpers -
 // Leer rol desde JWT app_metadata (no desde perfiles - evita recursión RLS)
 function getRolFromSession(session){
   if(!session) return "ingeniero";
@@ -114,7 +114,7 @@ function getRolFromSession(session){
   }catch(e){}
   // Fallback: rol guardado en sesión desde perfiles
   return session.rol||"ingeniero";
-}─
+}
 function getDias(iso) {
   const diff = new Date() - new Date(iso);
   const d = Math.floor(diff/86400000), h = Math.floor((diff%86400000)/3600000);
@@ -128,7 +128,7 @@ function fmt(iso) {
   return new Date(iso).toLocaleString("es-MX",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
 }
 
-// ─── Colores ──────────────────────────────────────────────────────────────────
+// - Colores -
 const C = {
   bg:"#07070f",card:"#0e0e1c",border:"#1c1c30",
   green:"#00e87a",greenDk:"#001f0e",
@@ -150,7 +150,7 @@ const btnP = (dis)=>({
   cursor:dis?"not-allowed":"pointer",fontFamily:"inherit",transition:"all 0.2s",
 });
 
-// ─── Pequeños ─────────────────────────────────────────────────────────────────
+// - Pequeños -
 function Row({label,value,last}){
   return <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0",
     borderBottom:last?"none":`1px solid ${C.border}`}}>
@@ -192,7 +192,7 @@ function Spin(){
   </div>;
 }
 
-// ─── Estado/Ciudad ────────────────────────────────────────────────────────────
+// - Estado/Ciudad -
 function EstadoCiudad({estado,ciudad,onEstado,onCiudad}){
   return <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
     <div>
@@ -218,7 +218,7 @@ function EstadoCiudad({estado,ciudad,onEstado,onCiudad}){
   </div>;
 }
 
-// ─── Cámara ───────────────────────────────────────────────────────────────────
+// - Cámara -
 function CamaraModal({titulo,onCaptura,onCerrar}){
   const vRef=useRef(),cRef=useRef(),sRef=useRef();
   const [live,setLive]=useState(false),[cap,setCap]=useState(null),[err,setErr]=useState(false);
@@ -298,7 +298,7 @@ function CamaraModal({titulo,onCaptura,onCerrar}){
   );
 }
 
-// ─── QR Label (inline) ────────────────────────────────────────────────────────
+// - QR Label (inline) -
 // Sanitizar strings para uso en HTML (prevención XSS)
 function sanitize(str){
   if(!str) return "";
@@ -456,7 +456,7 @@ function QRLabel({equipo,onCerrar}){
   );
 }
 
-// ─── PANTALLA REGISTRO DE NOMBRE ─────────────────────────────────────────────
+// - PANTALLA REGISTRO DE NOMBRE -
 function RegistroNombre({sessionTemp,onComplete}){
   const [nombre,setNombre]=useState("");
   const [loading,setLoading]=useState(false);
@@ -534,7 +534,7 @@ function RegistroNombre({sessionTemp,onComplete}){
   );
 }
 
-// ─── NUEVA CONTRASEÑA (desde link de email) ──────────────────────────────────
+// - NUEVA CONTRASEÑA (desde link de email) -
 function NuevaContrasena({token}){
   const [pass,setPass]=useState("");
   const [pass2,setPass2]=useState("");
@@ -624,7 +624,7 @@ function NuevaContrasena({token}){
   );
 }
 
-// ─── RESET CONTRASEÑA ─────────────────────────────────────────────────────────
+// - RESET CONTRASEÑA -
 function ResetPassword({onVolver}){
   const [email,setEmail]=useState("");
   const [loading,setLoading]=useState(false);
@@ -694,7 +694,7 @@ function ResetPassword({onVolver}){
   );
 }
 
-// ─── LOGIN ────────────────────────────────────────────────────────────────────
+// - LOGIN -
 function Login({onLogin}){
   const [email,setEmail]=useState(""),[pass,setPass]=useState("");
   const [loading,setLoading]=useState(false),[err,setErr]=useState("");
@@ -796,7 +796,7 @@ function Login({onLogin}){
   );
 }
 
-// ─── MODAL CHECKOUT ───────────────────────────────────────────────────────────
+// - MODAL CHECKOUT -
 function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
   const isAdmin=getRolFromSession(session)==="admin";
   const [paso,setPaso]=useState(1);
@@ -955,7 +955,7 @@ function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
   </>);
 }
 
-// ─── MODAL RECEPCIÓN PAQUETERÍA ───────────────────────────────────────────────
+// - MODAL RECEPCIÓN PAQUETERÍA -
 function ModalRecepcion({equipo,registro,token,session,onConfirmar,onCerrar}){
   const [estado,setEstado]=useState(""),[ciudad,setCiudad]=useState("");
   const [foto,setFoto]=useState(null),[showCam,setShowCam]=useState(false);
@@ -1044,7 +1044,7 @@ function ModalRecepcion({equipo,registro,token,session,onConfirmar,onCerrar}){
   </>);
 }
 
-// ─── MODAL CHECKIN ────────────────────────────────────────────────────────────
+// - MODAL CHECKIN -
 function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
   const [foto,setFoto]=useState(null),[showCam,setShowCam]=useState(false);
   const [loading,setLoading]=useState(false),[listo,setListo]=useState(false);
@@ -1136,7 +1136,7 @@ function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
   </>);
 }
 
-// ─── PANEL ADMIN ──────────────────────────────────────────────────────────────
+// - PANEL ADMIN -
 function AdminPanel({token,onClose,onEquipoCreado}){
   const [tab,setTab]=useState("equipos"); // equipos | categorias | ingenieros
   // Equipo form
@@ -1489,7 +1489,7 @@ function CatSelect({token,value,onChange}){
   );
 }
 
-// ─── MAPA ─────────────────────────────────────────────────────────────────────
+// - MAPA -
 function MapaModal({registros,equipos,onCerrar}){
   const mapRef=useRef(),mapInst=useRef();
   useEffect(()=>{
@@ -1612,7 +1612,7 @@ function MapaModal({registros,equipos,onCerrar}){
   );
 }
 
-// ─── APP ──────────────────────────────────────────────────────────────────────
+// - APP -
 export default function App(){
   // Detectar token de recovery ANTES del primer render usando lazy useState
   const [recoveryToken] = useState(function(){
@@ -1761,7 +1761,7 @@ export default function App(){
 
       {toast&&<Toast {...toast}/>}
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div style={{padding:"16px 16px 0",
         background:C.card,
         position:"sticky",top:0,zIndex:100,

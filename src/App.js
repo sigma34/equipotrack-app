@@ -704,29 +704,46 @@ function Login({onLogin}){
     e.preventDefault();setLoading(true);setErr("");
     try{
       const data=await authReq("token?grant_type=password",{email,password:pass});
-      // Cargar perfil existente
-      let perfil=null;
-      try{
-        const p=await supa("perfiles",{token:data.access_token,
-          params:{id:`eq.${data.user.id}`,limit:"1"}});
-        perfil=p&&p[0]?p[0]:null;
-      }catch{}
-      const pNombre = perfil && perfil.nombre ? perfil.nombre : null;
-      const pRol = perfil && perfil.rol ? perfil.rol : "ingeniero";
-      // También leer rol desde app_metadata del JWT recién recibido
-      var jwtRol = "ingeniero";
+
+      // Extraer user del JWT directamente (más robusto que data.user)
+      var userId=null, jwtRol="ingeniero";
       try{
         var parts=data.access_token.split(".");
         if(parts.length===3){
           var payload=JSON.parse(atob(parts[1].replace(/-/g,"+").replace(/_/g,"/")));
+          userId=payload.sub||null;
           if(payload.app_metadata&&payload.app_metadata.rol){
             jwtRol=payload.app_metadata.rol;
           }
         }
-      }catch(e){}
-      const rolFinal = jwtRol==="admin" ? "admin" : pRol;
-      const sessionData={token:data.access_token,email:data.user.email,
-        user:data.user,nombre:pNombre,rol:rolFinal,necesitaNombre:!pNombre};
+      }catch(je){}
+
+      // Fallback: intentar data.user si existe
+      if(!userId&&data.user){userId=data.user.id;}
+
+      // Cargar perfil
+      let perfil=null;
+      if(userId){
+        try{
+          const p=await supa("perfiles",{token:data.access_token,
+            params:{id:"eq."+userId,limit:"1"}});
+          perfil=p&&p[0]?p[0]:null;
+        }catch{}
+      }
+
+      const pNombre=perfil&&perfil.nombre?perfil.nombre:null;
+      const pRol=perfil&&perfil.rol?perfil.rol:"ingeniero";
+      const rolFinal=jwtRol==="admin"?"admin":pRol;
+      const userEmail=(data.user&&data.user.email)||email;
+
+      const sessionData={
+        token:data.access_token,
+        email:userEmail,
+        user:{id:userId,email:userEmail},
+        nombre:pNombre,
+        rol:rolFinal,
+        necesitaNombre:!pNombre
+      };
       onLogin(sessionData);
     }catch(ex){setErr(ex.message);}
     finally{setLoading(false);}

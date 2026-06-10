@@ -482,18 +482,32 @@ function RegistroNombre({sessionTemp,onComplete}){
     try{
       // Extraer userId del JWT directamente
       var userId=null;
+      var debugInfo="";
       try{
         var parts=sessionTemp.token.split(".");
         if(parts.length===3){
           var payload=JSON.parse(atob(parts[1].replace(/-/g,"+").replace(/_/g,"/")));
           userId=payload.sub||null;
+          debugInfo="sub:"+payload.sub+"|uid:"+payload.user_id;
         }
-      }catch(je){}
+      }catch(je){debugInfo="jwt_err:"+je.message;}
       // Fallback a sessionTemp.user.id si existe
-      if(!userId&&sessionTemp.user&&sessionTemp.user.id){
+      if(!userId&&sessionTemp.user&&sessionTemp.user.id&&sessionTemp.user.id!=="null"){
         userId=sessionTemp.user.id;
+        debugInfo+=" fallback:"+userId;
       }
-      if(!userId){setErr("No se pudo identificar el usuario. Intenta cerrar sesión y volver a entrar.");setLoading(false);return;}
+      // Segundo fallback: user_id en payload
+      if(!userId){
+        try{
+          var parts2=sessionTemp.token.split(".");
+          var pl2=JSON.parse(atob(parts2[1].replace(/-/g,"+").replace(/_/g,"/")));
+          userId=pl2.user_id||pl2.uid||pl2.id||null;
+        }catch(e2){}
+      }
+      if(!userId){
+        setErr("No se pudo identificar el usuario. Info: "+debugInfo);
+        setLoading(false);return;
+      }
 
       try{
         await supa("perfiles",{method:"POST",token:sessionTemp.token,

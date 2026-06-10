@@ -98,6 +98,19 @@ const COORDS_ESTADO = {
 };
 
 // - Helpers -
+// Obtener userId desde sesión de forma segura (el hook JWT puede alterar data.user)
+function getUserId(session){
+  if(!session) return null;
+  if(session.user&&session.user.id&&session.user.id!=="null") return session.user.id;
+  try{
+    var parts=session.token.split(".");
+    if(parts.length===3){
+      var pl=JSON.parse(atob(parts[1].replace(/-/g,"+").replace(/_/g,"/")));
+      return pl.sub||null;
+    }
+  }catch(e){}
+  return null;
+}
 // Leer rol desde JWT app_metadata (no desde perfiles - evita recursión RLS)
 function getRolFromSession(session){
   if(!session) return "ingeniero";
@@ -124,7 +137,7 @@ function getDiasNum(iso) {
   return Math.floor((new Date() - new Date(iso)) / 86400000);
 }
 function fmt(iso) {
-  if (!iso) return "—";
+  if (!iso) return "";
   return new Date(iso).toLocaleString("es-MX",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
 }
 
@@ -266,7 +279,7 @@ function CamaraModal({titulo,onCaptura,onCerrar}){
           📷 {titulo}
         </h3>
         {err&&<p style={{color:C.orange,fontSize:"12px",marginBottom:"10px",background:"#1a1200",padding:"8px 12px",borderRadius:"8px"}}>
-          Cámara no disponible — modo simulado</p>}
+          Cámara no disponible  modo simulado</p>}
         {!cap?<>
           <div style={{background:"#000",borderRadius:"12px",overflow:"hidden",aspectRatio:"4/3",
             display:"flex",alignItems:"center",justifyContent:"center",marginBottom:"12px",position:"relative"}}>
@@ -467,18 +480,33 @@ function RegistroNombre({sessionTemp,onComplete}){
     if(!nombre.trim()){setErr("Por favor ingresa tu nombre completo");return;}
     setLoading(true);setErr("");
     try{
-      // Intentar insertar, si ya existe actualizar
+      // Extraer userId del JWT directamente
+      var userId=null;
+      try{
+        var parts=sessionTemp.token.split(".");
+        if(parts.length===3){
+          var payload=JSON.parse(atob(parts[1].replace(/-/g,"+").replace(/_/g,"/")));
+          userId=payload.sub||null;
+        }
+      }catch(je){}
+      // Fallback a sessionTemp.user.id si existe
+      if(!userId&&sessionTemp.user&&sessionTemp.user.id){
+        userId=sessionTemp.user.id;
+      }
+      if(!userId){setErr("No se pudo identificar el usuario. Intenta cerrar sesión y volver a entrar.");setLoading(false);return;}
+
       try{
         await supa("perfiles",{method:"POST",token:sessionTemp.token,
-          body:{id:sessionTemp.user.id,nombre:nombre.trim(),email:sessionTemp.email}});
+          body:{id:userId,nombre:nombre.trim(),email:sessionTemp.email}});
       }catch{
-        await supa(`perfiles?id=eq.${sessionTemp.user.id}`,{method:"PATCH",token:sessionTemp.token,
+        await supa("perfiles?id=eq."+userId,{method:"PATCH",token:sessionTemp.token,
           body:{nombre:nombre.trim()}});
       }
-      const updated = {};
-      for(const k in sessionTemp) updated[k] = sessionTemp[k];
-      updated.nombre = nombre.trim();
-      updated.necesitaNombre = false;
+      const updated={};
+      for(var k in sessionTemp) updated[k]=sessionTemp[k];
+      updated.nombre=nombre.trim();
+      updated.necesitaNombre=false;
+      updated.user={id:userId,email:sessionTemp.email};
       onComplete(updated);
     }catch(ex){setErr(ex.message);}
     finally{setLoading(false);}
@@ -813,7 +841,7 @@ function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
     try{
       await supa("registros",{method:"POST",token,body:{
         equipo_id:equipo.id,
-        user_id:session.user.id,
+        user_id:getUserId(session),
         ingeniero,estado,ciudad,
         tipo,guia_paqueteria:guia||null,
         foto_retiro:foto,
@@ -847,7 +875,7 @@ function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
             </p>
             <h2 style={{color:C.text,margin:0,fontSize:"17px",fontWeight:"800"}}>{equipo.nombre}</h2>
             <p style={{color:C.muted,fontSize:"11px",marginTop:"2px"}}>
-              Base: {equipo.sitio_base} — {equipo.ciudad_base}
+              Base: {equipo.sitio_base}  {equipo.ciudad_base}
             </p>
           </div>
           <button onClick={onCerrar} style={{background:"none",border:"none",color:C.muted,fontSize:"22px",cursor:"pointer"}}>✕</button>
@@ -867,7 +895,7 @@ function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
               <select value={ingeniero} onChange={e=>setIng(e.target.value)}
                 style={{...inp,cursor:"pointer",color:ingeniero?C.text:C.muted}}>
                 <option value="">Selecciona ingeniero…</option>
-                {perfiles.map(p=><option key={p.id} value={p.nombre}>{p.nombre} — {p.email}</option>)}
+                {perfiles.map(p=><option key={p.id} value={p.nombre}>{p.nombre}  {p.email}</option>)}
               </select>
             ):(
               <input value={ingeniero} readOnly
@@ -910,7 +938,7 @@ function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
 
         {paso===2&&<div>
           <p style={{color:"#aaa",fontSize:"13px",marginBottom:"4px"}}>
-            📸 <strong style={{color:C.text}}>Foto obligatoria</strong> — estado al retirar.
+            📸 <strong style={{color:C.text}}>Foto obligatoria</strong>  estado al retirar.
           </p>
           <p style={{color:C.muted,fontSize:"11px",marginBottom:"14px"}}>Evidencia del estado inicial del equipo.</p>
           {!foto?(
@@ -1011,7 +1039,7 @@ function ModalRecepcion({equipo,registro,token,session,onConfirmar,onCerrar}){
         </div>
 
         <p style={{color:"#aaa",fontSize:"13px",marginBottom:"4px"}}>
-          📸 <strong style={{color:C.text}}>Foto obligatoria</strong> — confirma que lo recibiste en buen estado.
+          📸 <strong style={{color:C.text}}>Foto obligatoria</strong>  confirma que lo recibiste en buen estado.
         </p>
         <p style={{color:C.muted,fontSize:"11px",marginBottom:"14px"}}>Esta foto es evidencia de la recepción.</p>
 
@@ -1054,7 +1082,7 @@ function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
     try{
       await supa("historial",{method:"POST",token,body:{
         equipo_id:equipo.id,equipo_nombre:equipo.nombre,
-        user_id:session.user.id,
+        user_id:getUserId(session),
         ingeniero:registro.ingeniero,estado:registro.estado,ciudad:registro.ciudad,
         fecha_retiro:registro.fecha_retiro,
         foto_retiro:registro.foto_retiro,foto_devolucion:foto,
@@ -1105,7 +1133,7 @@ function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
         </div>
 
         <p style={{color:"#aaa",fontSize:"13px",marginBottom:"4px"}}>
-          📸 <strong style={{color:C.text}}>Foto obligatoria</strong> — estado al devolver.
+          📸 <strong style={{color:C.text}}>Foto obligatoria</strong>  estado al devolver.
         </p>
         <p style={{color:C.muted,fontSize:"11px",marginBottom:"14px"}}>Evidencia del estado de devolución.</p>
 
@@ -1205,7 +1233,7 @@ function AdminPanel({token,onClose,onEquipoCreado}){
 
   async function cargarPerfiles(){
     try{
-      // Cargar todos los perfiles — la política RLS permite al admin ver todos
+      // Cargar todos los perfiles  la política RLS permite al admin ver todos
       const r=await supa("perfiles",{token,params:{order:"nombre.asc",select:"*"}});
       setPerfiles(r||[]);
     }catch(ex){console.error("Error cargando perfiles:",ex.message);}
@@ -1269,7 +1297,7 @@ function AdminPanel({token,onClose,onEquipoCreado}){
           ))}
         </div>
 
-        {/* Tab: Equipos — sub-tabs */}
+        {/* Tab: Equipos  sub-tabs */}
         {tab==="equipos"&&<div>
           <div style={{display:"flex",gap:"6px",marginBottom:"14px"}}>
             {[{k:"lista",l:"📋 Lista"},{k:"nuevo",l:"➕ Nuevo"}].map(t=>(
@@ -1386,7 +1414,7 @@ function AdminPanel({token,onClose,onEquipoCreado}){
               <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
                 SITIO / EDIFICIO BASE <span style={{color:C.red}}>*</span>
               </label>
-              <input value={sitio} onChange={e=>setSitio(e.target.value)} placeholder="Ej. Puente de Vigas — Piso 3" style={inp}/>
+              <input value={sitio} onChange={e=>setSitio(e.target.value)} placeholder="Ej. Puente de Vigas  Piso 3" style={inp}/>
             </div>
             {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",padding:"10px 14px",borderRadius:"9px"}}>⚠️ {err}</p>}
             <button onClick={crearEquipo} disabled={loading} style={btnP(loading)}>
@@ -1547,7 +1575,7 @@ function MapaModal({registros,equipos,onCerrar}){
         }
       });
 
-      // Equipos en uso — agrupar por estado
+      // Equipos en uso  agrupar por estado
       const porEstado={};
       equipos.filter(function(eq){return registros[eq.id];}).forEach(function(eq){
         const reg=registros[eq.id];
@@ -1917,15 +1945,15 @@ export default function App(){
                           📍 {reg.ciudad}, {reg.estado} · {getDias(reg.fecha_retiro)}
                         </p>
                         {esPaq&&<p style={{fontSize:"11px",color:C.blue,marginTop:"3px",fontWeight:"700"}}>
-                          📦 En tránsito{reg.guia_paqueteria?` · ${reg.guia_paqueteria}`:""} — Toca para confirmar recepción
+                          📦 En tránsito{reg.guia_paqueteria?` · ${reg.guia_paqueteria}`:""}  Toca para confirmar recepción
                         </p>}
                         {alerta&&!esPaq&&<p style={{fontSize:"11px",color:C.red,marginTop:"4px",fontWeight:"700"}}>
-                          ⚠️ +5 días — requiere atención
+                          ⚠️ +5 días  requiere atención
                         </p>}
                       </div>
                     )}
                     {enRep&&<p style={{fontSize:"11px",color:C.orange,marginTop:"6px",fontWeight:"700"}}>
-                      🔧 En reparación — no disponible
+                      🔧 En reparación  no disponible
                     </p>}
                   </div>
                   <div style={{width:"40px",height:"40px",

@@ -828,7 +828,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador.
+          ¿Sin acceso? Contacta al administrador (v15).
         </p>
       </div>
     </div>

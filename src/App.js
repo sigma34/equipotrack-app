@@ -488,7 +488,13 @@ function RegistroNombre({sessionTemp,token,onComplete}){
         var parts=tkn.split(".");
         if(parts.length===3){
           var payload=JSON.parse(atob(parts[1].replace(/-/g,"+").replace(/_/g,"/")));
-          userId=payload.sub||payload.user_id||payload.uid||null;
+          // Mostrar todos los campos del payload para diagnóstico
+          var keys=Object.keys(payload).join(",");
+          userId=payload.sub||payload.user_id||payload.uid||payload.id||null;
+          if(!userId){
+            setErr("Campos JWT: "+keys);
+            setLoading(false);return;
+          }
         }
       }catch(je){}
       // Fallback a sessionTemp.user.id si existe

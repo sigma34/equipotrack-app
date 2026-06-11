@@ -481,6 +481,11 @@ function RegistroNombre({sessionTemp,token,onComplete}){
     e.preventDefault();
     if(!nombre.trim()){setErr("Por favor ingresa tu nombre completo");return;}
     setLoading(true);setErr("");
+    // Debug: mostrar qué tenemos
+    if(!tkn||tkn.length<10){
+      setErr("Token vacío. Longitud: "+(tkn?tkn.length:0)+". Cierra sesión y vuelve a entrar.");
+      setLoading(false);return;
+    }
     try{
       // Extraer userId del JWT usando tkn (prop directo, más confiable)
       var userId=null;
@@ -828,7 +833,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador (v15).
+          ¿Sin acceso? Contacta al administrador (v15-2).
         </p>
       </div>
     </div>
@@ -1672,6 +1677,7 @@ export default function App(){
   });
 
   const [session,setSession]=useState(null);
+  const sessionRef=useRef(null); // ref síncrono para evitar stale en RegistroNombre
   const [equipos,setEquipos]=useState([]);
   const [regsArr,setRegsArr]=useState([]);
   const [historial,setHistorial]=useState([]);
@@ -1721,6 +1727,7 @@ export default function App(){
   }
 
   function handleLogin(s){
+    sessionRef.current=s; // guardar síncronamente en ref
     setSession(s);
     if(!s.necesitaNombre) cargar(s.token);
   }
@@ -1774,8 +1781,8 @@ export default function App(){
 
   if(!session)return <Login onLogin={handleLogin}/>;
   if(session.necesitaNombre)return <RegistroNombre sessionTemp={session}
-    token={session.token}
-    onComplete={function(s){ setSession(s); cargar(s.token); }}/>;
+    token={sessionRef.current?sessionRef.current.token:session.token}
+    onComplete={function(s){ sessionRef.current=s; setSession(s); cargar(s.token); }}/>;
 
   return(<>
     <style>{`

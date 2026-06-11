@@ -470,50 +470,40 @@ function QRLabel({equipo,onCerrar}){
 }
 
 // - PANTALLA REGISTRO DE NOMBRE -
-function RegistroNombre({sessionTemp,onComplete}){
+function RegistroNombre({sessionTemp,token,onComplete}){
   const [nombre,setNombre]=useState("");
   const [loading,setLoading]=useState(false);
   const [err,setErr]=useState("");
+  // Usar token prop directamente — más confiable que sessionTemp.token
+  const tkn=token||(sessionTemp&&sessionTemp.token)||"";
 
   async function guardar(e){
     e.preventDefault();
     if(!nombre.trim()){setErr("Por favor ingresa tu nombre completo");return;}
     setLoading(true);setErr("");
     try{
-      // Extraer userId del JWT directamente
+      // Extraer userId del JWT usando tkn (prop directo, más confiable)
       var userId=null;
-      var debugInfo="";
       try{
-        var parts=sessionTemp.token.split(".");
+        var parts=tkn.split(".");
         if(parts.length===3){
           var payload=JSON.parse(atob(parts[1].replace(/-/g,"+").replace(/_/g,"/")));
-          userId=payload.sub||null;
-          debugInfo="sub:"+payload.sub+"|uid:"+payload.user_id;
+          userId=payload.sub||payload.user_id||payload.uid||null;
         }
-      }catch(je){debugInfo="jwt_err:"+je.message;}
+      }catch(je){}
       // Fallback a sessionTemp.user.id si existe
-      if(!userId&&sessionTemp.user&&sessionTemp.user.id&&sessionTemp.user.id!=="null"){
+      if(!userId&&sessionTemp&&sessionTemp.user&&sessionTemp.user.id&&sessionTemp.user.id!=="null"){
         userId=sessionTemp.user.id;
-        debugInfo+=" fallback:"+userId;
-      }
-      // Segundo fallback: user_id en payload
-      if(!userId){
-        try{
-          var parts2=sessionTemp.token.split(".");
-          var pl2=JSON.parse(atob(parts2[1].replace(/-/g,"+").replace(/_/g,"/")));
-          userId=pl2.user_id||pl2.uid||pl2.id||null;
-        }catch(e2){}
       }
       if(!userId){
-        setErr("No se pudo identificar el usuario. Info: "+debugInfo);
+        setErr("No se pudo identificar el usuario. Cierra sesión e intenta de nuevo.");
         setLoading(false);return;
       }
-
       try{
-        await supa("perfiles",{method:"POST",token:sessionTemp.token,
+        await supa("perfiles",{method:"POST",token:tkn,
           body:{id:userId,nombre:nombre.trim(),email:sessionTemp.email}});
       }catch{
-        await supa("perfiles?id=eq."+userId,{method:"PATCH",token:sessionTemp.token,
+        await supa("perfiles?id=eq."+userId,{method:"PATCH",token:tkn,
           body:{nombre:nombre.trim()}});
       }
       const updated={};
@@ -521,6 +511,7 @@ function RegistroNombre({sessionTemp,onComplete}){
       updated.nombre=nombre.trim();
       updated.necesitaNombre=false;
       updated.user={id:userId,email:sessionTemp.email};
+      updated.token=tkn;
       onComplete(updated);
     }catch(ex){setErr(ex.message);}
     finally{setLoading(false);}
@@ -1777,6 +1768,7 @@ export default function App(){
 
   if(!session)return <Login onLogin={handleLogin}/>;
   if(session.necesitaNombre)return <RegistroNombre sessionTemp={session}
+    token={session.token}
     onComplete={function(s){ setSession(s); cargar(s.token); }}/>;
 
   return(<>

@@ -833,7 +833,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador (v0.17.0).
+          ¿Sin acceso? Contacta al administrador (v0.18.0).
         </p>
       </div>
     </div>
@@ -1309,6 +1309,28 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
     }catch(ex){alert("Error: "+ex.message);}
   }
 
+  async function cambiarRol(perfil,nuevoRol){
+    if(perfil.rol===nuevoRol)return;
+    if(!confirm("Cambiar rol de "+perfil.nombre+" a "+nuevoRol+"?"))return;
+    try{
+      const res=await fetch(SUPA_URL+"/rest/v1/rpc/cambiar_rol_usuario",{
+        method:"POST",
+        headers:{
+          "apikey":SUPA_KEY,
+          "Content-Type":"application/json",
+          "Authorization":"Bearer "+token
+        },
+        body:JSON.stringify({target_email:perfil.email,nuevo_rol:nuevoRol}),
+      });
+      if(!res.ok){
+        const d=await res.json();
+        throw new Error(d.message||d.hint||"Error al cambiar rol");
+      }
+      alert("Rol actualizado. El usuario debe cerrar sesion y volver a entrar para que aplique.");
+      cargarPerfiles();
+    }catch(ex){alert("Error: "+ex.message);}
+  }
+
   async function crearEquipo(){
     if(!nombre||!serie||!cat||!estadoB||!ciudadB||!sitio){setErr("Todos los campos son requeridos");return;}
     setLoading(true);setErr("");
@@ -1334,7 +1356,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
     <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:10000,
       background:C.card,border:`1px solid ${C.border}`,
       borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
-      padding:"24px 20px",maxHeight:"80vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+      padding:"24px 20px",maxWidth:"600px",margin:"0 auto",maxHeight:"80vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
 
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:"18px"}}>
           <div>
@@ -1970,7 +1992,7 @@ export default function App(){
 
     <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'Sora',sans-serif",
       color:C.text,
-      maxWidth:"480px", // Más estrecho para móvil
+      maxWidth:"600px",
       margin:"0 auto",paddingBottom:"80px"}}>
 
       {toast&&<Toast {...toast}/>}

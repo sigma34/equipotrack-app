@@ -481,11 +481,6 @@ function RegistroNombre({sessionTemp,token,onComplete}){
     e.preventDefault();
     if(!nombre.trim()){setErr("Por favor ingresa tu nombre completo");return;}
     setLoading(true);setErr("");
-    // Debug: mostrar qué tenemos
-    if(!tkn||tkn.length<10){
-      setErr("Token vacío. Longitud: "+(tkn?tkn.length:0)+". Cierra sesión y vuelve a entrar.");
-      setLoading(false);return;
-    }
     try{
       // Extraer userId del JWT usando tkn (prop directo, más confiable)
       var userId=null;
@@ -833,7 +828,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador (v15-2).
+          ¿Sin acceso? Contacta al administrador (0.15.3).
         </p>
       </div>
     </div>

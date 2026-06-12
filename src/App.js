@@ -828,7 +828,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador (v0.16.1).
+          ¿Sin acceso? Contacta al administrador (v0.16.0).
         </p>
       </div>
     </div>
@@ -1005,14 +1005,15 @@ function ModalRecepcion({equipo,registro,token,session,onConfirmar,onCerrar}){
     setLoading(true);
     try{
       // Actualizar registro: cambia tipo a "directo" y actualiza ciudad de recepción
-      await supa(`registros?equipo_id=eq.${equipo.id}`,{method:"PATCH",token,body:{
+      await supa("registros?equipo_id=eq."+equipo.id,{method:"PATCH",token,body:{
         tipo:"directo",estado,ciudad,
-        foto_retiro:foto, // foto de recepción reemplaza la de envío
+        foto_retiro:foto,
         fecha_retiro:new Date().toISOString(),
         ingeniero:session.nombre,
+        user_id:getUserId(session), // actualizar user_id al receptor
       }});
-      onConfirmar(`📦 ${equipo.nombre} recibido en ${ciudad}`);
-    }catch(ex){alert("Error: "+ex.message);}
+      onConfirmar("📦 "+equipo.nombre+" recibido en "+ciudad);
+    }catch(ex){alert("Error en recepción: "+ex.message);}
     finally{setLoading(false);}
   }
 

@@ -833,7 +833,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador (v0.18.0).
+          ¿Sin acceso? Contacta al administrador (v0.19.0).
         </p>
       </div>
     </div>
@@ -878,10 +878,12 @@ function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
   return(<>
     {showCam&&<CamaraModal titulo="Foto de RETIRO" onCaptura={img=>{setFoto(img);setShowCam(false);}} onCerrar={()=>setShowCam(false)}/>}
     <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.6)"}} onClick={onCerrar}/>
-    <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:10000,
+    <div style={{position:"fixed",top:"6vh",left:"0",right:"0",zIndex:10000,width:"100%",boxSizing:"border-box",
       background:C.card,border:`1px solid ${C.border}`,
-      borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
-      padding:"24px 20px",maxHeight:"80vh",overflowY:"auto",
+      borderRadius:"22px",
+      padding:"24px 20px",
+      maxWidth:"600px",margin:"0 auto",
+      maxHeight:"88vh",overflowY:"auto",
       WebkitOverflowScrolling:"touch"}}>
 
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:"16px"}}>
@@ -1025,10 +1027,12 @@ function ModalRecepcion({equipo,registro,token,session,onConfirmar,onCerrar}){
   return(<>
     {showCam&&<CamaraModal titulo="Foto de RECEPCIÓN" onCaptura={img=>{setFoto(img);setShowCam(false);}} onCerrar={()=>setShowCam(false)}/>}
     <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.6)"}} onClick={onCerrar}/>
-    <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:10000,
+    <div style={{position:"fixed",top:"6vh",left:"0",right:"0",zIndex:10000,width:"100%",boxSizing:"border-box",
       background:C.card,border:`1px solid ${C.border}`,
-      borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
-      padding:"24px 20px",maxHeight:"80vh",overflowY:"auto",
+      borderRadius:"22px",
+      padding:"24px 20px",
+      maxWidth:"600px",margin:"0 auto",
+      maxHeight:"88vh",overflowY:"auto",
       WebkitOverflowScrolling:"touch"}}>
 
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:"16px"}}>
@@ -1126,10 +1130,12 @@ function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
   return(<>
     {showCam&&<CamaraModal titulo="Foto de DEVOLUCIÓN" onCaptura={img=>{setFoto(img);setShowCam(false);}} onCerrar={()=>setShowCam(false)}/>}
     <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.6)"}} onClick={onCerrar}/>
-    <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:10000,
+    <div style={{position:"fixed",top:"6vh",left:"0",right:"0",zIndex:10000,width:"100%",boxSizing:"border-box",
       background:C.card,border:`1px solid ${C.border}`,
-      borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
-      padding:"24px 20px",maxHeight:"80vh",overflowY:"auto",
+      borderRadius:"22px",
+      padding:"24px 20px",
+      maxWidth:"600px",margin:"0 auto",
+      maxHeight:"88vh",overflowY:"auto",
       WebkitOverflowScrolling:"touch"}}>
 
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:"16px"}}>

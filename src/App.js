@@ -1328,13 +1328,13 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
     finally{setLoading(false);}
   }
 
-  return(
-    <div style={{position:"fixed",inset:0,zIndex:2000,background:"rgba(0,0,0,0.88)",
-      display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-      {nuevoEq&&<QRLabel equipo={nuevoEq} onCerrar={()=>setNuevoEq(null)}/>}
-      <div style={{background:C.card,border:`1px solid ${C.border}`,
-        borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
-        padding:"24px 20px",width:"100%",maxWidth:"520px",maxHeight:"94vh",overflowY:"auto"}}>
+  return(<>
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:9999,background:"rgba(0,0,0,0.6)"}} onClick={onClose}/>
+    {nuevoEq&&<QRLabel equipo={nuevoEq} onCerrar={()=>setNuevoEq(null)}/>}
+    <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:10000,
+      background:C.card,border:`1px solid ${C.border}`,
+      borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
+      padding:"24px 20px",maxHeight:"80vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
 
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:"18px"}}>
           <div>
@@ -1595,11 +1595,11 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                     </div>
                     <p style={{fontSize:"11px",color:C.muted,margin:0}}>{p.email}</p>
                   </div>
-                  <button onClick={()=>{setEditPerfil(p.id);setNuevoNombre(p.nombre);}}
+                  {(isSA||(p.rol==="ingeniero"))?<button onClick={function(){setEditPerfil(p.id);setNuevoNombre(p.nombre);}}
                     style={{background:"transparent",border:"1px solid "+C.border,borderRadius:"8px",
                       color:C.muted,padding:"4px 10px",cursor:"pointer",fontSize:"12px",fontFamily:"inherit"}}>
                     Editar
-                  </button>
+                  </button>:<span style={{fontSize:"11px",color:C.muted}}>-</span>}
                 </div>
               )}
             </div>
@@ -1608,9 +1608,67 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
             Sin usuarios registrados aún
           </p>}
         </div>}
-      </div>
     </div>
-  );
+
+    {editEq&&<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:19999,background:"rgba(0,0,0,0.6)"}} onClick={function(){setEditEq(null);}}/>}
+    {editEq&&<div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:20000,
+      background:C.card,border:"1px solid "+C.border,
+      borderTopLeftRadius:"22px",borderTopRightRadius:"22px",
+      padding:"24px 20px",maxHeight:"85vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:"16px"}}>
+        <div>
+          <p style={{color:C.blue,fontSize:"11px",letterSpacing:"0.15em",textTransform:"uppercase",margin:"0 0 3px"}}>
+            EDITAR EQUIPO
+          </p>
+          <h2 style={{color:C.text,margin:0,fontSize:"17px",fontWeight:"800"}}>{editEq.id}</h2>
+        </div>
+        <button onClick={function(){setEditEq(null);}} style={{background:"none",border:"none",color:C.muted,fontSize:"22px",cursor:"pointer"}}>x</button>
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
+        <div>
+          <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>NOMBRE</label>
+          <input value={editEq.nombre}
+            onChange={function(e){setEditEq(Object.assign({},editEq,{nombre:e.target.value}));}}
+            style={inp}/>
+        </div>
+        <div>
+          <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>NUMERO DE SERIE</label>
+          <input value={editEq.serie}
+            onChange={function(e){setEditEq(Object.assign({},editEq,{serie:e.target.value}));}}
+            style={inp}/>
+        </div>
+        <div style={{borderTop:"1px solid "+C.border,paddingTop:"12px"}}>
+          <p style={{color:C.blue,fontSize:"11px",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"10px"}}>
+            UBICACION BASE
+          </p>
+          <EstadoCiudad
+            estado={editEq.estado_base} ciudad={editEq.ciudad_base}
+            onEstado={function(v){setEditEq(Object.assign({},editEq,{estado_base:v,ciudad_base:""}));}}
+            onCiudad={function(v){setEditEq(Object.assign({},editEq,{ciudad_base:v}));}}/>
+        </div>
+        <div>
+          <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>SITIO / EDIFICIO</label>
+          <input value={editEq.sitio_base||""}
+            onChange={function(e){setEditEq(Object.assign({},editEq,{sitio_base:e.target.value}));}}
+            style={inp}/>
+        </div>
+        <div>
+          <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>ADMINISTRADOR RESPONSABLE</label>
+          <select value={editEq.admin_email||""}
+            onChange={function(e){setEditEq(Object.assign({},editEq,{admin_email:e.target.value}));}}
+            style={{...inp,cursor:"pointer",color:editEq.admin_email?C.text:C.muted}}>
+            <option value="">Sin asignar</option>
+            {perfilesAdmin.map(function(p){return(
+              <option key={p.id} value={p.email}>{p.nombre} - {p.email}</option>
+            );})}
+          </select>
+        </div>
+        <button onClick={guardarEdicion} style={btnP(false)}>
+          Guardar cambios
+        </button>
+      </div>
+    </div>}
+  </>);
 }
 
 // Selector de categoría con carga dinámica desde Supabase

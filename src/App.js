@@ -114,7 +114,6 @@ function getUserId(session){
 // Leer rol desde JWT app_metadata (no desde perfiles - evita recursión RLS)
 function getRolFromSession(session){
   if(!session) return "ingeniero";
-  // Primero intentar app_metadata del JWT (fuente más confiable)
   try{
     var token=session.token;
     var parts=token.split(".");
@@ -125,8 +124,14 @@ function getRolFromSession(session){
       }
     }
   }catch(e){}
-  // Fallback: rol guardado en sesión desde perfiles
   return session.rol||"ingeniero";
+}
+function isAdminOrSuper(session){
+  var rol=getRolFromSession(session);
+  return rol==="admin"||rol==="super_admin";
+}
+function isSuperAdmin(session){
+  return getRolFromSession(session)==="super_admin";
 }
 function getDias(iso) {
   const diff = new Date() - new Date(iso);
@@ -828,7 +833,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador (v0.16.0).
+          ¿Sin acceso? Contacta al administrador (v0.17.0).
         </p>
       </div>
     </div>
@@ -837,7 +842,7 @@ function Login({onLogin}){
 
 // - MODAL CHECKOUT -
 function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
-  const isAdmin=getRolFromSession(session)==="admin";
+  const isAdmin=isAdminOrSuper(session);
   const [paso,setPaso]=useState(1);
   const [ingeniero,setIng]=useState(isAdmin?"":session.nombre);
   const [estado,setEstado]=useState(""),[ciudad,setCiudad]=useState("");
@@ -1177,7 +1182,7 @@ function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
 }
 
 // - PANEL ADMIN -
-function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[]}){
+function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
   const [tab,setTab]=useState("equipos"); // equipos | categorias | ingenieros
   // Equipo form
   const [nombre,setNombre]=useState(""),[serie,setSerie]=useState("");
@@ -1196,6 +1201,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[]}){
   // Lista de equipos
   const [listaEqs,setListaEqs]=useState([]),[loadEqs,setLoadEqs]=useState(false);
   const [subTab,setSubTab]=useState("lista"); // lista | nuevo
+  const [editEq,setEditEq]=useState(null); // equipo en edición
 
   useEffect(()=>{
     if(tab==="categorias")cargarCats();
@@ -1207,6 +1213,21 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[]}){
     setLoadEqs(true);
     try{const r=await supa("equipos",{token,params:{order:"created_at.asc"}});setListaEqs(r||[]);}
     catch{}finally{setLoadEqs(false);}
+  }
+
+  async function guardarEdicion(){
+    if(!editEq)return;
+    try{
+      await supa("equipos?id=eq."+editEq.id,{method:"PATCH",token,body:{
+        nombre:editEq.nombre,
+        serie:editEq.serie,
+        estado_base:editEq.estado_base,
+        ciudad_base:editEq.ciudad_base,
+        sitio_base:editEq.sitio_base,
+        admin_email:editEq.admin_email||null,
+      }});
+      setEditEq(null);cargarEquipos();onEquipoCreado();
+    }catch(ex){alert("Error: "+ex.message);}
   }
 
   function exportarCSV(){
@@ -1234,6 +1255,10 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[]}){
   }
 
   async function cambiarEstatus(eq,nuevoEstatus){
+    var msg=nuevoEstatus==="reparacion"
+      ?("Poner en reparacion: "+eq.nombre+"?\nNo estara disponible para los ingenieros.")
+      :("Reactivar: "+eq.nombre+"?\nVolvera a estar disponible.");
+    if(!confirm(msg))return;
     try{
       await supa("equipos?id=eq."+eq.id,{method:"PATCH",token,body:{estatus:nuevoEstatus}});
       cargarEquipos();onEquipoCreado();
@@ -1241,7 +1266,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[]}){
   }
 
   async function eliminarEquipo(eq){
-    if(!confirm("¿Eliminar \""+eq.nombre+"\"?\nEsta acción no se puede deshacer."))return;
+    if(!confirm("Eliminar: "+eq.nombre+"?\n\nEsta accion no se puede deshacer.\nEl equipo dejara de aparecer en el dashboard."))return;
     try{
       await supa("equipos?id=eq."+eq.id,{method:"PATCH",token,body:{activo:false}});
       cargarEquipos();onEquipoCreado();
@@ -1418,8 +1443,14 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[]}){
                           fontWeight:"700",fontFamily:"inherit"}}>
                         🗑 Eliminar
                       </button>
+                      <button onClick={function(){setEditEq(Object.assign({},eq));}}
+                        style={{padding:"8px 10px",background:"transparent",
+                          border:"1px solid "+C.blue+"44",borderRadius:"8px",
+                          color:C.blue,cursor:"pointer",fontSize:"11px",fontFamily:"inherit",fontWeight:"700"}}>
+                        ✏️
+                      </button>
                       <button onClick={function(){setNuevoEq(eq);}}
-                        style={{padding:"8px 12px",background:"transparent",
+                        style={{padding:"8px 10px",background:"transparent",
                           border:"1px solid "+C.border,borderRadius:"8px",
                           color:C.muted,cursor:"pointer",fontSize:"12px",fontFamily:"inherit"}}>
                         QR
@@ -1519,41 +1550,62 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[]}){
         {/* Tab: Ingenieros */}
         {tab==="ingenieros"&&<div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
           <p style={{color:C.muted,fontSize:"12px",marginBottom:"4px"}}>
-            Aquí puedes editar el nombre visible de cada ingeniero registrado.
+            {isSA?"Gestiona nombres y roles de todos los usuarios.":"Edita el nombre visible de cada usuario."}
           </p>
-          {perfiles.map(p=>(
-            <div key={p.id} style={{background:"#12121f",border:`1px solid ${C.border}`,
+          {perfiles.map(function(p){
+            var rolColor=p.rol==="super_admin"?C.green:p.rol==="admin"?C.blue:C.muted;
+            var rolLabel=p.rol==="super_admin"?"Super Admin":p.rol==="admin"?"Admin":"Ingeniero";
+            return(
+            <div key={p.id} style={{background:"#12121f",border:"1px solid "+C.border,
               borderRadius:"11px",padding:"12px 14px"}}>
               {editPerfil===p.id?(
-                <div style={{display:"flex",gap:"8px"}}>
-                  <input value={nuevoNombre} onChange={e=>setNuevoNombre(e.target.value)}
-                    style={{...inp,flex:1,padding:"9px 12px",fontSize:"13px"}}
-                    placeholder="Nombre completo"/>
-                  <button onClick={()=>guardarNombre(p)}
-                    style={{padding:"9px 14px",background:`linear-gradient(135deg,${C.green},#00c066)`,
-                      border:"none",borderRadius:"9px",color:"#001a0d",fontWeight:"800",
-                      cursor:"pointer",fontFamily:"inherit"}}>✓</button>
-                  <button onClick={()=>{setEditPerfil(null);setNuevoNombre("");}}
-                    style={{padding:"9px 12px",background:"transparent",border:`1px solid ${C.border}`,
-                      borderRadius:"9px",color:C.muted,cursor:"pointer",fontFamily:"inherit"}}>✕</button>
+                <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
+                  <div style={{display:"flex",gap:"8px"}}>
+                    <input value={nuevoNombre} onChange={e=>setNuevoNombre(e.target.value)}
+                      style={{...inp,flex:1,padding:"9px 12px",fontSize:"13px"}}
+                      placeholder="Nombre completo"/>
+                    <button onClick={()=>guardarNombre(p)}
+                      style={{padding:"9px 14px",background:"linear-gradient(135deg,"+C.green+",#00c066)",
+                        border:"none",borderRadius:"9px",color:"#001a0d",fontWeight:"800",
+                        cursor:"pointer",fontFamily:"inherit"}}>✓</button>
+                    <button onClick={()=>{setEditPerfil(null);setNuevoNombre("");}}
+                      style={{padding:"9px 12px",background:"transparent",border:"1px solid "+C.border,
+                        borderRadius:"9px",color:C.muted,cursor:"pointer",fontFamily:"inherit"}}>✕</button>
+                  </div>
+                  {isSA&&<div style={{display:"flex",gap:"6px"}}>
+                    {["ingeniero","admin","super_admin"].map(function(r){
+                      return <button key={r} onClick={()=>cambiarRol(p,r)}
+                        style={{flex:1,padding:"7px",fontSize:"11px",fontWeight:"700",
+                          background:p.rol===r?"#001a0d":"transparent",
+                          border:"1px solid "+(p.rol===r?C.green:C.border),
+                          borderRadius:"8px",color:p.rol===r?C.green:C.muted,
+                          cursor:"pointer",fontFamily:"inherit",textTransform:"capitalize"}}>
+                        {r==="super_admin"?"Super Admin":r==="admin"?"Admin":"Ingeniero"}
+                      </button>;
+                    })}
+                  </div>}
                 </div>
               ):(
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                   <div>
-                    <p style={{fontSize:"14px",fontWeight:"700",color:C.text,margin:0}}>{p.nombre}</p>
-                    <p style={{fontSize:"11px",color:C.muted,margin:"2px 0 0"}}>{p.email}</p>
+                    <div style={{display:"flex",alignItems:"center",gap:"6px",marginBottom:"2px"}}>
+                      <p style={{fontSize:"14px",fontWeight:"700",color:C.text,margin:0}}>{p.nombre}</p>
+                      <span style={{fontSize:"10px",color:rolColor,background:rolColor+"22",
+                        padding:"1px 7px",borderRadius:"20px",fontWeight:"700"}}>{rolLabel}</span>
+                    </div>
+                    <p style={{fontSize:"11px",color:C.muted,margin:0}}>{p.email}</p>
                   </div>
                   <button onClick={()=>{setEditPerfil(p.id);setNuevoNombre(p.nombre);}}
-                    style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:"8px",
+                    style={{background:"transparent",border:"1px solid "+C.border,borderRadius:"8px",
                       color:C.muted,padding:"4px 10px",cursor:"pointer",fontSize:"12px",fontFamily:"inherit"}}>
                     Editar
                   </button>
                 </div>
               )}
             </div>
-          ))}
+          );})}
           {perfiles.length===0&&<p style={{textAlign:"center",color:C.muted,padding:"20px",fontSize:"13px"}}>
-            Sin ingenieros registrados aún
+            Sin usuarios registrados aún
           </p>}
         </div>}
       </div>
@@ -1738,7 +1790,8 @@ export default function App(){
   const [imgZoom,setImgZoom]=useState(null);
   const [toast,setToast]=useState(null);
 
-  const isAdmin=getRolFromSession(session)==="admin";
+  const isAdmin=isAdminOrSuper(session);
+  const isSA=isSuperAdmin(session);
   const registros={};
   regsArr.forEach(r=>{registros[r.equipo_id]=r;});
 
@@ -1877,7 +1930,7 @@ export default function App(){
               <h1 style={{fontSize:"17px",fontWeight:"800",lineHeight:1}}>EquipoTrack</h1>
               <p style={{fontSize:"10px",color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>
                 {session.nombre}
-                {isAdmin&&<span style={{color:C.blue,marginLeft:"6px"}}>· ADMIN</span>}
+                {isAdmin&&<span style={{color:C.blue,marginLeft:"6px"}}>{isSA?"· SUPER ADMIN":"· ADMIN"}</span>}
               </p>
             </div>
           </div>
@@ -2127,7 +2180,8 @@ export default function App(){
 
     {/* Modales */}
     {showAdmin&&<AdminPanel token={session.token}
-      perfilesAdmin={perfiles.filter(function(p){return p.rol==="admin";})}
+      perfilesAdmin={perfiles.filter(function(p){return p.rol==="admin"||p.rol==="super_admin";})}
+      isSA={isSA}
       onClose={()=>setShowAdmin(false)}
       onEquipoCreado={()=>cargar(session.token)}/>}
 

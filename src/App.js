@@ -828,7 +828,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador (0.15.3).
+          ¿Sin acceso? Contacta al administrador (v0.16.1).
         </p>
       </div>
     </div>
@@ -1176,10 +1176,11 @@ function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
 }
 
 // - PANEL ADMIN -
-function AdminPanel({token,onClose,onEquipoCreado}){
+function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[]}){
   const [tab,setTab]=useState("equipos"); // equipos | categorias | ingenieros
   // Equipo form
   const [nombre,setNombre]=useState(""),[serie,setSerie]=useState("");
+  const [adminEq,setAdminEq]=useState(""); // admin responsable del equipo
   const [cat,setCat]=useState(""),[estadoB,setEstadoB]=useState("");
   const [ciudadB,setCiudadB]=useState(""),[sitio,setSitio]=useState("");
   const [loading,setLoading]=useState(false),[err,setErr]=useState("");
@@ -1205,6 +1206,30 @@ function AdminPanel({token,onClose,onEquipoCreado}){
     setLoadEqs(true);
     try{const r=await supa("equipos",{token,params:{order:"created_at.asc"}});setListaEqs(r||[]);}
     catch{}finally{setLoadEqs(false);}
+  }
+
+  function exportarCSV(){
+    var headers=["ID","Nombre","Serie","Categoria","Estado Base","Ciudad Base","Sitio Base","Administrador","Estatus"];
+    var rows=listaEqs.map(function(eq){
+      return [
+        eq.id,
+        eq.nombre,
+        eq.serie,
+        eq.categoria,
+        eq.estado_base,
+        eq.ciudad_base,
+        eq.sitio_base,
+        eq.admin_email||"Sin asignar",
+        eq.activo?(eq.estatus==="reparacion"?"En reparación":"Activo"):"Eliminado"
+      ].map(function(v){return '"'+(v||"").replace(/"/g,'""')+'"';}).join(",");
+    });
+    var csv=[headers.join(",")].concat(rows).join("\n");
+    var blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement("a");
+    a.href=url;a.download="equipos_auditoria_"+new Date().toISOString().slice(0,10)+".csv";
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   async function cambiarEstatus(eq,nuevoEstatus){
@@ -1268,7 +1293,7 @@ function AdminPanel({token,onClose,onEquipoCreado}){
         const num=parseInt(existentes[0].id.replace("EQ-",""))||0;next=num+1;
       }
       const id=`EQ-${String(next).padStart(3,"0")}`;
-      const eq={id,nombre,serie,categoria:cat,estado_base:estadoB,ciudad_base:ciudadB,sitio_base:sitio,activo:true};
+      const eq={id,nombre,serie,categoria:cat,estado_base:estadoB,ciudad_base:ciudadB,sitio_base:sitio,activo:true,admin_email:adminEq||null};
       await supa("equipos",{method:"POST",token,body:eq});
       setNuevoEq(eq);
       onEquipoCreado();
@@ -1327,6 +1352,13 @@ function AdminPanel({token,onClose,onEquipoCreado}){
           {/* Sub-tab: Lista */}
           {subTab==="lista"&&(loadEqs?<Spin/>:
             <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
+              {listaEqs.length>0&&<button onClick={exportarCSV}
+                style={{width:"100%",padding:"10px",background:"transparent",
+                  border:"1px solid "+C.green+"44",borderRadius:"10px",
+                  color:C.green,cursor:"pointer",fontSize:"12px",
+                  fontWeight:"700",fontFamily:"inherit",marginBottom:"4px"}}>
+                📊 Exportar CSV de auditoría ({listaEqs.length} equipos)
+              </button>}
               {listaEqs.length===0&&<p style={{textAlign:"center",color:C.muted,padding:"20px",fontSize:"13px"}}>
                 Sin equipos registrados
               </p>}
@@ -1354,6 +1386,9 @@ function AdminPanel({token,onClose,onEquipoCreado}){
                         <p style={{fontSize:"11px",color:C.muted,margin:0}}>{eq.categoria}</p>
                         <p style={{fontSize:"10px",color:C.muted,margin:"2px 0 0",
                           fontFamily:"'JetBrains Mono',monospace"}}>Base: {eq.ciudad_base} · {eq.sitio_base}</p>
+                        {eq.admin_email&&<p style={{fontSize:"10px",color:C.blue,margin:"2px 0 0"}}>
+                          👤 Admin: {eq.admin_email}
+                        </p>}
                       </div>
                     </div>
                     {eq.activo&&<div style={{display:"flex",gap:"6px",marginTop:"10px",
@@ -1428,6 +1463,18 @@ function AdminPanel({token,onClose,onEquipoCreado}){
               <input value={sitio} onChange={e=>setSitio(e.target.value)} placeholder="Ej. Puente de Vigas  Piso 3" style={inp}/>
             </div>
             {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",padding:"10px 14px",borderRadius:"9px"}}>⚠️ {err}</p>}
+            <div>
+              <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+                ADMINISTRADOR RESPONSABLE
+              </label>
+              <select value={adminEq} onChange={e=>setAdminEq(e.target.value)}
+                style={{...inp,cursor:"pointer",color:adminEq?C.text:C.muted}}>
+                <option value="">Sin asignar</option>
+                {perfilesAdmin.map(function(p){return(
+                  <option key={p.id} value={p.email}>{p.nombre} — {p.email}</option>
+                );})}
+              </select>
+            </div>
             <button onClick={crearEquipo} disabled={loading} style={btnP(loading)}>
               {loading?"Creando…":"✅ Crear equipo"}
             </button>
@@ -1685,6 +1732,9 @@ export default function App(){
   const [vista,setVista]=useState("equipos");
   const [filtro,setFiltro]=useState("todas");
   const [busq,setBusq]=useState("");
+  const [filtroHistEq,setFiltroHistEq]=useState("");
+  const [filtroHistIng,setFiltroHistIng]=useState("");
+  const [imgZoom,setImgZoom]=useState(null);
   const [toast,setToast]=useState(null);
 
   const isAdmin=getRolFromSession(session)==="admin";
@@ -1765,6 +1815,16 @@ export default function App(){
       ||(filtro==="reparacion"&&enRep)
       ||(reg&&reg.ciudad===filtro);
     return mb&&mc;
+  });
+
+  // Historial filtrado
+  const historialFiltrado=historial.filter(function(h){
+    var matchEq=!filtroHistEq||
+      h.equipo_nombre.toLowerCase().includes(filtroHistEq.toLowerCase())||
+      h.equipo_id.toLowerCase().includes(filtroHistEq.toLowerCase());
+    var matchIng=!filtroHistIng||
+      h.ingeniero.toLowerCase().includes(filtroHistIng.toLowerCase());
+    return matchEq&&matchIng;
   });
 
   const enUso=regsArr.length;
@@ -1986,14 +2046,25 @@ export default function App(){
       {/* Historial */}
       {vista==="historial"&&(loading?<Spin/>:
         <div style={{padding:"0 16px"}}>
-          {historial.length===0?(
+          {historial.length>0&&<div style={{display:"flex",flexDirection:"column",gap:"8px",marginBottom:"12px"}}>
+            <input value={filtroHistEq} onChange={e=>setFiltroHistEq(e.target.value)}
+              placeholder="Filtrar por equipo..."
+              style={{...inp,fontSize:"13px",padding:"10px 14px"}}/>
+            <input value={filtroHistIng} onChange={e=>setFiltroHistIng(e.target.value)}
+              placeholder="Filtrar por ingeniero..."
+              style={{...inp,fontSize:"13px",padding:"10px 14px"}}/>
+            {(filtroHistEq||filtroHistIng)&&<p style={{fontSize:"11px",color:C.muted}}>
+              {historialFiltrado.length} resultado{historialFiltrado.length!==1?"s":""}
+            </p>}
+          </div>}
+          {historialFiltrado.length===0?(
             <div style={{textAlign:"center",padding:"60px 20px",color:C.muted}}>
               <div style={{fontSize:"44px",marginBottom:"12px"}}>📋</div>
-              <p style={{fontSize:"14px"}}>Aún no hay devoluciones</p>
+              <p style={{fontSize:"14px"}}>{historial.length===0?"Aún no hay devoluciones":"Sin resultados para ese filtro"}</p>
             </div>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
-              {historial.map((h,i)=>(
+              {historialFiltrado.map((h,i)=>(
                 <div key={h.id} style={{background:C.card,border:`1px solid ${C.border}`,
                   borderRadius:"14px",overflow:"hidden",
                   animation:`slideUp 0.3s ease ${i*0.04}s both`}}>
@@ -2013,15 +2084,21 @@ export default function App(){
                   </div>
                   {(h.foto_retiro||h.foto_devolucion)&&(
                     <div style={{display:"flex",gap:"2px"}}>
-                      {h.foto_retiro&&<div style={{flex:1,position:"relative"}}>
+                      {h.foto_retiro&&<div style={{flex:1,position:"relative",cursor:"pointer"}}
+                        onClick={()=>setImgZoom(h.foto_retiro)}>
                         <img src={h.foto_retiro} alt="r" style={{width:"100%",height:"72px",objectFit:"cover",display:"block"}}/>
                         <span style={{position:"absolute",bottom:"4px",left:"4px",background:"rgba(0,0,0,0.75)",
                           fontSize:"9px",color:"#aaa",padding:"2px 5px",borderRadius:"4px"}}>📤 Retiro</span>
+                        <span style={{position:"absolute",top:"4px",right:"4px",background:"rgba(0,0,0,0.6)",
+                          fontSize:"11px",padding:"2px 5px",borderRadius:"4px"}}>🔍</span>
                       </div>}
-                      {h.foto_devolucion&&<div style={{flex:1,position:"relative"}}>
+                      {h.foto_devolucion&&<div style={{flex:1,position:"relative",cursor:"pointer"}}
+                        onClick={()=>setImgZoom(h.foto_devolucion)}>
                         <img src={h.foto_devolucion} alt="d" style={{width:"100%",height:"72px",objectFit:"cover",display:"block"}}/>
                         <span style={{position:"absolute",bottom:"4px",left:"4px",background:"rgba(0,0,0,0.75)",
                           fontSize:"9px",color:"#aaa",padding:"2px 5px",borderRadius:"4px"}}>📦 Dev.</span>
+                        <span style={{position:"absolute",top:"4px",right:"4px",background:"rgba(0,0,0,0.6)",
+                          fontSize:"11px",padding:"2px 5px",borderRadius:"4px"}}>🔍</span>
                       </div>}
                     </div>
                   )}
@@ -2033,8 +2110,23 @@ export default function App(){
       )}
     </div>
 
+    {/* Modal imagen ampliada */}
+    {imgZoom&&<div style={{position:"fixed",inset:0,zIndex:20000,background:"rgba(0,0,0,0.95)",
+      display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}}
+      onClick={()=>setImgZoom(null)}>
+      <div style={{position:"relative",maxWidth:"100%",maxHeight:"100%"}}>
+        <img src={imgZoom} alt="zoom" style={{maxWidth:"100%",maxHeight:"85vh",
+          borderRadius:"12px",display:"block",objectFit:"contain"}}/>
+        <button onClick={()=>setImgZoom(null)}
+          style={{position:"absolute",top:"-12px",right:"-12px",width:"32px",height:"32px",
+            background:C.card,border:"1px solid "+C.border,borderRadius:"50%",
+            color:C.text,cursor:"pointer",fontSize:"16px",fontFamily:"inherit"}}>✕</button>
+      </div>
+    </div>}
+
     {/* Modales */}
     {showAdmin&&<AdminPanel token={session.token}
+      perfilesAdmin={perfiles.filter(function(p){return p.rol==="admin";})}
       onClose={()=>setShowAdmin(false)}
       onEquipoCreado={()=>cargar(session.token)}/>}
 

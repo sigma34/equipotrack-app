@@ -276,10 +276,10 @@ function CamaraModal({titulo,onCaptura,onCerrar}){
     }
   }
   return(
-    <div style={{position:"fixed",inset:0,zIndex:20000,background:"rgba(0,0,0,0.97)",
-      display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
+    <div style={{position:"fixed",top:"6vh",left:0,right:0,zIndex:20000,width:"100%",boxSizing:"border-box"}}>
       <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"20px",
-        padding:"20px",width:"100%",maxWidth:"440px"}}>
+        padding:"20px",width:"100%",maxWidth:"500px",margin:"0 auto",
+        maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
         <h3 style={{color:C.green,margin:"0 0 12px",fontSize:"12px",letterSpacing:"0.12em",textTransform:"uppercase"}}>
           📷 {titulo}
         </h3>
@@ -833,7 +833,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador (v0.20.0).
+          ¿Sin acceso? Contacta al administrador (v0.21.0).
         </p>
       </div>
     </div>
@@ -894,7 +894,15 @@ function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
             <h2 style={{color:C.text,margin:0,fontSize:"17px",fontWeight:"800"}}>{equipo.nombre}</h2>
             <p style={{color:C.muted,fontSize:"11px",marginTop:"2px"}}>
               Base: {equipo.sitio_base}  {equipo.ciudad_base}
+              {equipo.serie&&<span style={{color:"#555",fontFamily:"monospace",marginLeft:"8px"}}>· S/N: {equipo.serie}</span>}
             </p>
+            {equipo.notas&&<div style={{marginTop:"8px",background:"#1a1200",border:"1px solid "+C.orange+"44",
+              borderRadius:"10px",padding:"8px 12px"}}>
+              <p style={{color:C.orange,fontSize:"10px",fontWeight:"700",marginBottom:"3px",letterSpacing:"0.08em"}}>
+                ⚠️ VERIFICA ACCESORIOS ANTES DE ACEPTAR
+              </p>
+              <p style={{color:"#ccc",fontSize:"12px",lineHeight:"1.5",margin:0}}>{equipo.notas}</p>
+            </div>}
           </div>
           <button onClick={onCerrar} style={{background:"none",border:"none",color:C.muted,fontSize:"22px",cursor:"pointer"}}>✕</button>
         </div>
@@ -1152,8 +1160,17 @@ function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
           <Row label="Ingeniero" value={registro.ingeniero}/>
           <Row label="Ciudad" value={`${registro.ciudad}, ${registro.estado}`}/>
           <Row label="Tiempo en uso" value={getDias(registro.fecha_retiro)}/>
-          <Row label="Retiro" value={fmt(registro.fecha_retiro)} last/>
+          <Row label="Retiro" value={fmt(registro.fecha_retiro)}/>
+          {equipo.serie&&<Row label="S/N" value={equipo.serie} last/>}
+          {!equipo.serie&&<Row label="Retiro" value={fmt(registro.fecha_retiro)} last/>}
         </div>
+        {equipo.notas&&<div style={{marginBottom:"14px",background:"#1a1200",border:"1px solid "+C.orange+"44",
+          borderRadius:"10px",padding:"8px 12px"}}>
+          <p style={{color:C.orange,fontSize:"10px",fontWeight:"700",marginBottom:"3px",letterSpacing:"0.08em"}}>
+            ⚠️ VERIFICA ACCESORIOS ANTES DE DEVOLVER
+          </p>
+          <p style={{color:"#ccc",fontSize:"12px",lineHeight:"1.5",margin:0}}>{equipo.notas}</p>
+        </div>}
 
         <p style={{color:"#aaa",fontSize:"13px",marginBottom:"4px"}}>
           📸 <strong style={{color:C.text}}>Foto obligatoria</strong>  estado al devolver.
@@ -1193,6 +1210,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
   // Equipo form
   const [nombre,setNombre]=useState(""),[serie,setSerie]=useState("");
   const [adminEq,setAdminEq]=useState(""); // admin responsable del equipo
+  const [notas,setNotas]=useState(""); // notas y accesorios del equipo
   const [cat,setCat]=useState(""),[estadoB,setEstadoB]=useState("");
   const [ciudadB,setCiudadB]=useState(""),[sitio,setSitio]=useState("");
   const [loading,setLoading]=useState(false),[err,setErr]=useState("");
@@ -1231,6 +1249,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
         ciudad_base:editEq.ciudad_base,
         sitio_base:editEq.sitio_base,
         admin_email:editEq.admin_email||null,
+        notas:editEq.notas||null,
       }});
       setEditEq(null);cargarEquipos();onEquipoCreado();
     }catch(ex){alert("Error: "+ex.message);}
@@ -1347,7 +1366,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
         const num=parseInt(existentes[0].id.replace("EQ-",""))||0;next=num+1;
       }
       const id=`EQ-${String(next).padStart(3,"0")}`;
-      const eq={id,nombre,serie,categoria:cat,estado_base:estadoB,ciudad_base:ciudadB,sitio_base:sitio,activo:true,admin_email:adminEq||null};
+      const eq={id,nombre,serie,categoria:cat,estado_base:estadoB,ciudad_base:ciudadB,sitio_base:sitio,activo:true,admin_email:adminEq||null,notas:notas.trim()||null};
       await supa("equipos",{method:"POST",token,body:eq});
       setNuevoEq(eq);
       onEquipoCreado();
@@ -1440,7 +1459,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                           overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{eq.nombre}</p>
                         <p style={{fontSize:"11px",color:C.muted,margin:0}}>{eq.categoria}</p>
                         <p style={{fontSize:"10px",color:C.muted,margin:"2px 0 0",
-                          fontFamily:"'JetBrains Mono',monospace"}}>Base: {eq.ciudad_base} · {eq.sitio_base}</p>
+                          fontFamily:"'JetBrains Mono',monospace",fontSize:"12px"}}>Base: {eq.ciudad_base} · {eq.sitio_base}</p>
                         {eq.admin_email&&<p style={{fontSize:"10px",color:C.blue,margin:"2px 0 0"}}>
                           👤 Admin: {eq.admin_email}
                         </p>}
@@ -1524,6 +1543,18 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
               <input value={sitio} onChange={e=>setSitio(e.target.value)} placeholder="Ej. Puente de Vigas  Piso 3" style={inp}/>
             </div>
             {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",padding:"10px 14px",borderRadius:"9px"}}>⚠️ {err}</p>}
+            <div>
+              <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+                NOTAS Y ACCESORIOS
+              </label>
+              <textarea value={notas} onChange={e=>setNotas(e.target.value)}
+                placeholder="Ej: Incluye cable FC/APC, estuche rigido y manual..."
+                rows={3}
+                style={{...inp,resize:"vertical",lineHeight:"1.5"}}/>
+              <p style={{color:"#555",fontSize:"10px",marginTop:"4px"}}>
+                Esta nota sera visible para el ingeniero al hacer check-out.
+              </p>
+            </div>
             <div>
               <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
                 ADMINISTRADOR RESPONSABLE
@@ -1681,6 +1712,14 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
           <input value={editEq.sitio_base||""}
             onChange={function(e){setEditEq(Object.assign({},editEq,{sitio_base:e.target.value}));}}
             style={inp}/>
+        </div>
+        <div>
+          <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>NOTAS Y ACCESORIOS</label>
+          <textarea value={editEq.notas||""}
+            onChange={function(e){setEditEq(Object.assign({},editEq,{notas:e.target.value}));}}
+            placeholder="Ej: Incluye cable FC/APC, estuche rigido..."
+            rows={3}
+            style={{...inp,resize:"vertical",lineHeight:"1.5"}}/>
         </div>
         <div>
           <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>ADMINISTRADOR RESPONSABLE</label>
@@ -1876,6 +1915,33 @@ export default function App(){
   const [filtroHistEq,setFiltroHistEq]=useState("");
   const [filtroHistIng,setFiltroHistIng]=useState("");
   const [imgZoom,setImgZoom]=useState(null);
+
+  function exportarHistorialCSV(){
+    var headers=["Equipo ID","Equipo","Ingeniero","Ciudad","Estado","Tipo","Fecha Retiro","Fecha Devolucion","Dias en uso","Guia Paqueteria"];
+    var rows=historialFiltrado.map(function(h){
+      return [
+        h.equipo_id||"",
+        h.equipo_nombre||"",
+        h.ingeniero||"",
+        h.ciudad||"",
+        h.estado||"",
+        h.tipo==="paqueteria"?"Paqueteria":"Retiro directo",
+        h.fecha_retiro?fmt(h.fecha_retiro):"",
+        h.fecha_devolucion?fmt(h.fecha_devolucion):"",
+        h.dias||"",
+        h.guia_paqueteria||"",
+      ].map(function(v){return '"'+(String(v)).replace(/"/g,'""')+'"';}).join(",");
+    });
+    var filtro=(filtroHistEq||filtroHistIng)?("_filtro_"+(filtroHistEq||filtroHistIng).replace(/\s+/g,"_")):"_completo";
+    var csv=[headers.join(",")].concat(rows).join("\n");
+    var blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement("a");
+    a.href=url;
+    a.download="historial_equipotrack"+filtro+"_"+new Date().toISOString().slice(0,10)+".csv";
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
   const [toast,setToast]=useState(null);
 
   const isAdmin=isAdminOrSuper(session);
@@ -2128,7 +2194,7 @@ export default function App(){
                 onClick={function(){if(!enRep)abrir(eq);}}
                 style={{background:C.card,
                   border:"1px solid "+(enRep?"#ff950055":alerta?"#ff3b3b33":esPaq?"#4a9eff22":reg?"#ff950022":C.border),
-                  borderRadius:"16px",padding:"15px",
+                  borderRadius:"16px",padding:"16px",
                   cursor:enRep?"default":"pointer",
                   opacity:enRep?0.7:1,
                   animation:"slideUp 0.3s ease "+(i*0.04)+"s both",
@@ -2157,25 +2223,25 @@ export default function App(){
                         <p style={{fontSize:"13px",color:"#aaa"}}>
                           👤 <strong style={{color:"#ddd"}}>{reg.ingeniero}</strong>
                         </p>
-                        <p style={{fontSize:"11px",color:C.muted,marginTop:"2px"}}>
+                        <p style={{fontSize:"13px",color:C.muted,marginTop:"3px"}}>
                           📍 {reg.ciudad}, {reg.estado} · {getDias(reg.fecha_retiro)}
                         </p>
-                        {esPaq&&<p style={{fontSize:"11px",color:C.blue,marginTop:"3px",fontWeight:"700"}}>
+                        {esPaq&&<p style={{fontSize:"13px",color:C.blue,marginTop:"3px",fontWeight:"700"}}>
                           📦 En tránsito{reg.guia_paqueteria?` · ${reg.guia_paqueteria}`:""}  Toca para confirmar recepción
                         </p>}
-                        {alerta&&!esPaq&&<p style={{fontSize:"11px",color:C.red,marginTop:"4px",fontWeight:"700"}}>
+                        {alerta&&!esPaq&&<p style={{fontSize:"13px",color:C.red,marginTop:"4px",fontWeight:"700"}}>
                           ⚠️ +5 días  requiere atención
                         </p>}
                       </div>
                     )}
-                    {enRep&&<p style={{fontSize:"11px",color:C.orange,marginTop:"6px",fontWeight:"700"}}>
+                    {enRep&&<p style={{fontSize:"13px",color:C.orange,marginTop:"6px",fontWeight:"700"}}>
                       🔧 En reparación  no disponible
                     </p>}
                   </div>
-                  <div style={{width:"40px",height:"40px",
+                  <div style={{width:"48px",height:"48px",
                     background:esPaq?C.blueDk:reg?C.orangeDk:C.greenDk,
-                    borderRadius:"10px",flexShrink:0,marginLeft:"10px",
-                    display:"flex",alignItems:"center",justifyContent:"center",fontSize:"18px"}}>
+                    borderRadius:"12px",flexShrink:0,marginLeft:"10px",
+                    display:"flex",alignItems:"center",justifyContent:"center",fontSize:"22px"}}>
                     {esPaq?"📦":reg?"📤":"📥"}
                   </div>
                 </div>
@@ -2198,6 +2264,13 @@ export default function App(){
             {(filtroHistEq||filtroHistIng)&&<p style={{fontSize:"11px",color:C.muted}}>
               {historialFiltrado.length} resultado{historialFiltrado.length!==1?"s":""}
             </p>}
+            {isAdmin&&<button onClick={exportarHistorialCSV}
+              style={{width:"100%",padding:"10px",background:"transparent",
+                border:"1px solid "+C.blue+"44",borderRadius:"10px",
+                color:C.blue,cursor:"pointer",fontSize:"12px",
+                fontWeight:"700",fontFamily:"inherit"}}>
+              📊 Exportar CSV {(filtroHistEq||filtroHistIng)?"(filtro aplicado)":"(historial completo)"} — {historialFiltrado.length} registros
+            </button>}
           </div>}
           {historialFiltrado.length===0?(
             <div style={{textAlign:"center",padding:"60px 20px",color:C.muted}}>

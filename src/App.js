@@ -836,7 +836,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador (v0.22.0).
+          ¿Sin acceso? Contacta al administrador (v0.23.0).
         </p>
       </div>
     </div>
@@ -1229,6 +1229,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
   // Perfiles
   const [perfiles,setPerfiles]=useState([]),[nuevoNombre,setNuevoNombre]=useState("");
   const [editPerfil,setEditPerfil]=useState(null);
+  const [gerenciaPerfil,setGerenciaPerfil]=useState(""); // gerencia del usuario en edicion
 
   // Lista de equipos
   const [listaEqs,setListaEqs]=useState([]),[loadEqs,setLoadEqs]=useState(false);
@@ -1339,8 +1340,11 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
   async function guardarNombre(perfil){
     if(!nuevoNombre.trim())return;
     try{
-      await supa(`perfiles?id=eq.${perfil.id}`,{method:"PATCH",token,body:{nombre:nuevoNombre.trim()}});
-      setEditPerfil(null);setNuevoNombre("");cargarPerfiles();
+      await supa(`perfiles?id=eq.${perfil.id}`,{method:"PATCH",token,body:{
+        nombre:nuevoNombre.trim(),
+        gerencia:gerenciaPerfil||null,
+      }});
+      setEditPerfil(null);setNuevoNombre("");setGerenciaPerfil("");cargarPerfiles();
     }catch(ex){alert("Error: "+ex.message);}
   }
 
@@ -1632,11 +1636,12 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
         {/* Tab: Ingenieros */}
         {tab==="ingenieros"&&<div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
           <p style={{color:C.muted,fontSize:"12px",marginBottom:"4px"}}>
-            {isSA?"Gestiona nombres y roles de todos los usuarios.":"Edita el nombre visible de cada usuario."}
+            {isSA?"Gestiona nombres, roles y gerencias de todos los usuarios.":"Edita el nombre y gerencia de cada usuario."}
           </p>
           {perfiles.map(function(p){
             var rolColor=p.rol==="super_admin"?C.green:p.rol==="admin"?C.blue:C.muted;
-            var rolLabel=p.rol==="super_admin"?"Super Admin":p.rol==="admin"?"Admin":"Ingeniero";
+            var rolLabel=p.rol==="super_admin"?"Super Admin":p.rol==="admin"?"Admin":p.rol==="gerente"?"Gerente":"Ingeniero";
+            var gerenciaColor="#9966ff";
             return(
             <div key={p.id} style={{background:"#12121f",border:"1px solid "+C.border,
               borderRadius:"11px",padding:"12px 14px"}}>
@@ -1650,9 +1655,24 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                       style={{padding:"9px 14px",background:"linear-gradient(135deg,"+C.green+",#00c066)",
                         border:"none",borderRadius:"9px",color:"#001a0d",fontWeight:"800",
                         cursor:"pointer",fontFamily:"inherit"}}>✓</button>
-                    <button onClick={()=>{setEditPerfil(null);setNuevoNombre("");}}
+                    <button onClick={()=>{setEditPerfil(null);setNuevoNombre("");setGerenciaPerfil("");}}
                       style={{padding:"9px 12px",background:"transparent",border:"1px solid "+C.border,
                         borderRadius:"9px",color:C.muted,cursor:"pointer",fontFamily:"inherit"}}>✕</button>
+                  </div>
+                  <div>
+                    <p style={{fontSize:"10px",color:C.muted,marginBottom:"5px",letterSpacing:"0.08em"}}>GERENCIA</p>
+                    <div style={{display:"flex",gap:"6px"}}>
+                      {["","Centro-Sur","Norte-Occidente"].map(function(g){return(
+                        <button key={g||"sin"} onClick={function(){setGerenciaPerfil(g);}}
+                          style={{flex:1,padding:"7px 4px",fontSize:"11px",fontWeight:"700",
+                            background:gerenciaPerfil===g?"#1a0a2a":"transparent",
+                            border:"1px solid "+(gerenciaPerfil===g?"#9966ff":C.border),
+                            borderRadius:"8px",color:gerenciaPerfil===g?"#9966ff":C.muted,
+                            cursor:"pointer",fontFamily:"inherit"}}>
+                          {g||"Ninguna"}
+                        </button>
+                      );})}
+                    </div>
                   </div>
                   {isSA&&<div style={{display:"flex",gap:"6px"}}>
                     {["ingeniero","gerente","admin","super_admin"].map(function(r){
@@ -1676,8 +1696,12 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                         padding:"1px 7px",borderRadius:"20px",fontWeight:"700"}}>{rolLabel}</span>
                     </div>
                     <p style={{fontSize:"11px",color:C.muted,margin:0}}>{p.email}</p>
+                    {p.gerencia&&<span style={{fontSize:"10px",color:"#9966ff",background:"#9966ff22",
+                      padding:"1px 7px",borderRadius:"20px",fontWeight:"700",display:"inline-block",marginTop:"3px"}}>
+                      🏢 {p.gerencia}
+                    </span>}
                   </div>
-                  {(isSA||(p.rol==="ingeniero"))?<button onClick={function(){setEditPerfil(p.id);setNuevoNombre(p.nombre);}}
+                  {(isSA||(isAdmin&&(p.rol==="ingeniero"||p.rol==="gerente")))?<button onClick={function(){setEditPerfil(p.id);setNuevoNombre(p.nombre);setGerenciaPerfil(p.gerencia||"");}}
                     style={{background:"transparent",border:"1px solid "+C.border,borderRadius:"8px",
                       color:C.muted,padding:"4px 10px",cursor:"pointer",fontSize:"12px",fontFamily:"inherit"}}>
                     Editar
@@ -2188,35 +2212,46 @@ export default function App(){
             style={{...inp,marginBottom:"10px",fontSize:"14px"}}/>
         )}
 
-        {/* Filtros */}
+        {/* Filtros — una sola fila con scroll horizontal */}
         {vista==="equipos"&&(
-          <div style={{display:"flex",gap:"6px",overflowX:"auto",paddingBottom:"12px",scrollbarWidth:"none"}}>
-            {/* Selector gerencia solo para admin/gerente */}
-            {(isAdmin||isGer)&&<div style={{display:"flex",gap:"6px",marginBottom:"6px",flexWrap:"wrap"}}>
-              {["","Centro-Sur","Norte-Occidente"].map(function(g){return(
-                <button key={g||"all"} onClick={function(){setFiltroGerencia(g);}}
-                  style={{padding:"6px 12px",borderRadius:"20px",fontSize:"12px",fontWeight:"700",
-                    cursor:"pointer",fontFamily:"inherit",border:"1px solid "+(!g&&!filtroGerencia||filtroGerencia===g?"#4a9eff":"#2a2a4a"),
-                    background:(!g&&!filtroGerencia||filtroGerencia===g)?"#020d1a":"transparent",
-                    color:(!g&&!filtroGerencia||filtroGerencia===g)?"#4a9eff":"#666"}}>
-                  {g||"🌎 Nacional"}
-                </button>
-              );})}
-            </div>}
-            {[{key:"todas",label:"Todos"},{key:"disponibles",label:"Disponibles"},
-              {key:"reparacion",label:"🔧 Reparación"},
-              ...ciudadesEnUso.map(c=>({key:c,label:c}))].map(f=>(
-              <button key={f.key} onClick={()=>setFiltro(f.key)}
-                style={{flexShrink:0,padding:"6px 12px",
-                  background:filtro===f.key?C.green:C.card,
-                  border:`1px solid ${filtro===f.key?C.green:C.border}`,
-                  borderRadius:"20px",cursor:"pointer",whiteSpace:"nowrap",
-                  color:filtro===f.key?"#001a0d":C.muted,
-                  fontWeight:filtro===f.key?"700":"500",
-                  fontSize:"11px",fontFamily:"'Sora',sans-serif"}}>
-                {f.label}
-              </button>
-            ))}
+          <div style={{overflowX:"auto",paddingBottom:"10px",scrollbarWidth:"none",WebkitOverflowScrolling:"touch",
+            msOverflowStyle:"none"}}>
+            <div style={{display:"flex",gap:"6px",paddingRight:"16px",width:"max-content",minWidth:"100%"}}>
+              {/* Pills de gerencia — solo admin/gerente, color azul */}
+              {(isAdmin||isGer)&&["","Centro-Sur","Norte-Occidente"].map(function(g){
+                var activo=filtroGerencia===g;
+                return(
+                  <button key={g||"nac"} onClick={function(){setFiltroGerencia(g);}}
+                    style={{flexShrink:0,padding:"7px 13px",borderRadius:"20px",fontSize:"12px",fontWeight:"700",
+                      cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",
+                      border:"1px solid "+(activo?"#4a9eff":"#1a1a3a"),
+                      background:activo?"#020d1a":"transparent",
+                      color:activo?"#4a9eff":"#445"}}>
+                    {g?"🏢 "+g:"🌎 Nacional"}
+                  </button>
+                );
+              })}
+              {/* Separador visual si hay gerencias */}
+              {(isAdmin||isGer)&&<div style={{width:"1px",background:"#2a2a4a",flexShrink:0,margin:"4px 2px"}}/>}
+              {/* Pills de estado — verde cuando activo */}
+              {[{key:"todas",label:"Todos"},{key:"disponibles",label:"Disponibles"},
+                {key:"reparacion",label:"🔧 Reparación"},
+                ...ciudadesEnUso.map(c=>({key:c,label:"📍 "+c}))].map(function(f){
+                var activo=filtro===f.key;
+                return(
+                  <button key={f.key} onClick={function(){setFiltro(f.key);}}
+                    style={{flexShrink:0,padding:"7px 13px",
+                      background:activo?C.green:"transparent",
+                      border:"1px solid "+(activo?C.green:"#1a1a3a"),
+                      borderRadius:"20px",cursor:"pointer",whiteSpace:"nowrap",
+                      color:activo?"#001a0d":"#667",
+                      fontWeight:activo?"700":"500",
+                      fontSize:"12px",fontFamily:"inherit",transition:"all 0.15s"}}>
+                    {f.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

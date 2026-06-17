@@ -130,6 +130,9 @@ function isAdminOrSuper(session){
   var rol=getRolFromSession(session);
   return rol==="admin"||rol==="super_admin";
 }
+function isGerente(session){
+  return getRolFromSession(session)==="gerente";
+}
 function isSuperAdmin(session){
   return getRolFromSession(session)==="super_admin";
 }
@@ -833,7 +836,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador (v0.21.0).
+          ¿Sin acceso? Contacta al administrador (v0.22.0).
         </p>
       </div>
     </div>
@@ -855,14 +858,18 @@ function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
   async function confirmar(){
     setLoading(true);
     try{
+      // NOTA: el trigger set_ingeniero en DB fue actualizado para no sobreescribir si ya viene valor
+      // ingeniero = nombre seleccionado del dropdown (admin) o propio (ingeniero)
+      // enviado_por = quien hace el registro (siempre el usuario logueado)
       await supa("registros",{method:"POST",token,body:{
         equipo_id:equipo.id,
         user_id:getUserId(session),
-        ingeniero,estado,ciudad,
+        ingeniero:ingeniero||session.nombre,
+        estado,ciudad,
         tipo,guia_paqueteria:guia||null,
         foto_retiro:foto,
         enviado_por:session.nombre,
-        // fecha_retiro y user_id los genera el trigger en DB
+        // fecha_retiro la genera el trigger en DB
       }});
       onConfirmar(`✅ ${equipo.nombre} asignado a ${ingeniero}`);
     }catch(ex){
@@ -1211,6 +1218,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
   const [nombre,setNombre]=useState(""),[serie,setSerie]=useState("");
   const [adminEq,setAdminEq]=useState(""); // admin responsable del equipo
   const [notas,setNotas]=useState(""); // notas y accesorios del equipo
+  const [gerenciaEq,setGerenciaEq]=useState(""); // gerencia del equipo
   const [cat,setCat]=useState(""),[estadoB,setEstadoB]=useState("");
   const [ciudadB,setCiudadB]=useState(""),[sitio,setSitio]=useState("");
   const [loading,setLoading]=useState(false),[err,setErr]=useState("");
@@ -1250,13 +1258,14 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
         sitio_base:editEq.sitio_base,
         admin_email:editEq.admin_email||null,
         notas:editEq.notas||null,
+        gerencia:editEq.gerencia||null,
       }});
       setEditEq(null);cargarEquipos();onEquipoCreado();
     }catch(ex){alert("Error: "+ex.message);}
   }
 
   function exportarCSV(){
-    var headers=["ID","Nombre","Serie","Categoria","Estado Base","Ciudad Base","Sitio Base","Administrador","Estatus"];
+    var headers=["ID","Nombre","Serie","Categoria","Gerencia","Estado Base","Ciudad Base","Sitio Base","Administrador","Estatus"];
     var rows=listaEqs.map(function(eq){
       return [
         eq.id,
@@ -1266,6 +1275,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
         eq.estado_base,
         eq.ciudad_base,
         eq.sitio_base,
+        eq.gerencia||"Sin asignar",
         eq.admin_email||"Sin asignar",
         eq.activo?(eq.estatus==="reparacion"?"En reparación":"Activo"):"Eliminado"
       ].map(function(v){return '"'+(v||"").replace(/"/g,'""')+'"';}).join(",");
@@ -1366,7 +1376,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
         const num=parseInt(existentes[0].id.replace("EQ-",""))||0;next=num+1;
       }
       const id=`EQ-${String(next).padStart(3,"0")}`;
-      const eq={id,nombre,serie,categoria:cat,estado_base:estadoB,ciudad_base:ciudadB,sitio_base:sitio,activo:true,admin_email:adminEq||null,notas:notas.trim()||null};
+      const eq={id,nombre,serie,categoria:cat,estado_base:estadoB,ciudad_base:ciudadB,sitio_base:sitio,activo:true,admin_email:adminEq||null,notas:notas.trim()||null,gerencia:gerenciaEq||null};
       await supa("equipos",{method:"POST",token,body:eq});
       setNuevoEq(eq);
       onEquipoCreado();
@@ -1459,7 +1469,8 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                           overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{eq.nombre}</p>
                         <p style={{fontSize:"11px",color:C.muted,margin:0}}>{eq.categoria}</p>
                         <p style={{fontSize:"10px",color:C.muted,margin:"2px 0 0",
-                          fontFamily:"'JetBrains Mono',monospace",fontSize:"12px"}}>Base: {eq.ciudad_base} · {eq.sitio_base}</p>
+                          fontFamily:"'JetBrains Mono',monospace",fontSize:"12px"}}>Base: {eq.ciudad_base} · {eq.sitio_base}{eq.gerencia&&<span style={{color:"#9966ff",marginLeft:"8px",fontSize:"11px"}}>· {eq.gerencia}</span>}</p>
+                        {eq.gerencia&&<p style={{fontSize:"10px",color:"#9966ff",margin:"2px 0 0"}}>🏢 {eq.gerencia}</p>}
                         {eq.admin_email&&<p style={{fontSize:"10px",color:C.blue,margin:"2px 0 0"}}>
                           👤 Admin: {eq.admin_email}
                         </p>}
@@ -1543,6 +1554,17 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
               <input value={sitio} onChange={e=>setSitio(e.target.value)} placeholder="Ej. Puente de Vigas  Piso 3" style={inp}/>
             </div>
             {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",padding:"10px 14px",borderRadius:"9px"}}>⚠️ {err}</p>}
+            <div>
+              <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+                GERENCIA
+              </label>
+              <select value={gerenciaEq} onChange={e=>setGerenciaEq(e.target.value)}
+                style={{...inp,cursor:"pointer",color:gerenciaEq?C.text:C.muted}}>
+                <option value="">Sin asignar</option>
+                <option value="Centro-Sur">Centro-Sur</option>
+                <option value="Norte-Occidente">Norte-Occidente</option>
+              </select>
+            </div>
             <div>
               <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
                 NOTAS Y ACCESORIOS
@@ -1633,14 +1655,14 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                         borderRadius:"9px",color:C.muted,cursor:"pointer",fontFamily:"inherit"}}>✕</button>
                   </div>
                   {isSA&&<div style={{display:"flex",gap:"6px"}}>
-                    {["ingeniero","admin","super_admin"].map(function(r){
+                    {["ingeniero","gerente","admin","super_admin"].map(function(r){
                       return <button key={r} onClick={()=>cambiarRol(p,r)}
                         style={{flex:1,padding:"7px",fontSize:"11px",fontWeight:"700",
                           background:p.rol===r?"#001a0d":"transparent",
                           border:"1px solid "+(p.rol===r?C.green:C.border),
                           borderRadius:"8px",color:p.rol===r?C.green:C.muted,
                           cursor:"pointer",fontFamily:"inherit",textTransform:"capitalize"}}>
-                        {r==="super_admin"?"Super Admin":r==="admin"?"Admin":"Ingeniero"}
+                        {r==="super_admin"?"Super Admin":r==="admin"?"Admin":r==="gerente"?"Gerente":"Ingeniero"}
                       </button>;
                     })}
                   </div>}
@@ -1720,6 +1742,16 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
             placeholder="Ej: Incluye cable FC/APC, estuche rigido..."
             rows={3}
             style={{...inp,resize:"vertical",lineHeight:"1.5"}}/>
+        </div>
+        <div>
+          <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>GERENCIA</label>
+          <select value={editEq.gerencia||""}
+            onChange={function(e){setEditEq(Object.assign({},editEq,{gerencia:e.target.value}));}}
+            style={{...inp,cursor:"pointer",color:editEq.gerencia?C.text:C.muted}}>
+            <option value="">Sin asignar</option>
+            <option value="Centro-Sur">Centro-Sur</option>
+            <option value="Norte-Occidente">Norte-Occidente</option>
+          </select>
         </div>
         <div>
           <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>ADMINISTRADOR RESPONSABLE</label>
@@ -1915,6 +1947,7 @@ export default function App(){
   const [filtroHistEq,setFiltroHistEq]=useState("");
   const [filtroHistIng,setFiltroHistIng]=useState("");
   const [imgZoom,setImgZoom]=useState(null);
+  const [filtroGerencia,setFiltroGerencia]=useState(""); // filtro por gerencia
 
   function exportarHistorialCSV(){
     var headers=["Equipo ID","Equipo","Ingeniero","Ciudad","Estado","Tipo","Fecha Retiro","Fecha Devolucion","Dias en uso","Guia Paqueteria"];
@@ -1946,6 +1979,7 @@ export default function App(){
 
   const isAdmin=isAdminOrSuper(session);
   const isSA=isSuperAdmin(session);
+  const isGer=isGerente(session);
   const registros={};
   regsArr.forEach(r=>{registros[r.equipo_id]=r;});
 
@@ -2022,8 +2056,15 @@ export default function App(){
       ||(filtro==="disponibles"&&!reg&&!enRep)
       ||(filtro==="reparacion"&&enRep)
       ||(reg&&reg.ciudad===filtro);
-    return mb&&mc;
+    // Filtro por gerencia (si está activo)
+    const mg=!filtroGerencia||(eq.gerencia||"")=== filtroGerencia;
+    return mb&&mc&&mg;
   });
+
+  // Historial filtrado por gerencia también
+  const equiposPorGerencia=filtroGerencia
+    ?equipos.filter(function(e){return (e.gerencia||"")===filtroGerencia;}).map(function(e){return e.id;})
+    :null;
 
   // Historial filtrado
   const historialFiltrado=historial.filter(function(h){
@@ -2032,7 +2073,9 @@ export default function App(){
       h.equipo_id.toLowerCase().includes(filtroHistEq.toLowerCase());
     var matchIng=!filtroHistIng||
       h.ingeniero.toLowerCase().includes(filtroHistIng.toLowerCase());
-    return matchEq&&matchIng;
+    // Filtro por gerencia en historial
+    var matchGer=!equiposPorGerencia||equiposPorGerencia.indexOf(h.equipo_id)!==-1;
+    return matchEq&&matchIng&&matchGer;
   });
 
   const enUso=regsArr.length;
@@ -2085,6 +2128,7 @@ export default function App(){
               <p style={{fontSize:"10px",color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>
                 {session.nombre}
                 {isAdmin&&<span style={{color:C.blue,marginLeft:"6px"}}>{isSA?"· SUPER ADMIN":"· ADMIN"}</span>}
+                {isGer&&<span style={{color:"#9966ff",marginLeft:"6px"}}>· GERENTE</span>}
               </p>
             </div>
           </div>
@@ -2119,15 +2163,20 @@ export default function App(){
         </div>
 
         {/* Stats */}
-        <div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
-          {[{label:"Disponibles",val:disponibles,color:C.green},
-            {label:"En uso",val:enUso,color:C.orange},
-            {label:"Total",val:disponibles+enUso,color:"#888"}].map(s=>(
-            <div key={s.label} style={{flex:1,background:C.card,border:`1px solid ${C.border}`,
-              borderRadius:"12px",padding:"10px",textAlign:"center"}}>
-              <div style={{fontSize:"20px",fontWeight:"800",color:s.color}}>{s.val}</div>
-              <div style={{fontSize:"9px",color:C.muted,letterSpacing:"0.08em",
-                textTransform:"uppercase",marginTop:"2px"}}>{s.label}</div>
+        <div style={{display:"flex",gap:"8px",marginBottom:"16px"}}>
+          {[{label:"Disponibles",val:disponibles,color:C.green,icon:"✓"},
+            {label:"En uso",val:enUso,color:C.orange,icon:"↗"},
+            {label:"Total",val:disponibles+enUso,color:"#aaa",icon:"#"}].map(s=>(
+            <div key={s.label} style={{flex:1,
+              background:s.color==="C.green"?C.card:C.card,
+              border:"1px solid "+(s.val>0?s.color+"44":C.border),
+              borderRadius:"14px",padding:"14px 8px",textAlign:"center",
+              boxShadow:s.val>0?"0 0 12px "+s.color+"22":"none",
+              transition:"all 0.3s"}}>
+              <div style={{fontSize:"32px",fontWeight:"900",color:s.color,
+                lineHeight:"1",letterSpacing:"-0.02em"}}>{s.val}</div>
+              <div style={{fontSize:"10px",color:s.color,letterSpacing:"0.1em",
+                textTransform:"uppercase",marginTop:"5px",fontWeight:"700",opacity:0.8}}>{s.label}</div>
             </div>
           ))}
         </div>
@@ -2142,6 +2191,18 @@ export default function App(){
         {/* Filtros */}
         {vista==="equipos"&&(
           <div style={{display:"flex",gap:"6px",overflowX:"auto",paddingBottom:"12px",scrollbarWidth:"none"}}>
+            {/* Selector gerencia solo para admin/gerente */}
+            {(isAdmin||isGer)&&<div style={{display:"flex",gap:"6px",marginBottom:"6px",flexWrap:"wrap"}}>
+              {["","Centro-Sur","Norte-Occidente"].map(function(g){return(
+                <button key={g||"all"} onClick={function(){setFiltroGerencia(g);}}
+                  style={{padding:"6px 12px",borderRadius:"20px",fontSize:"12px",fontWeight:"700",
+                    cursor:"pointer",fontFamily:"inherit",border:"1px solid "+(!g&&!filtroGerencia||filtroGerencia===g?"#4a9eff":"#2a2a4a"),
+                    background:(!g&&!filtroGerencia||filtroGerencia===g)?"#020d1a":"transparent",
+                    color:(!g&&!filtroGerencia||filtroGerencia===g)?"#4a9eff":"#666"}}>
+                  {g||"🌎 Nacional"}
+                </button>
+              );})}
+            </div>}
             {[{key:"todas",label:"Todos"},{key:"disponibles",label:"Disponibles"},
               {key:"reparacion",label:"🔧 Reparación"},
               ...ciudadesEnUso.map(c=>({key:c,label:c}))].map(f=>(
@@ -2191,7 +2252,7 @@ export default function App(){
             const enRep=eq.estatus==="reparacion";
             return(
               <div key={eq.id} className={enRep?"":"eq-card"}
-                onClick={function(){if(!enRep)abrir(eq);}}
+                onClick={function(){if(!enRep&&!isGer)abrir(eq);}}
                 style={{background:C.card,
                   border:"1px solid "+(enRep?"#ff950055":alerta?"#ff3b3b33":esPaq?"#4a9eff22":reg?"#ff950022":C.border),
                   borderRadius:"16px",padding:"16px",
@@ -2264,7 +2325,7 @@ export default function App(){
             {(filtroHistEq||filtroHistIng)&&<p style={{fontSize:"11px",color:C.muted}}>
               {historialFiltrado.length} resultado{historialFiltrado.length!==1?"s":""}
             </p>}
-            {isAdmin&&<button onClick={exportarHistorialCSV}
+            {(isAdmin||isGer)&&<button onClick={exportarHistorialCSV}
               style={{width:"100%",padding:"10px",background:"transparent",
                 border:"1px solid "+C.blue+"44",borderRadius:"10px",
                 color:C.blue,cursor:"pointer",fontSize:"12px",

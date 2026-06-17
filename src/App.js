@@ -363,7 +363,7 @@ function QRLabel({equipo,onCerrar}){
     doc.open();
     var style=doc.createElement("style");
     style.textContent=[
-      "body{margin:0;padding:20px;font-family:sans-serif;background:#fff;}",
+      "body{margin:0;padding:0;font-family:'Sora',sans-serif;background:#07070f}",
       ".et{border:2px solid #111;border-radius:8px;overflow:hidden;max-width:280px;margin:0 auto;}",
       ".eh{background:#111;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;}",
       ".logo{display:flex;align-items:center;gap:6px;}",
@@ -836,7 +836,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador (v0.23.0).
+          ¿Sin acceso? Contacta al administrador (v0.24.0).
         </p>
       </div>
     </div>
@@ -1812,7 +1812,7 @@ function CatSelect({token,value,onChange}){
 }
 
 // - MAPA -
-function MapaModal({registros,equipos,onCerrar}){
+function MapaModal({registros,equipos,onCerrar}){ // font heredado de App via Sora
   const mapRef=useRef(),mapInst=useRef();
   useEffect(()=>{
     if(!document.getElementById("lf-css")){
@@ -2102,9 +2102,19 @@ export default function App(){
     return matchEq&&matchIng&&matchGer;
   });
 
-  const enUso=regsArr.length;
-  const enReparacion=equipos.filter(function(e){return e.estatus==="reparacion"&&!registros[e.id];}).length;
-  const disponibles=equipos.length-enUso-enReparacion;
+  // Equipos filtrados por gerencia para los indicadores
+  const equiposFiltradosGer=filtroGerencia
+    ?equipos.filter(function(e){return (e.gerencia||"")===filtroGerencia;})
+    :equipos;
+  const regsArrFiltrados=filtroGerencia
+    ?regsArr.filter(function(r){
+        var eq=equipos.find(function(e){return e.id===r.equipo_id;});
+        return eq&&(eq.gerencia||"")===filtroGerencia;
+      })
+    :regsArr;
+  const enUso=regsArrFiltrados.length;
+  const enReparacion=equiposFiltradosGer.filter(function(e){return e.estatus==="reparacion"&&!registros[e.id];}).length;
+  const disponibles=equiposFiltradosGer.length-enUso-enReparacion;
 
   // Si hay token de recovery, mostrar pantalla de nueva contraseña
   if(recoveryToken) return <NuevaContrasena token={recoveryToken}/>;
@@ -2205,59 +2215,8 @@ export default function App(){
           ))}
         </div>
 
-        {/* Búsqueda */}
-        {vista==="equipos"&&(
-          <input value={busq} onChange={e=>setBusq(e.target.value)}
-            placeholder="Buscar equipo o código…"
-            style={{...inp,marginBottom:"10px",fontSize:"14px"}}/>
-        )}
-
-        {/* Filtros — una sola fila con scroll horizontal */}
-        {vista==="equipos"&&(
-          <div style={{overflowX:"auto",paddingBottom:"10px",scrollbarWidth:"none",WebkitOverflowScrolling:"touch",
-            msOverflowStyle:"none"}}>
-            <div style={{display:"flex",gap:"6px",paddingRight:"16px",width:"max-content",minWidth:"100%"}}>
-              {/* Pills de gerencia — solo admin/gerente, color azul */}
-              {(isAdmin||isGer)&&["","Centro-Sur","Norte-Occidente"].map(function(g){
-                var activo=filtroGerencia===g;
-                return(
-                  <button key={g||"nac"} onClick={function(){setFiltroGerencia(g);}}
-                    style={{flexShrink:0,padding:"7px 13px",borderRadius:"20px",fontSize:"12px",fontWeight:"700",
-                      cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",
-                      border:"1px solid "+(activo?"#4a9eff":"#1a1a3a"),
-                      background:activo?"#020d1a":"transparent",
-                      color:activo?"#4a9eff":"#445"}}>
-                    {g?"🏢 "+g:"🌎 Nacional"}
-                  </button>
-                );
-              })}
-              {/* Separador visual si hay gerencias */}
-              {(isAdmin||isGer)&&<div style={{width:"1px",background:"#2a2a4a",flexShrink:0,margin:"4px 2px"}}/>}
-              {/* Pills de estado — verde cuando activo */}
-              {[{key:"todas",label:"Todos"},{key:"disponibles",label:"Disponibles"},
-                {key:"reparacion",label:"🔧 Reparación"},
-                ...ciudadesEnUso.map(c=>({key:c,label:"📍 "+c}))].map(function(f){
-                var activo=filtro===f.key;
-                return(
-                  <button key={f.key} onClick={function(){setFiltro(f.key);}}
-                    style={{flexShrink:0,padding:"7px 13px",
-                      background:activo?C.green:"transparent",
-                      border:"1px solid "+(activo?C.green:"#1a1a3a"),
-                      borderRadius:"20px",cursor:"pointer",whiteSpace:"nowrap",
-                      color:activo?"#001a0d":"#667",
-                      fontWeight:activo?"700":"500",
-                      fontSize:"12px",fontFamily:"inherit",transition:"all 0.15s"}}>
-                    {f.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Tabs */}
-      <div style={{display:"flex",padding:"0 16px 16px"}}>
+      {/* Tabs — SIEMPRE primero */}
+      <div style={{display:"flex",padding:"0 16px 12px"}}>
         {["equipos","historial"].map(v=>(
           <button key={v} onClick={()=>setVista(v)}
             style={{flex:1,padding:"10px",background:vista===v?C.card:"transparent",
@@ -2265,11 +2224,61 @@ export default function App(){
               borderRadius:v==="equipos"?"10px 0 0 10px":"0 10px 10px 0",
               color:vista===v?C.green:C.muted,fontWeight:"700",fontSize:"12px",
               cursor:"pointer",letterSpacing:"0.05em",textTransform:"uppercase",
-              fontFamily:"'Sora',sans-serif",transition:"all 0.2s"}}>
+              fontFamily:"inherit",transition:"all 0.2s"}}>
             {v==="equipos"?"⚡ Equipos":"📋 Historial"}
           </button>
         ))}
       </div>
+
+      {/* Búsqueda — solo en equipos */}
+      {vista==="equipos"&&(
+        <div style={{padding:"0 16px"}}>
+          <input value={busq} onChange={e=>setBusq(e.target.value)}
+            placeholder="Buscar equipo o código…"
+            style={{...inp,marginBottom:"10px",fontSize:"14px"}}/>
+        </div>
+      )}
+
+      {/* Filtros — una sola fila con scroll horizontal, solo en equipos */}
+      {vista==="equipos"&&(
+        <div style={{overflowX:"auto",paddingBottom:"10px",paddingLeft:"16px",
+          scrollbarWidth:"none",WebkitOverflowScrolling:"touch",msOverflowStyle:"none"}}>
+          <div style={{display:"flex",gap:"6px",paddingRight:"16px",width:"max-content",minWidth:"100%"}}>
+            {(isAdmin||isGer)&&["","Centro-Sur","Norte-Occidente"].map(function(g){
+              var activo=filtroGerencia===g;
+              return(
+                <button key={g||"nac"} onClick={function(){setFiltroGerencia(g);}}
+                  style={{flexShrink:0,padding:"7px 13px",borderRadius:"20px",fontSize:"12px",fontWeight:"700",
+                    cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",
+                    border:"1px solid "+(activo?"#4a9eff":"#1a1a3a"),
+                    background:activo?"#020d1a":"transparent",
+                    color:activo?"#4a9eff":"#445"}}>
+                  {g?"🏢 "+g:"🌎 Nacional"}
+                </button>
+              );
+            })}
+            {(isAdmin||isGer)&&<div style={{width:"1px",background:"#2a2a4a",flexShrink:0,margin:"4px 2px"}}/>}
+            {[{key:"todas",label:"Todos"},{key:"disponibles",label:"Disponibles"},
+              {key:"reparacion",label:"🔧 Reparación"},
+              ...ciudadesEnUso.map(c=>({key:c,label:"📍 "+c}))].map(function(f){
+              var activo=filtro===f.key;
+              return(
+                <button key={f.key} onClick={function(){setFiltro(f.key);}}
+                  style={{flexShrink:0,padding:"7px 13px",
+                    background:activo?C.green:"transparent",
+                    border:"1px solid "+(activo?C.green:"#1a1a3a"),
+                    borderRadius:"20px",cursor:"pointer",whiteSpace:"nowrap",
+                    color:activo?"#001a0d":"#667",
+                    fontWeight:activo?"700":"500",
+                    fontSize:"12px",fontFamily:"inherit",transition:"all 0.15s"}}>
+                  {f.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
 
       {/* Lista equipos */}
       {vista==="equipos"&&(loading?<Spin/>:

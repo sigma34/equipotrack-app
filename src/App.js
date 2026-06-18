@@ -2276,8 +2276,14 @@ export default function App(){
                 padding:"1px 6px",fontSize:"10px",fontWeight:"800"}}>{enUso}</span>}
             </button>
             <button onClick={function(){
+              // Limpiar todos los estados al cerrar sesión
               setSession(null);
-              // Limpiar ?equipo=XXX de la URL para que no persista
+              setEquipos([]); setRegsArr([]); setHistorial([]); setPerfiles([]);
+              setFiltro("todas"); setBusq("");
+              setFiltroGerencia("");
+              setFiltroHistEq(""); setFiltroHistIng("");
+              setVista("equipos");
+              setSel(null); setModo(null);
               if(window.history&&window.history.replaceState){
                 window.history.replaceState(null,"",window.location.pathname);
               }

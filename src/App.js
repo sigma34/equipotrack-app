@@ -546,7 +546,14 @@ function RegistroNombre({sessionTemp,token,onComplete}){
       updated.user={id:userId,email:sessionTemp.email};
       updated.token=tkn;
       onComplete(updated);
-    }catch(ex){setErr(ex.message);}
+    }catch(ex){
+      setErr(ex.message);
+      // Reset captcha para que el usuario pueda intentar de nuevo
+      setCaptchaToken(null);
+      if(window.hcaptcha&&captchaRef.current){
+        try{window.hcaptcha.reset(captchaRef.current);}catch{}
+      }
+    }
     finally{setLoading(false);}
   }
 
@@ -628,7 +635,14 @@ function NuevaContrasena({token}){
         window.history.replaceState(null,null," ");
       }
       setListo(true);
-    }catch(ex){setErr(ex.message);}
+    }catch(ex){
+      setErr(ex.message);
+      // Reset captcha para que el usuario pueda intentar de nuevo
+      setCaptchaToken(null);
+      if(window.hcaptcha&&captchaRef.current){
+        try{window.hcaptcha.reset(captchaRef.current);}catch{}
+      }
+    }
     finally{setLoading(false);}
   }
 
@@ -706,7 +720,14 @@ function ResetPassword({onVolver}){
       });
       if(!res.ok){const d=await res.json();throw new Error(d.error_description||d.msg||"Error");}
       setEnviado(true);
-    }catch(ex){setErr(ex.message);}
+    }catch(ex){
+      setErr(ex.message);
+      // Reset captcha para que el usuario pueda intentar de nuevo
+      setCaptchaToken(null);
+      if(window.hcaptcha&&captchaRef.current){
+        try{window.hcaptcha.reset(captchaRef.current);}catch{}
+      }
+    }
     finally{setLoading(false);}
   }
   if(enviado) return(
@@ -764,12 +785,28 @@ function ResetPassword({onVolver}){
 function Login({onLogin}){
   const [email,setEmail]=useState(""),[pass,setPass]=useState("");
   const [loading,setLoading]=useState(false),[err,setErr]=useState("");
+  const [captchaToken,setCaptchaToken]=useState(null);
+  const captchaRef=useRef(null);
   const [showReset,setShowReset]=useState(false);
+
+  // Cargar script hCaptcha una sola vez
+  React.useEffect(function(){
+    if(document.getElementById("hcaptcha-script")) return;
+    var s=document.createElement("script");
+    s.id="hcaptcha-script";
+    s.src="https://js.hcaptcha.com/1/api.js";
+    s.async=true; s.defer=true;
+    document.head.appendChild(s);
+    window.onHCaptchaVerify=function(token){setCaptchaToken(token);};
+    window.onHCaptchaExpire=function(){setCaptchaToken(null);};
+  },[]);
   if(showReset) return React.createElement(ResetPassword,{onVolver:function(){setShowReset(false);}});
   async function login(e){
     e.preventDefault();setLoading(true);setErr("");
     try{
-      const data=await authReq("token?grant_type=password",{email,password:pass});
+      // Verificar que captcha fue completado
+      if(!captchaToken){setErr("Por favor completa la verificación de seguridad.");setLoading(false);return;}
+      const data=await authReq("token?grant_type=password",{email,password:pass,gotrue_meta_security:{captcha_token:captchaToken}});
 
       // Extraer user del JWT directamente (más robusto que data.user)
       var userId=null, jwtRol="ingeniero";
@@ -812,7 +849,14 @@ function Login({onLogin}){
         necesitaNombre:!pNombre
       };
       onLogin(sessionData);
-    }catch(ex){setErr(ex.message);}
+    }catch(ex){
+      setErr(ex.message);
+      // Reset captcha para que el usuario pueda intentar de nuevo
+      setCaptchaToken(null);
+      if(window.hcaptcha&&captchaRef.current){
+        try{window.hcaptcha.reset(captchaRef.current);}catch{}
+      }
+    }
     finally{setLoading(false);}
   }
   return(
@@ -869,8 +913,16 @@ function Login({onLogin}){
           </div>
           {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",padding:"10px 14px",borderRadius:"9px",margin:0}}>
             ⚠️ {err}</p>}
-          <button type="submit" disabled={loading} style={{...btnP(loading),marginTop:"6px"}}>
-            {loading?"Entrando…":"Iniciar sesión"}
+          <div style={{display:"flex",justifyContent:"center",margin:"4px 0"}}>
+            <div ref={captchaRef}
+              className="h-captcha"
+              data-sitekey="c8541066-98c2-474a-8d3e-0f0c4748f016"
+              data-callback="onHCaptchaVerify"
+              data-expired-callback="onHCaptchaExpire"
+              data-theme="dark"/>
+          </div>
+          <button type="submit" disabled={loading||!captchaToken} style={{...btnP(loading||!captchaToken),marginTop:"6px"}}>
+            {loading?"Verificando…":"Iniciar sesión"}
           </button>
           <button type="button" onClick={function(){setShowReset(true);}}
             style={{background:"transparent",border:"none",color:C.muted,
@@ -880,7 +932,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador · v0.25.1
+          ¿Sin acceso? Contacta al administrador · v0.26.0
         </p>
       </div>
     </div>
@@ -1429,7 +1481,14 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
       setNuevoEq(eq);
       onEquipoCreado();
       setNombre("");setSerie("");setCat("");setEstadoB("");setCiudadB("");setSitio("");
-    }catch(ex){setErr(ex.message);}
+    }catch(ex){
+      setErr(ex.message);
+      // Reset captcha para que el usuario pueda intentar de nuevo
+      setCaptchaToken(null);
+      if(window.hcaptcha&&captchaRef.current){
+        try{window.hcaptcha.reset(captchaRef.current);}catch{}
+      }
+    }
     finally{setLoading(false);}
   }
 

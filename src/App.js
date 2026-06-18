@@ -808,6 +808,7 @@ function Login({onLogin}){
         user:{id:userId,email:userEmail},
         nombre:pNombre,
         rol:rolFinal,
+        gerencia:perfil&&perfil.gerencia?perfil.gerencia:"",
         necesitaNombre:!pNombre
       };
       onLogin(sessionData);
@@ -879,7 +880,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador · v0.25.0
+          ¿Sin acceso? Contacta al administrador · v0.25.1
         </p>
       </div>
     </div>
@@ -2015,6 +2016,32 @@ export default function App(){
   const [imgZoom,setImgZoom]=useState(null);
   const [filtroGerencia,setFiltroGerencia]=useState(""); // filtro por gerencia
 
+  function exportarActivosCSV(){
+    // Exporta equipos filtrados por gerencia actual
+    var lista=filtroGerencia
+      ?equipos.filter(function(e){return (e.gerencia||"")===filtroGerencia;})
+      :equipos;
+    var headers=["ID","Nombre","Serie","Categoria","Gerencia","Estado Base","Ciudad Base","Sitio Base","Administrador","Estatus"];
+    var rows=lista.map(function(eq){
+      return [
+        eq.id, eq.nombre, eq.serie, eq.categoria,
+        eq.gerencia||"Sin asignar",
+        eq.estado_base, eq.ciudad_base, eq.sitio_base,
+        eq.admin_email||"Sin asignar",
+        eq.activo?(eq.estatus==="reparacion"?"En reparacion":"Activo"):"Eliminado"
+      ].map(function(v){return '"'+(String(v||"")).replace(/"/g,'""')+'"';}).join(",");
+    });
+    var sufijo=filtroGerencia?"_"+filtroGerencia.replace(/[^a-zA-Z0-9]/g,"_"):"_nacional";
+    var csv=[headers.join(",")].concat(rows).join("\n");
+    var blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement("a");
+    a.href=url;
+    a.download="lumo_activos"+sufijo+"_"+new Date().toISOString().slice(0,10)+".csv";
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   function exportarHistorialCSV(){
     var headers=["Equipo ID","Equipo","Ingeniero","Ciudad","Estado","Tipo","Fecha Retiro","Fecha Devolucion","Dias en uso","Guia Paqueteria"];
     var rows=historialFiltrado.map(function(h){
@@ -2080,8 +2107,12 @@ export default function App(){
   }
 
   function handleLogin(s){
-    sessionRef.current=s; // guardar síncronamente en ref
+    sessionRef.current=s;
     setSession(s);
+    // Si es gerente con gerencia asignada, pre-filtrar su dashboard
+    if(getRolFromSession(s)==="gerente"&&s.gerencia){
+      setFiltroGerencia(s.gerencia);
+    }
     if(!s.necesitaNombre) cargar(s.token);
   }
   function cerrar(){
@@ -2289,6 +2320,17 @@ export default function App(){
           </button>
         ))}
       </div>
+
+      {/* Export activos para gerente */}
+      {isGer&&vista==="equipos"&&<div style={{padding:"0 16px 8px"}}>
+        <button onClick={exportarActivosCSV}
+          style={{width:"100%",padding:"10px",background:"transparent",
+            border:"1px solid #9966ff44",borderRadius:"10px",
+            color:"#9966ff",cursor:"pointer",fontSize:"12px",
+            fontWeight:"700",fontFamily:"inherit"}}>
+          📊 Exportar activos {filtroGerencia?"— "+filtroGerencia:"(Nacional)"} ({filtroGerencia?(equiposFiltradosGer.length):equipos.length} equipos)
+        </button>
+      </div>}
 
       {/* Búsqueda — solo en equipos */}
       {vista==="equipos"&&(

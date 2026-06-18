@@ -373,10 +373,10 @@ function QRLabel({equipo,onCerrar}){
       ".eb{padding:14px;display:flex;gap:14px;align-items:flex-start;}",
       ".qrimg{width:140px;height:140px;flex-shrink:0;}",
       ".name{font-size:14px;font-weight:800;color:#111;margin-bottom:4px;}",
-      ".serie{font-size:10px;color:#888;font-family:monospace;}",
+      ".serie{font-size:11px;color:#333;font-family:monospace;font-weight:600;}",
       ".cat{font-size:10px;color:#555;background:#f5f5f5;padding:2px 8px;border-radius:20px;display:inline-block;margin-top:4px;}",
       ".ef{background:#f8f8f8;border-top:1px solid #eee;padding:7px 12px;}",
-      ".scan{font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.08em;font-weight:600;}",
+      ".scan{font-size:10px;color:#444;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;}",
       "@media print{body{padding:0;}}"
     ].join("");
 
@@ -477,7 +477,7 @@ function QRLabel({equipo,onCerrar}){
             <div ref={qrRef} style={{width:"140px",height:"140px",flexShrink:0}}/>
             <div>
               <p style={{fontWeight:"800",fontSize:"13px",color:"#111",lineHeight:1.3,marginBottom:"4px"}}>{equipo.nombre}</p>
-              <p style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",color:"#888"}}>S/N: {equipo.serie}</p>
+              <p style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"11px",color:"#444",fontWeight:"600"}}>S/N: {equipo.serie}</p>
               <span style={{fontSize:"10px",color:"#555",background:"#f5f5f5",padding:"2px 8px",
                 borderRadius:"20px",display:"inline-block",marginTop:"4px"}}>{equipo.categoria}</span>
             </div>
@@ -1517,7 +1517,6 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                         <p style={{fontSize:"11px",color:C.muted,margin:0}}>{eq.categoria}</p>
                         <p style={{fontSize:"10px",color:C.muted,margin:"2px 0 0",
                           fontFamily:"'JetBrains Mono',monospace",fontSize:"12px"}}>Base: {eq.ciudad_base} · {eq.sitio_base}{eq.gerencia&&<span style={{color:"#9966ff",marginLeft:"8px",fontSize:"11px"}}>· {eq.gerencia}</span>}</p>
-                        {eq.gerencia&&<p style={{fontSize:"10px",color:"#9966ff",margin:"2px 0 0"}}>🏢 {eq.gerencia}</p>}
                         {eq.admin_email&&<p style={{fontSize:"10px",color:C.blue,margin:"2px 0 0"}}>
                           👤 Admin: {eq.admin_email}
                         </p>}

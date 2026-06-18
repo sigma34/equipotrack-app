@@ -394,8 +394,10 @@ function QRLabel({equipo,onCerrar}){
     var et=doc.createElement("div"); et.className="et";
     var eh=doc.createElement("div"); eh.className="eh";
     var logo=doc.createElement("div"); logo.className="logo";
-    var icon=doc.createElement("div"); icon.className="icon"; icon.textContent="⚡";
-    var brand=doc.createElement("span"); brand.className="brand"; brand.textContent="EquipoTrack";
+    var icon=doc.createElement("div"); icon.className="icon";
+    icon.style.cssText="width:24px;height:24px;background:radial-gradient(circle at 38% 32%, #003322, #000d07);border:1px solid #00e87a33;border-radius:6px;display:flex;align-items:center;justify-content:center;overflow:hidden;";
+    icon.innerHTML='<svg width="20" height="20" viewBox="0 0 28 28" fill="none"><defs><radialGradient id="ps" cx="38%" cy="32%" r="68%"><stop offset="0%" stop-color="#003322"/><stop offset="100%" stop-color="#000d07"/></radialGradient><radialGradient id="pd" cx="38%" cy="28%" r="65%"><stop offset="0%" stop-color="#00ff88"/><stop offset="55%" stop-color="#00e87a"/><stop offset="100%" stop-color="#00a854"/></radialGradient></defs><circle cx="14" cy="14" r="13" fill="url(#ps)"/><path d="M 14 4 C 14 4 22 11 22 16 C 22 21 18.4 24 14 24 C 9.6 24 6 21 6 16 C 6 11 14 4 14 4 Z" fill="url(#pd)"/><circle cx="11" cy="15.5" r="2" fill="#001a0d"/><circle cx="17" cy="15.5" r="2" fill="#001a0d"/><circle cx="12" cy="14" r=".9" fill="white" opacity=".9"/><circle cx="18" cy="14" r=".9" fill="white" opacity=".9"/><line x1="14" y1="4" x2="14" y2="1.5" stroke="#00e87a" stroke-width="1.5" stroke-linecap="round"/><circle cx="14" cy="1" r="1.5" fill="#00e87a"/></svg>';
+    var brand=doc.createElement("span"); brand.className="brand"; brand.textContent="Lumo";
     logo.appendChild(icon); logo.appendChild(brand);
     var eid=doc.createElement("span"); eid.className="eid"; eid.textContent=equipo.id;
     eh.appendChild(logo); eh.appendChild(eid);
@@ -446,9 +448,26 @@ function QRLabel({equipo,onCerrar}){
         <div style={{border:`2px solid ${C.border}`,borderRadius:"12px",overflow:"hidden",marginBottom:"16px"}}>
           <div style={{background:"#111",padding:"8px 12px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
-              <div style={{width:"20px",height:"20px",background:C.green,borderRadius:"5px",
-                display:"flex",alignItems:"center",justifyContent:"center",fontSize:"11px"}}>⚡</div>
-              <span style={{color:"#fff",fontSize:"12px",fontWeight:"800"}}>EquipoTrack</span>
+              <div style={{width:"24px",height:"24px",
+                background:"radial-gradient(circle at 38% 32%, #003322, #000d07)",
+                border:"1px solid #00e87a33",borderRadius:"6px",
+                display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+                <svg width="20" height="20" viewBox="0 0 28 28" fill="none">
+                  <defs>
+                    <radialGradient id="qls" cx="38%" cy="32%" r="68%"><stop offset="0%" stop-color="#003322"/><stop offset="100%" stop-color="#000d07"/></radialGradient>
+                    <radialGradient id="qld" cx="38%" cy="28%" r="65%"><stop offset="0%" stop-color="#00ff88"/><stop offset="55%" stop-color="#00e87a"/><stop offset="100%" stop-color="#00a854"/></radialGradient>
+                  </defs>
+                  <circle cx="14" cy="14" r="13" fill="url(#qls)"/>
+                  <path d="M 14 4 C 14 4 22 11 22 16 C 22 21 18.4 24 14 24 C 9.6 24 6 21 6 16 C 6 11 14 4 14 4 Z" fill="url(#qld)"/>
+                  <circle cx="11" cy="15.5" r="2" fill="#001a0d"/>
+                  <circle cx="17" cy="15.5" r="2" fill="#001a0d"/>
+                  <circle cx="12" cy="14" r=".9" fill="white" opacity=".9"/>
+                  <circle cx="18" cy="14" r=".9" fill="white" opacity=".9"/>
+                  <line x1="14" y1="4" x2="14" y2="1.5" stroke="#00e87a" stroke-width="1.5" stroke-linecap="round"/>
+                  <circle cx="14" cy="1" r="1.5" fill="#00e87a"/>
+                </svg>
+              </div>
+              <span style={{color:"#fff",fontSize:"12px",fontWeight:"800"}}>Lumo</span>
             </div>
             <span style={{fontFamily:"'JetBrains Mono',monospace",color:C.green,fontSize:"11px",fontWeight:"700"}}>
               {equipo.id}
@@ -801,11 +820,35 @@ function Login({onLogin}){
       <div style={{width:"100%",maxWidth:"360px"}}>
         <div style={{textAlign:"center",marginBottom:"36px"}}>
           <div style={{width:"64px",height:"64px",margin:"0 auto 14px",
-            background:`linear-gradient(135deg,${C.green},#00c066)`,
-            borderRadius:"20px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"28px"}}>⚡</div>
-          <h1 style={{fontSize:"26px",fontWeight:"800",margin:"0 0 4px",color:C.text}}>EquipoTrack</h1>
+            background:"radial-gradient(circle at 38% 32%, #003322, #000d07)",
+            border:"1px solid #00e87a44",
+            borderRadius:"20px",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+            <svg width="50" height="50" viewBox="0 0 28 28" fill="none">
+              <defs>
+                <radialGradient id="lls" cx="38%" cy="32%" r="68%"><stop offset="0%" stop-color="#003322"/><stop offset="100%" stop-color="#000d07"/></radialGradient>
+                <radialGradient id="lld" cx="38%" cy="28%" r="65%"><stop offset="0%" stop-color="#00ff88"/><stop offset="55%" stop-color="#00e87a"/><stop offset="100%" stop-color="#00a854"/></radialGradient>
+              </defs>
+              <circle cx="14" cy="14" r="13" fill="url(#lls)"/>
+              <ellipse cx="14" cy="14" rx="13" ry="4" stroke="#00e87a" stroke-width="0.8" opacity="0.25" fill="none" transform="rotate(-25 14 14)"/>
+              <path d="M 14 4 C 14 4 22 11 22 16 C 22 21 18.4 24 14 24 C 9.6 24 6 21 6 16 C 6 11 14 4 14 4 Z" fill="url(#lld)"/>
+              <ellipse cx="11" cy="10" rx="2.5" ry="3.5" fill="white" opacity="0.15" transform="rotate(-15 11 10)"/>
+              <circle cx="11" cy="15.5" r="2.2" fill="#001a0d"/>
+              <circle cx="17" cy="15.5" r="2.2" fill="#001a0d"/>
+              <circle cx="12" cy="14" r="1" fill="white" opacity="0.9"/>
+              <circle cx="18" cy="14" r="1" fill="white" opacity="0.9"/>
+              <path d="M 10 19 Q 14 22 18 19" stroke="#001a0d" stroke-width="1.3" stroke-linecap="round" fill="none"/>
+              <ellipse cx="8" cy="17" rx="2" ry="1.2" fill="#00e87a" opacity="0.3"/>
+              <ellipse cx="20" cy="17" rx="2" ry="1.2" fill="#00e87a" opacity="0.3"/>
+              <line x1="14" y1="4" x2="14" y2="1.5" stroke="#00e87a" stroke-width="1.5" stroke-linecap="round"/>
+              <circle cx="14" cy="1" r="1.5" fill="#00e87a"/>
+            </svg>
+          </div>
+          <h1 style={{fontSize:"26px",fontWeight:"800",margin:"0 0 4px",color:C.text}}>Lumo</h1>
           <p style={{color:C.muted,fontSize:"12px",letterSpacing:"0.08em",fontFamily:"'JetBrains Mono',monospace"}}>
-            CONTROL DE INSTRUMENTOS
+            TRACK DE ACTIVOS
+          </p>
+          <p style={{color:"#555",fontSize:"12px",fontStyle:"italic",marginTop:"4px"}}>
+            Cada activo en su lugar
           </p>
         </div>
         <form onSubmit={login} style={{display:"flex",flexDirection:"column",gap:"12px"}}>
@@ -836,7 +879,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador (v0.24.0).
+          ¿Sin acceso? Contacta al administrador · v0.25.0
         </p>
       </div>
     </div>
@@ -1995,7 +2038,7 @@ export default function App(){
     var url=URL.createObjectURL(blob);
     var a=document.createElement("a");
     a.href=url;
-    a.download="historial_equipotrack"+filtro+"_"+new Date().toISOString().slice(0,10)+".csv";
+    a.download="historial_lumo"+filtro+"_"+new Date().toISOString().slice(0,10)+".csv";
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
@@ -2155,10 +2198,28 @@ export default function App(){
         borderBottom:`1px solid ${C.border}`}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"14px"}}>
           <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
-            <div style={{width:"38px",height:"38px",background:`linear-gradient(135deg,${C.green},#00c066)`,
-              borderRadius:"11px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"18px"}}>⚡</div>
-            <div>
-              <h1 style={{fontSize:"17px",fontWeight:"800",lineHeight:1}}>EquipoTrack</h1>
+            <div style={{width:"38px",height:"38px",
+              background:"radial-gradient(circle at 38% 32%, #003322, #000d07)",
+              border:"1px solid #00e87a33",
+              borderRadius:"11px",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+              <svg width="30" height="30" viewBox="0 0 28 28" fill="none">
+                <defs>
+                  <radialGradient id="hls" cx="38%" cy="32%" r="68%"><stop offset="0%" stop-color="#003322"/><stop offset="100%" stop-color="#000d07"/></radialGradient>
+                  <radialGradient id="hld" cx="38%" cy="28%" r="65%"><stop offset="0%" stop-color="#00ff88"/><stop offset="55%" stop-color="#00e87a"/><stop offset="100%" stop-color="#00a854"/></radialGradient>
+                </defs>
+                <circle cx="14" cy="14" r="13" fill="url(#hls)"/>
+                <ellipse cx="14" cy="14" rx="13" ry="4" stroke="#00e87a" stroke-width="0.8" opacity="0.25" fill="none" transform="rotate(-25 14 14)"/>
+                <path d="M 14 4 C 14 4 22 11 22 16 C 22 21 18.4 24 14 24 C 9.6 24 6 21 6 16 C 6 11 14 4 14 4 Z" fill="url(#hld)"/>
+                <circle cx="11" cy="15.5" r="2.2" fill="#001a0d"/>
+                <circle cx="17" cy="15.5" r="2.2" fill="#001a0d"/>
+                <circle cx="12" cy="14" r="1" fill="white" opacity="0.9"/>
+                <circle cx="18" cy="14" r="1" fill="white" opacity="0.9"/>
+                <path d="M 10 19 Q 14 22 18 19" stroke="#001a0d" stroke-width="1.3" stroke-linecap="round" fill="none"/>
+                <line x1="14" y1="4" x2="14" y2="1.5" stroke="#00e87a" stroke-width="1.5" stroke-linecap="round"/>
+                <circle cx="14" cy="1" r="1.5" fill="#00e87a"/>
+              </svg>
+            </div>        <div>
+              <h1 style={{fontSize:"17px",fontWeight:"800",lineHeight:1}}>Lumo</h1>
               <p style={{fontSize:"10px",color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>
                 {session.nombre}
                 {isAdmin&&<span style={{color:C.blue,marginLeft:"6px"}}>{isSA?"· SUPER ADMIN":"· ADMIN"}</span>}

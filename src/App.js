@@ -2329,6 +2329,12 @@ export default function App(){
     if(getRolFromSession(s)==="gerente"&&s.gerencia){
       setFiltroGerencia(s.gerencia);
     }
+    // Mostrar guía automáticamente en el primer login del usuario
+    var guiaKey="lumo_guia_vista_"+s.email;
+    if(!localStorage.getItem(guiaKey)){
+      localStorage.setItem(guiaKey,"1");
+      setTimeout(function(){playSound("guia");setShowGuia(true);},800);
+    }
     if(!s.necesitaNombre) cargar(s.token);
   }
   function cerrar(){
@@ -2814,150 +2820,232 @@ export default function App(){
       <div style={{position:"fixed",inset:0,zIndex:19998,background:"rgba(0,0,0,0.7)"}}
         onClick={function(){setShowGuia(false);}}/>
       <div style={{position:"fixed",top:"6vh",left:0,right:0,zIndex:19999,
-        width:"100%",boxSizing:"border-box"}}>
+        width:"100%",boxSizing:"border-box",fontFamily:"'Sora',sans-serif"}}>
         <div style={{background:C.card,border:"1px solid "+C.border,borderRadius:"22px",
           padding:"0",maxWidth:"600px",margin:"0 auto",
           maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
 
-          {/* Header Lumi */}
+          {/* Header con Lumi completo (brazos y piernas) */}
           <div style={{background:"radial-gradient(circle at 30% 40%, #003322, #000d07)",
-            borderRadius:"22px 22px 0 0",padding:"24px 20px",
-            display:"flex",alignItems:"center",gap:"16px",
-            borderBottom:"1px solid #00e87a22",position:"relative"}}>
-            <div style={{filter:"drop-shadow(0 0 12px #00e87a44)"}}>
-              <svg width="80" height="80" viewBox="0 0 28 28" fill="none">
+            borderRadius:"22px 22px 0 0",padding:"20px 20px 0",
+            borderBottom:"1px solid #00e87a22",position:"relative",
+            display:"flex",flexDirection:"column",alignItems:"center"}}>
+            <button onClick={function(){setShowGuia(false);}}
+              style={{position:"absolute",top:"14px",right:"14px",
+                background:"transparent",border:"none",color:"#555",
+                fontSize:"20px",cursor:"pointer",lineHeight:1,fontFamily:"inherit"}}>✕</button>
+            {/* Lumi con cuerpo completo */}
+            <div style={{filter:"drop-shadow(0 0 16px #00e87a55)",marginBottom:"-8px"}}>
+              <svg width="120" height="140" viewBox="0 0 160 160" fill="none">
                 <defs>
-                  <radialGradient id="gls" cx="38%" cy="32%" r="68%"><stop offset="0%" stopColor="#003322"/><stop offset="100%" stopColor="#000d07"/></radialGradient>
-                  <radialGradient id="gld" cx="38%" cy="28%" r="65%"><stop offset="0%" stopColor="#00ff88"/><stop offset="55%" stopColor="#00e87a"/><stop offset="100%" stopColor="#00a854"/></radialGradient>
+                  <radialGradient id="gls2" cx="38%" cy="32%" r="68%"><stop offset="0%" stopColor="#003322"/><stop offset="100%" stopColor="#000d07"/></radialGradient>
+                  <radialGradient id="gld2" cx="38%" cy="28%" r="65%"><stop offset="0%" stopColor="#00ff88"/><stop offset="55%" stopColor="#00e87a"/><stop offset="100%" stopColor="#00a854"/></radialGradient>
+                  <radialGradient id="glowG" cx="50%" cy="50%" r="50%"><stop offset="0%" stopColor="#00e87a" stopOpacity="0.12"/><stop offset="100%" stopColor="#00e87a" stopOpacity="0"/></radialGradient>
                 </defs>
-                <circle cx="14" cy="14" r="13" fill="url(#gls)"/>
-                <ellipse cx="14" cy="14" rx="13" ry="4" stroke="#00e87a" strokeWidth="0.8" opacity="0.3" fill="none" transform="rotate(-25 14 14)"/>
-                <ellipse cx="14" cy="14" rx="13" ry="4" stroke="#4a9eff" strokeWidth="0.6" opacity="0.2" fill="none" transform="rotate(25 14 14)"/>
-                <circle cx="26" cy="9" r="1.5" fill="#00e87a" opacity="0.9"/>
-                <circle cx="3" cy="20" r="1" fill="#4a9eff" opacity="0.8"/>
-                <path d="M 14 4 C 14 4 22 11 22 16 C 22 21 18.4 24 14 24 C 9.6 24 6 21 6 16 C 6 11 14 4 14 4 Z" fill="url(#gld)"/>
-                <ellipse cx="11" cy="9" rx="2.5" ry="3.5" fill="white" opacity="0.15" transform="rotate(-15 11 9)"/>
-                <circle cx="11" cy="15.5" r="2.2" fill="#001a0d"/><circle cx="17" cy="15.5" r="2.2" fill="#001a0d"/>
-                <circle cx="12" cy="14" r="1" fill="white" opacity="0.9"/><circle cx="18" cy="14" r="1" fill="white" opacity="0.9"/>
-                <path d="M 10 19 Q 14 22 18 19" stroke="#001a0d" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
-                <ellipse cx="8" cy="17" rx="2" ry="1.2" fill="#00e87a" opacity="0.3"/>
-                <ellipse cx="20" cy="17" rx="2" ry="1.2" fill="#00e87a" opacity="0.3"/>
-                <line x1="14" y1="4" x2="14" y2="1.5" stroke="#00e87a" strokeWidth="1.5" strokeLinecap="round"/>
-                <circle cx="14" cy="1" r="1.5" fill="#00e87a"/>
+                {/* Glow fondo */}
+                <circle cx="80" cy="75" r="65" fill="url(#glowG)"/>
+                {/* Esfera base */}
+                <circle cx="80" cy="75" r="52" fill="url(#gls2)"/>
+                {/* Anillos orbitales */}
+                <ellipse cx="80" cy="75" rx="63" ry="20" stroke="#00e87a" strokeWidth="1.2" opacity="0.22" fill="none" transform="rotate(-25 80 75)"/>
+                <ellipse cx="80" cy="75" rx="63" ry="20" stroke="#4a9eff" strokeWidth="0.9" opacity="0.15" fill="none" transform="rotate(25 80 75)"/>
+                {/* Puntos orbitales */}
+                <circle cx="140" cy="58" r="3.5" fill="#00e87a" opacity="0.9"/>
+                <circle cx="22" cy="95" r="2.5" fill="#4a9eff" opacity="0.8"/>
+                {/* Brillo esfera */}
+                <ellipse cx="64" cy="50" rx="14" ry="9" fill="white" opacity="0.08" transform="rotate(-20 64 50)"/>
+                {/* Cuerpo gota */}
+                <path d="M 80 26 C 80 26 112 55 112 76 C 112 95 97 110 80 110 C 63 110 48 95 48 76 C 48 55 80 26 80 26 Z" fill="url(#gld2)" opacity="0.96"/>
+                {/* Brillo interno gota */}
+                <ellipse cx="67" cy="52" rx="9" ry="13" fill="white" opacity="0.18" transform="rotate(-15 67 52)"/>
+                {/* Visor oscuro */}
+                <rect x="54" y="62" width="52" height="32" rx="10" fill="#001a0d" opacity="0.85"/>
+                {/* Ojos */}
+                <ellipse cx="67" cy="76" rx="8" ry="9" fill="#00e87a" opacity="0.95"/>
+                <ellipse cx="93" cy="76" rx="8" ry="9" fill="#00e87a" opacity="0.95"/>
+                <circle cx="67" cy="77" r="4" fill="#001a0d"/>
+                <circle cx="93" cy="77" r="4" fill="#001a0d"/>
+                <circle cx="70" cy="74" r="2" fill="white" opacity="0.9"/>
+                <circle cx="96" cy="74" r="2" fill="white" opacity="0.9"/>
+                {/* Sonrisa */}
+                <path d="M 63 88 Q 80 97 97 88" stroke="#00e87a" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.8"/>
+                {/* Mejillas */}
+                <ellipse cx="50" cy="82" rx="6" ry="3.5" fill="#00e87a" opacity="0.25"/>
+                <ellipse cx="110" cy="82" rx="6" ry="3.5" fill="#00e87a" opacity="0.25"/>
+                {/* Rayos / antenas */}
+                <line x1="80" y1="26" x2="80" y2="10" stroke="#00e87a" strokeWidth="2.5" strokeLinecap="round"/>
+                <circle cx="80" cy="8" r="4" fill="#00e87a"/>
+                <line x1="95" y1="32" x2="105" y2="18" stroke="#00e87a" strokeWidth="2" strokeLinecap="round" opacity="0.8"/>
+                <circle cx="106" cy="16" r="3" fill="#00e87a" opacity="0.8"/>
+                <line x1="65" y1="32" x2="55" y2="18" stroke="#00e87a" strokeWidth="2" strokeLinecap="round" opacity="0.8"/>
+                <circle cx="54" cy="16" r="3" fill="#00e87a" opacity="0.8"/>
+                {/* Brazos */}
+                <path d="M 48 80 Q 34 72 37 62" stroke="url(#gld2)" strokeWidth="10" strokeLinecap="round" fill="none"/>
+                <path d="M 112 80 Q 126 72 123 62" stroke="url(#gld2)" strokeWidth="10" strokeLinecap="round" fill="none"/>
+                {/* Piernas */}
+                <path d="M 68 108 Q 63 126 59 132" stroke="url(#gld2)" strokeWidth="9" strokeLinecap="round" fill="none"/>
+                <path d="M 92 108 Q 97 126 101 132" stroke="url(#gld2)" strokeWidth="9" strokeLinecap="round" fill="none"/>
               </svg>
             </div>
-            <div style={{flex:1}}>
+            <div style={{textAlign:"center",paddingBottom:"20px"}}>
               <p style={{fontSize:"11px",color:"#00e87a",fontWeight:"700",
-                letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:"4px"}}>
+                letterSpacing:"0.14em",textTransform:"uppercase",
+                margin:"0 0 4px",fontFamily:"'Sora',sans-serif"}}>
                 GUIA RAPIDA
               </p>
-              <h2 style={{fontSize:"20px",fontWeight:"900",color:"#eee",margin:"0 0 4px"}}>
+              <h2 style={{fontSize:"22px",fontWeight:"900",color:"#eee",
+                margin:"0 0 4px",fontFamily:"'Sora',sans-serif"}}>
                 Hola, soy Lumi
               </h2>
-              <p style={{fontSize:"13px",color:"#666",margin:0}}>
+              <p style={{fontSize:"13px",color:"#555",margin:0,fontFamily:"'Sora',sans-serif"}}>
                 Te explico como usar la app en segundos
               </p>
             </div>
-            <button onClick={function(){setShowGuia(false);}}
-              style={{position:"absolute",top:"16px",right:"16px",
-                background:"transparent",border:"none",color:"#555",
-                fontSize:"20px",cursor:"pointer",lineHeight:1}}>✕</button>
           </div>
 
           {/* Contenido por rol */}
-          <div style={{padding:"20px"}}>
+          <div style={{padding:"20px",fontFamily:"'Sora',sans-serif"}}>
 
-            {/* Paso a paso según rol */}
-            {(!isAdmin&&!isGer)&&<div style={{marginBottom:"16px"}}>
+            {/* INGENIERO */}
+            {(!isAdmin&&!isGer)&&<>
               <p style={{fontSize:"11px",color:C.green,fontWeight:"700",
-                letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"12px"}}>
+                letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"12px",
+                fontFamily:"'Sora',sans-serif"}}>
                 COMO INGENIERO
               </p>
               {[
-                {icon:"📱",titulo:"Escanea el QR",desc:"Apunta la camara al codigo QR del equipo. La app se abre directo en ese equipo."},
-                {icon:"📸",titulo:"Foto obligatoria",desc:"Antes de confirmar el retiro, toma una foto clara del equipo. Es tu evidencia."},
+                {icon:"📱",titulo:"Escanea el QR",desc:"Apunta la camara al QR del equipo. La app se abre directo en ese equipo."},
+                {icon:"📸",titulo:"Foto obligatoria",desc:"Toma una foto clara del equipo antes de confirmar. Es tu evidencia."},
                 {icon:"✅",titulo:"Confirma el retiro",desc:"Selecciona tu estado y ciudad, revisa el resumen y da Confirmar."},
-                {icon:"🔄",titulo:"Para devolver",desc:"Escanea el QR de nuevo. El sistema detecta que el equipo esta contigo y abre el modo devolucion."},
-                {icon:"📦",titulo:"Paqueteria",desc:"Si ves un badge azul 'En transito', el equipo viene para ti. Escanea el QR para confirmar recepcion."},
+                {icon:"🔄",titulo:"Para devolver",desc:"Escanea el QR de nuevo. El sistema detecta que el equipo esta contigo."},
+                {icon:"📦",titulo:"Paqueteria",desc:"Badge azul 'En transito' significa que el equipo viene para ti. Escanea para confirmar."},
               ].map(function(s){return(
                 <div key={s.titulo} style={{display:"flex",gap:"12px",padding:"12px 0",
                   borderBottom:"1px solid "+C.border}}>
-                  <div style={{fontSize:"24px",flexShrink:0,width:"36px",textAlign:"center"}}>{s.icon}</div>
+                  <div style={{fontSize:"22px",flexShrink:0,width:"34px",textAlign:"center",
+                    marginTop:"1px"}}>{s.icon}</div>
                   <div>
-                    <p style={{fontSize:"13px",fontWeight:"700",color:"#eee",margin:"0 0 3px"}}>{s.titulo}</p>
-                    <p style={{fontSize:"12px",color:"#777",margin:0,lineHeight:"1.5"}}>{s.desc}</p>
+                    <p style={{fontSize:"13px",fontWeight:"700",color:"#eee",
+                      margin:"0 0 3px",fontFamily:"'Sora',sans-serif"}}>{s.titulo}</p>
+                    <p style={{fontSize:"12px",color:"#666",margin:0,lineHeight:"1.6",
+                      fontFamily:"'Sora',sans-serif"}}>{s.desc}</p>
                   </div>
                 </div>
               );})}
-            </div>}
+              {/* Tips ingenieros */}
+              <div style={{background:"#0a0a18",borderRadius:"12px",padding:"14px 16px",marginTop:"16px"}}>
+                <p style={{fontSize:"10px",color:"#444",fontWeight:"700",letterSpacing:"0.1em",
+                  textTransform:"uppercase",marginBottom:"10px",fontFamily:"'Sora',sans-serif"}}>
+                  RECUERDA
+                </p>
+                {["La foto es obligatoria — te protege ante cualquier reclamacion de danos",
+                  "Badge rojo +5 dias significa que llevas mucho tiempo con el equipo",
+                  "Puedes buscar tu equipo por nombre o codigo en el buscador",
+                  "Si el equipo tiene notas de accesorios, verifica que esten completos"
+                ].map(function(t){return(
+                  <p key={t} style={{fontSize:"12px",color:"#555",margin:"0 0 6px",
+                    paddingLeft:"14px",position:"relative",lineHeight:"1.5",
+                    fontFamily:"'Sora',sans-serif"}}>
+                    <span style={{position:"absolute",left:0,color:C.green}}>·</span>{t}
+                  </p>
+                );})}
+              </div>
+            </>}
 
-            {isAdmin&&<div style={{marginBottom:"16px"}}>
+            {/* ADMIN */}
+            {isAdmin&&<>
               <p style={{fontSize:"11px",color:C.blue,fontWeight:"700",
-                letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"12px"}}>
+                letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"12px",
+                fontFamily:"'Sora',sans-serif"}}>
                 COMO ADMINISTRADOR
               </p>
               {[
-                {icon:"⚙️",titulo:"Panel Admin",desc:"Toca el icono de engranaje para gestionar equipos, categorias e ingenieros."},
-                {icon:"📤",titulo:"Asignar equipo",desc:"Toca cualquier equipo disponible, selecciona el ingeniero y el tipo de traslado (directo o paqueteria)."},
-                {icon:"🏢",titulo:"Filtrar por gerencia",desc:"Usa los pills azules (Nacional / Centro-Sur / Norte-Occidente) para ver solo los equipos de una region."},
-                {icon:"📊",titulo:"Exportar CSV",desc:"En Panel Admin > Equipos > Lista, usa el boton verde para exportar datos de auditoria."},
-                {icon:"📋",titulo:"Historial",desc:"En la pestana Historial puedes filtrar por equipo o ingeniero y exportar el CSV filtrado."},
-                {icon:"👤",titulo:"Gestionar usuarios",desc:"En Panel Admin > Ingenieros puedes editar nombres, gerencias y (super admin) roles."},
+                {icon:"⚙️",titulo:"Panel Admin",desc:"Icono de engranaje en el header para gestionar equipos, categorias e ingenieros."},
+                {icon:"📤",titulo:"Asignar equipo",desc:"Toca un equipo disponible, selecciona el ingeniero y el tipo de traslado."},
+                {icon:"🏢",titulo:"Filtrar por gerencia",desc:"Pills azules (Nacional / Centro-Sur / Norte-Occidente) — los indicadores se actualizan al filtrar."},
+                {icon:"📊",titulo:"Exportar CSV",desc:"Panel Admin > Equipos > Lista > boton verde. Incluye gerencia y administrador."},
+                {icon:"📋",titulo:"Historial filtrado",desc:"Filtra por equipo o ingeniero y exporta solo esos registros en CSV."},
+                {icon:"👤",titulo:"Gestionar usuarios",desc:"Panel Admin > Ingenieros: nombres, gerencias y roles (super admin)."},
               ].map(function(s){return(
                 <div key={s.titulo} style={{display:"flex",gap:"12px",padding:"12px 0",
                   borderBottom:"1px solid "+C.border}}>
-                  <div style={{fontSize:"24px",flexShrink:0,width:"36px",textAlign:"center"}}>{s.icon}</div>
+                  <div style={{fontSize:"22px",flexShrink:0,width:"34px",textAlign:"center",
+                    marginTop:"1px"}}>{s.icon}</div>
                   <div>
-                    <p style={{fontSize:"13px",fontWeight:"700",color:"#eee",margin:"0 0 3px"}}>{s.titulo}</p>
-                    <p style={{fontSize:"12px",color:"#777",margin:0,lineHeight:"1.5"}}>{s.desc}</p>
+                    <p style={{fontSize:"13px",fontWeight:"700",color:"#eee",
+                      margin:"0 0 3px",fontFamily:"'Sora',sans-serif"}}>{s.titulo}</p>
+                    <p style={{fontSize:"12px",color:"#666",margin:0,lineHeight:"1.6",
+                      fontFamily:"'Sora',sans-serif"}}>{s.desc}</p>
                   </div>
                 </div>
               );})}
-            </div>}
+              {/* Tips admin */}
+              <div style={{background:"#0a0a18",borderRadius:"12px",padding:"14px 16px",marginTop:"16px"}}>
+                <p style={{fontSize:"10px",color:"#444",fontWeight:"700",letterSpacing:"0.1em",
+                  textTransform:"uppercase",marginBottom:"10px",fontFamily:"'Sora',sans-serif"}}>
+                  TIPS ADMIN
+                </p>
+                {["Asigna un administrador responsable a cada equipo para trazabilidad regional",
+                  "El CSV de equipos incluye gerencia — util para reportes a gerencia nacional",
+                  "Los cambios de rol aplican en el proximo inicio de sesion del usuario",
+                  "El historial muestra fotos de retiro y devolucion lado a lado para comparar"
+                ].map(function(t){return(
+                  <p key={t} style={{fontSize:"12px",color:"#555",margin:"0 0 6px",
+                    paddingLeft:"14px",position:"relative",lineHeight:"1.5",
+                    fontFamily:"'Sora',sans-serif"}}>
+                    <span style={{position:"absolute",left:0,color:C.blue}}>·</span>{t}
+                  </p>
+                );})}
+              </div>
+            </>}
 
-            {isGer&&<div style={{marginBottom:"16px"}}>
+            {/* GERENTE */}
+            {isGer&&<>
               <p style={{fontSize:"11px",color:"#9966ff",fontWeight:"700",
-                letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"12px"}}>
+                letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"12px",
+                fontFamily:"'Sora',sans-serif"}}>
                 COMO GERENTE
               </p>
               {[
-                {icon:"🏢",titulo:"Filtrar por gerencia",desc:"Usa los pills azules arriba del dashboard para ver solo los equipos de tu region."},
-                {icon:"📊",titulo:"Exportar activos",desc:"El boton morado debajo de los filtros exporta un CSV de los equipos de tu gerencia."},
-                {icon:"📋",titulo:"Historial",desc:"En la pestana Historial puedes filtrar por equipo o ingeniero y exportar movimientos."},
-                {icon:"🗺",titulo:"Mapa",desc:"El icono de mapa muestra la ubicacion geografica de todos los equipos en tiempo real."},
+                {icon:"🏢",titulo:"Filtrar tu gerencia",desc:"Pills azules arriba del dashboard. Tu gerencia se pre-selecciona al entrar."},
+                {icon:"📊",titulo:"Exportar activos",desc:"Boton morado debajo de los filtros — exporta equipos de tu gerencia en CSV."},
+                {icon:"📋",titulo:"Historial filtrado",desc:"Filtra por equipo o ingeniero y exporta los movimientos de tu region."},
+                {icon:"🗺",titulo:"Mapa en tiempo real",desc:"Icono de mapa en el header — ubicacion de todos los equipos con estado actual."},
               ].map(function(s){return(
                 <div key={s.titulo} style={{display:"flex",gap:"12px",padding:"12px 0",
                   borderBottom:"1px solid "+C.border}}>
-                  <div style={{fontSize:"24px",flexShrink:0,width:"36px",textAlign:"center"}}>{s.icon}</div>
+                  <div style={{fontSize:"22px",flexShrink:0,width:"34px",textAlign:"center",
+                    marginTop:"1px"}}>{s.icon}</div>
                   <div>
-                    <p style={{fontSize:"13px",fontWeight:"700",color:"#eee",margin:"0 0 3px"}}>{s.titulo}</p>
-                    <p style={{fontSize:"12px",color:"#777",margin:0,lineHeight:"1.5"}}>{s.desc}</p>
+                    <p style={{fontSize:"13px",fontWeight:"700",color:"#eee",
+                      margin:"0 0 3px",fontFamily:"'Sora',sans-serif"}}>{s.titulo}</p>
+                    <p style={{fontSize:"12px",color:"#666",margin:0,lineHeight:"1.6",
+                      fontFamily:"'Sora',sans-serif"}}>{s.desc}</p>
                   </div>
                 </div>
               );})}
-            </div>}
-
-            {/* Tips generales */}
-            <div style={{background:"#0a0a18",borderRadius:"12px",padding:"14px 16px",marginTop:"8px"}}>
-              <p style={{fontSize:"11px",color:"#555",fontWeight:"700",
-                letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:"10px"}}>
-                TIPS
-              </p>
-              {[
-                "La foto es obligatoria en retiro y devolucion — protege al ingeniero",
-                "Badge rojo +5 dias significa que el equipo lleva demasiado tiempo fuera",
-                "Badge azul significa que el equipo viaja por paqueteria hacia ti",
-              ].map(function(t){return(
-                <p key={t} style={{fontSize:"12px",color:"#666",margin:"0 0 6px",
-                  paddingLeft:"14px",position:"relative",lineHeight:"1.5"}}>
-                  <span style={{position:"absolute",left:0,color:C.green}}>·</span>
-                  {t}
+              {/* Tips gerente */}
+              <div style={{background:"#0a0a18",borderRadius:"12px",padding:"14px 16px",marginTop:"16px"}}>
+                <p style={{fontSize:"10px",color:"#444",fontWeight:"700",letterSpacing:"0.1em",
+                  textTransform:"uppercase",marginBottom:"10px",fontFamily:"'Sora',sans-serif"}}>
+                  TIPS GERENTE
                 </p>
-              );})}
-            </div>
+                {["Los indicadores (Disponibles, En uso, Total) se actualizan al filtrar por gerencia",
+                  "Badge rojo en el mapa = equipo con mas de 5 dias fuera — requiere atencion",
+                  "El CSV de auditoria incluye el administrador responsable de cada equipo",
+                  "No puedes hacer check-out — contacta al admin de zona si necesitas asignar un equipo"
+                ].map(function(t){return(
+                  <p key={t} style={{fontSize:"12px",color:"#555",margin:"0 0 6px",
+                    paddingLeft:"14px",position:"relative",lineHeight:"1.5",
+                    fontFamily:"'Sora',sans-serif"}}>
+                    <span style={{position:"absolute",left:0,color:"#9966ff"}}>·</span>{t}
+                  </p>
+                );})}
+              </div>
+            </>}
 
             <p style={{textAlign:"center",fontSize:"11px",color:"#333",
-              marginTop:"16px",fontStyle:"italic"}}>
+              marginTop:"20px",fontStyle:"italic",fontFamily:"'Sora',sans-serif"}}>
               Cada activo en su lugar ✦ Lumo v0.27.0
             </p>
           </div>

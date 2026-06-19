@@ -29,10 +29,16 @@ async function authReq(path, body) {
     body: JSON.stringify(body),
   });
   const data = await res.json();
-  if (data.error || data.error_description) {
-    var msg = data.error_description || (data.error && data.error.message) || "Error";
-    // Mensajes más amigables
-    if(msg.indexOf("Invalid login credentials")!==-1){
+
+  // Verificar primero el status HTTP
+  if (!res.ok) {
+    var msg = data.error_description
+      || (data.error && typeof data.error === "string" ? data.error : null)
+      || (data.error && data.error.message)
+      || data.msg
+      || data.message
+      || "Error de autenticación";
+    if(msg.indexOf("Invalid login credentials")!==-1||msg.indexOf("invalid_grant")!==-1){
       msg = "Correo o contraseña incorrectos. Verifica tus datos.";
     } else if(msg.indexOf("Email not confirmed")!==-1){
       msg = "Debes confirmar tu correo antes de entrar.";
@@ -40,9 +46,31 @@ async function authReq(path, body) {
       msg = "No existe una cuenta con ese correo.";
     } else if(msg.indexOf("too many requests")!==-1||msg.indexOf("rate limit")!==-1){
       msg = "Demasiados intentos. Espera unos minutos e intenta de nuevo.";
+    } else if(msg.indexOf("captcha")!==-1||msg.indexOf("hcaptcha")!==-1){
+      msg = "Verificacion de seguridad invalida. Intenta de nuevo.";
     }
     throw new Error(msg);
   }
+
+  // Verificar también errores en el body aunque el status sea 200
+  if (data.error || data.error_description) {
+    var msg2 = data.error_description
+      || (data.error && data.error.message)
+      || data.error
+      || "Error";
+    if(msg2.indexOf("Invalid login credentials")!==-1){
+      msg2 = "Correo o contraseña incorrectos. Verifica tus datos.";
+    } else if(msg2.indexOf("Email not confirmed")!==-1){
+      msg2 = "Debes confirmar tu correo antes de entrar.";
+    }
+    throw new Error(msg2);
+  }
+
+  // Verificar que la respuesta tenga access_token (login exitoso)
+  if(path.indexOf("token")!==-1 && !data.access_token){
+    throw new Error("No se pudo iniciar sesión. Verifica tus credenciales.");
+  }
+
   return data;
 }
 

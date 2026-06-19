@@ -140,6 +140,43 @@ function getUserId(session){
   return null;
 }
 // Leer rol desde JWT app_metadata (no desde perfiles - evita recursión RLS)
+// ─── SONIDOS ─────────────────────────────────────────
+function playSound(tipo){
+  try{
+    var ctx=new (window.AudioContext||window.webkitAudioContext)();
+    var g=ctx.createGain();
+    g.connect(ctx.destination);
+    function note(freq,start,dur,vol){
+      var o=ctx.createOscillator();
+      o.type="sine";
+      o.frequency.value=freq;
+      o.connect(g);
+      g.gain.setValueAtTime(0,ctx.currentTime+start);
+      g.gain.linearRampToValueAtTime(vol||0.18,ctx.currentTime+start+0.01);
+      g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+start+dur);
+      o.start(ctx.currentTime+start);
+      o.stop(ctx.currentTime+start+dur+0.05);
+    }
+    if(tipo==="checkout"){
+      // Dos notas ascendentes — acción positiva
+      note(523,0,0.15); note(659,0.16,0.2);
+    } else if(tipo==="checkin"){
+      // Dos notas descendentes — cierre de ciclo
+      note(659,0,0.15); note(523,0.16,0.2);
+    } else if(tipo==="guia"){
+      // Pop suave — personalidad Lumi
+      note(880,0,0.08,0.12); note(1046,0.09,0.12,0.1);
+    } else if(tipo==="paqueteria"){
+      // Campanita — evento especial
+      note(1046,0,0.1,0.12); note(1318,0.11,0.15,0.1); note(1568,0.22,0.2,0.08);
+    } else if(tipo==="error"){
+      // Nota grave corta — feedback de error
+      note(220,0,0.2,0.15);
+    }
+    setTimeout(function(){try{ctx.close();}catch{}},1000);
+  }catch(e){}
+}
+
 function getRolFromSession(session){
   if(!session) return "ingeniero";
   try{
@@ -585,6 +622,15 @@ function RegistroNombre({sessionTemp,token,onComplete}){
     finally{setLoading(false);}
   }
 
+  // Inyectar animación CSS para Lumi
+  React.useEffect(function(){
+    if(document.getElementById("lumi-style")) return;
+    var s=document.createElement("style");
+    s.id="lumi-style";
+    s.textContent="@keyframes lumiPulse{0%,100%{box-shadow:0 0 0 0 #00e87a33}50%{box-shadow:0 0 0 5px #00e87a00}}";
+    document.head.appendChild(s);
+  },[]);
+
   return(
     <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
       justifyContent:"center",padding:"20px",fontFamily:"'Sora',sans-serif"}}>
@@ -691,6 +737,15 @@ function NuevaContrasena({token}){
     </div>
   );
 
+  // Inyectar animación CSS para Lumi
+  React.useEffect(function(){
+    if(document.getElementById("lumi-style")) return;
+    var s=document.createElement("style");
+    s.id="lumi-style";
+    s.textContent="@keyframes lumiPulse{0%,100%{box-shadow:0 0 0 0 #00e87a33}50%{box-shadow:0 0 0 5px #00e87a00}}";
+    document.head.appendChild(s);
+  },[]);
+
   return(
     <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
       justifyContent:"center",padding:"20px",fontFamily:"'Sora',sans-serif"}}>
@@ -772,6 +827,15 @@ function ResetPassword({onVolver}){
       </div>
     </div>
   );
+  // Inyectar animación CSS para Lumi
+  React.useEffect(function(){
+    if(document.getElementById("lumi-style")) return;
+    var s=document.createElement("style");
+    s.id="lumi-style";
+    s.textContent="@keyframes lumiPulse{0%,100%{box-shadow:0 0 0 0 #00e87a33}50%{box-shadow:0 0 0 5px #00e87a00}}";
+    document.head.appendChild(s);
+  },[]);
+
   return(
     <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
       justifyContent:"center",padding:"20px",fontFamily:"'Sora',sans-serif"}}>
@@ -914,6 +978,7 @@ function Login({onLogin}){
       };
       onLogin(sessionData);
     }catch(ex){
+      playSound("error");
       setErr(ex.message);
       // Reset captcha para que el usuario pueda intentar de nuevo
       setCaptchaToken(null);
@@ -923,6 +988,15 @@ function Login({onLogin}){
     }
     finally{setLoading(false);}
   }
+  // Inyectar animación CSS para Lumi
+  React.useEffect(function(){
+    if(document.getElementById("lumi-style")) return;
+    var s=document.createElement("style");
+    s.id="lumi-style";
+    s.textContent="@keyframes lumiPulse{0%,100%{box-shadow:0 0 0 0 #00e87a33}50%{box-shadow:0 0 0 5px #00e87a00}}";
+    document.head.appendChild(s);
+  },[]);
+
   return(
     <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
       justifyContent:"center",padding:"20px",fontFamily:"'Sora',sans-serif"}}>
@@ -991,7 +1065,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador · v0.26.0
+          ¿Sin acceso? Contacta al administrador · v0.27.0
         </p>
       </div>
     </div>
@@ -1026,6 +1100,7 @@ function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
         enviado_por:session.nombre,
         // fecha_retiro la genera el trigger en DB
       }});
+      playSound("checkout");
       onConfirmar(`✅ ${equipo.nombre} asignado a ${ingeniero}`);
     }catch(ex){
       if(ex.message.indexOf("no_duplicate_checkout")!==-1||ex.message.indexOf("unique")!==-1){
@@ -1189,6 +1264,7 @@ function ModalRecepcion({equipo,registro,token,session,onConfirmar,onCerrar}){
         ingeniero:session.nombre,
         user_id:getUserId(session), // actualizar user_id al receptor
       }});
+      playSound("paqueteria");
       onConfirmar("📦 "+equipo.nombre+" recibido en "+ciudad);
     }catch(ex){alert("Error en recepción: "+ex.message);}
     finally{setLoading(false);}
@@ -1284,6 +1360,7 @@ function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
       // Borrar registro activo - requiere política RLS que permita al usuario borrar su propio registro
       await supa("registros?equipo_id=eq."+equipo.id,{method:"DELETE",token});
       setListo(true);
+      playSound("checkin");
       setTimeout(()=>{onConfirmar(`📦 ${equipo.nombre} devuelto correctamente`);onCerrar();},1800);
     }catch(ex){alert("Error: "+ex.message);}
     finally{setLoading(false);}
@@ -2126,6 +2203,7 @@ export default function App(){
   const [modo,setModo]=useState(null); // checkout|checkin|recepcion
   const [showAdmin,setShowAdmin]=useState(false);
   const [showMapa,setShowMapa]=useState(false);
+  const [showGuia,setShowGuia]=useState(false);
   const [vista,setVista]=useState("equipos");
   const [filtro,setFiltro]=useState("todas");
   const [busq,setBusq]=useState("");
@@ -2412,6 +2490,26 @@ export default function App(){
               🗺
               {enUso>0&&<span style={{background:C.orange,color:"#1a0a00",borderRadius:"10px",
                 padding:"1px 6px",fontSize:"10px",fontWeight:"800"}}>{enUso}</span>}
+            </button>
+            <button onClick={function(){playSound("guia");setShowGuia(true);}}
+              style={{background:"transparent",border:"1px solid #00e87a33",
+                borderRadius:"10px",padding:"6px 8px",cursor:"pointer",
+                display:"flex",alignItems:"center",justifyContent:"center",
+                animation:"lumiPulse 2.5s ease-in-out infinite"}}>
+              <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
+                <defs>
+                  <radialGradient id="bls" cx="38%" cy="32%" r="68%"><stop offset="0%" stopColor="#003322"/><stop offset="100%" stopColor="#000d07"/></radialGradient>
+                  <radialGradient id="bld" cx="38%" cy="28%" r="65%"><stop offset="0%" stopColor="#00ff88"/><stop offset="55%" stopColor="#00e87a"/><stop offset="100%" stopColor="#00a854"/></radialGradient>
+                </defs>
+                <circle cx="14" cy="14" r="13" fill="url(#bls)"/>
+                <ellipse cx="14" cy="14" rx="13" ry="4" stroke="#00e87a" strokeWidth="0.8" opacity="0.25" fill="none" transform="rotate(-25 14 14)"/>
+                <path d="M 14 4 C 14 4 22 11 22 16 C 22 21 18.4 24 14 24 C 9.6 24 6 21 6 16 C 6 11 14 4 14 4 Z" fill="url(#bld)"/>
+                <circle cx="11" cy="15.5" r="2.2" fill="#001a0d"/><circle cx="17" cy="15.5" r="2.2" fill="#001a0d"/>
+                <circle cx="12" cy="14" r="1" fill="white" opacity="0.9"/><circle cx="18" cy="14" r="1" fill="white" opacity="0.9"/>
+                <path d="M 10 19 Q 14 22 18 19" stroke="#001a0d" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
+                <line x1="14" y1="4" x2="14" y2="1.5" stroke="#00e87a" strokeWidth="1.5" strokeLinecap="round"/>
+                <circle cx="14" cy="1" r="1.5" fill="#00e87a"/>
+              </svg>
             </button>
             <button onClick={function(){
               // Limpiar todos los estados al cerrar sesión
@@ -2710,5 +2808,162 @@ export default function App(){
       onConfirmar={onAccion} onCerrar={cerrar}/>}
 
     {showMapa&&<MapaModal registros={registros} equipos={equipos} onCerrar={()=>setShowMapa(false)}/>}
+
+    {/* ── GUÍA RÁPIDA LUMI ── */}
+    {showGuia&&<>
+      <div style={{position:"fixed",inset:0,zIndex:19998,background:"rgba(0,0,0,0.7)"}}
+        onClick={function(){setShowGuia(false);}}/>
+      <div style={{position:"fixed",top:"6vh",left:0,right:0,zIndex:19999,
+        width:"100%",boxSizing:"border-box"}}>
+        <div style={{background:C.card,border:"1px solid "+C.border,borderRadius:"22px",
+          padding:"0",maxWidth:"600px",margin:"0 auto",
+          maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+
+          {/* Header Lumi */}
+          <div style={{background:"radial-gradient(circle at 30% 40%, #003322, #000d07)",
+            borderRadius:"22px 22px 0 0",padding:"24px 20px",
+            display:"flex",alignItems:"center",gap:"16px",
+            borderBottom:"1px solid #00e87a22",position:"relative"}}>
+            <div style={{filter:"drop-shadow(0 0 12px #00e87a44)"}}>
+              <svg width="80" height="80" viewBox="0 0 28 28" fill="none">
+                <defs>
+                  <radialGradient id="gls" cx="38%" cy="32%" r="68%"><stop offset="0%" stopColor="#003322"/><stop offset="100%" stopColor="#000d07"/></radialGradient>
+                  <radialGradient id="gld" cx="38%" cy="28%" r="65%"><stop offset="0%" stopColor="#00ff88"/><stop offset="55%" stopColor="#00e87a"/><stop offset="100%" stopColor="#00a854"/></radialGradient>
+                </defs>
+                <circle cx="14" cy="14" r="13" fill="url(#gls)"/>
+                <ellipse cx="14" cy="14" rx="13" ry="4" stroke="#00e87a" strokeWidth="0.8" opacity="0.3" fill="none" transform="rotate(-25 14 14)"/>
+                <ellipse cx="14" cy="14" rx="13" ry="4" stroke="#4a9eff" strokeWidth="0.6" opacity="0.2" fill="none" transform="rotate(25 14 14)"/>
+                <circle cx="26" cy="9" r="1.5" fill="#00e87a" opacity="0.9"/>
+                <circle cx="3" cy="20" r="1" fill="#4a9eff" opacity="0.8"/>
+                <path d="M 14 4 C 14 4 22 11 22 16 C 22 21 18.4 24 14 24 C 9.6 24 6 21 6 16 C 6 11 14 4 14 4 Z" fill="url(#gld)"/>
+                <ellipse cx="11" cy="9" rx="2.5" ry="3.5" fill="white" opacity="0.15" transform="rotate(-15 11 9)"/>
+                <circle cx="11" cy="15.5" r="2.2" fill="#001a0d"/><circle cx="17" cy="15.5" r="2.2" fill="#001a0d"/>
+                <circle cx="12" cy="14" r="1" fill="white" opacity="0.9"/><circle cx="18" cy="14" r="1" fill="white" opacity="0.9"/>
+                <path d="M 10 19 Q 14 22 18 19" stroke="#001a0d" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
+                <ellipse cx="8" cy="17" rx="2" ry="1.2" fill="#00e87a" opacity="0.3"/>
+                <ellipse cx="20" cy="17" rx="2" ry="1.2" fill="#00e87a" opacity="0.3"/>
+                <line x1="14" y1="4" x2="14" y2="1.5" stroke="#00e87a" strokeWidth="1.5" strokeLinecap="round"/>
+                <circle cx="14" cy="1" r="1.5" fill="#00e87a"/>
+              </svg>
+            </div>
+            <div style={{flex:1}}>
+              <p style={{fontSize:"11px",color:"#00e87a",fontWeight:"700",
+                letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:"4px"}}>
+                GUIA RAPIDA
+              </p>
+              <h2 style={{fontSize:"20px",fontWeight:"900",color:"#eee",margin:"0 0 4px"}}>
+                Hola, soy Lumi
+              </h2>
+              <p style={{fontSize:"13px",color:"#666",margin:0}}>
+                Te explico como usar la app en segundos
+              </p>
+            </div>
+            <button onClick={function(){setShowGuia(false);}}
+              style={{position:"absolute",top:"16px",right:"16px",
+                background:"transparent",border:"none",color:"#555",
+                fontSize:"20px",cursor:"pointer",lineHeight:1}}>✕</button>
+          </div>
+
+          {/* Contenido por rol */}
+          <div style={{padding:"20px"}}>
+
+            {/* Paso a paso según rol */}
+            {(!isAdmin&&!isGer)&&<div style={{marginBottom:"16px"}}>
+              <p style={{fontSize:"11px",color:C.green,fontWeight:"700",
+                letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"12px"}}>
+                COMO INGENIERO
+              </p>
+              {[
+                {icon:"📱",titulo:"Escanea el QR",desc:"Apunta la camara al codigo QR del equipo. La app se abre directo en ese equipo."},
+                {icon:"📸",titulo:"Foto obligatoria",desc:"Antes de confirmar el retiro, toma una foto clara del equipo. Es tu evidencia."},
+                {icon:"✅",titulo:"Confirma el retiro",desc:"Selecciona tu estado y ciudad, revisa el resumen y da Confirmar."},
+                {icon:"🔄",titulo:"Para devolver",desc:"Escanea el QR de nuevo. El sistema detecta que el equipo esta contigo y abre el modo devolucion."},
+                {icon:"📦",titulo:"Paqueteria",desc:"Si ves un badge azul 'En transito', el equipo viene para ti. Escanea el QR para confirmar recepcion."},
+              ].map(function(s){return(
+                <div key={s.titulo} style={{display:"flex",gap:"12px",padding:"12px 0",
+                  borderBottom:"1px solid "+C.border}}>
+                  <div style={{fontSize:"24px",flexShrink:0,width:"36px",textAlign:"center"}}>{s.icon}</div>
+                  <div>
+                    <p style={{fontSize:"13px",fontWeight:"700",color:"#eee",margin:"0 0 3px"}}>{s.titulo}</p>
+                    <p style={{fontSize:"12px",color:"#777",margin:0,lineHeight:"1.5"}}>{s.desc}</p>
+                  </div>
+                </div>
+              );})}
+            </div>}
+
+            {isAdmin&&<div style={{marginBottom:"16px"}}>
+              <p style={{fontSize:"11px",color:C.blue,fontWeight:"700",
+                letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"12px"}}>
+                COMO ADMINISTRADOR
+              </p>
+              {[
+                {icon:"⚙️",titulo:"Panel Admin",desc:"Toca el icono de engranaje para gestionar equipos, categorias e ingenieros."},
+                {icon:"📤",titulo:"Asignar equipo",desc:"Toca cualquier equipo disponible, selecciona el ingeniero y el tipo de traslado (directo o paqueteria)."},
+                {icon:"🏢",titulo:"Filtrar por gerencia",desc:"Usa los pills azules (Nacional / Centro-Sur / Norte-Occidente) para ver solo los equipos de una region."},
+                {icon:"📊",titulo:"Exportar CSV",desc:"En Panel Admin > Equipos > Lista, usa el boton verde para exportar datos de auditoria."},
+                {icon:"📋",titulo:"Historial",desc:"En la pestana Historial puedes filtrar por equipo o ingeniero y exportar el CSV filtrado."},
+                {icon:"👤",titulo:"Gestionar usuarios",desc:"En Panel Admin > Ingenieros puedes editar nombres, gerencias y (super admin) roles."},
+              ].map(function(s){return(
+                <div key={s.titulo} style={{display:"flex",gap:"12px",padding:"12px 0",
+                  borderBottom:"1px solid "+C.border}}>
+                  <div style={{fontSize:"24px",flexShrink:0,width:"36px",textAlign:"center"}}>{s.icon}</div>
+                  <div>
+                    <p style={{fontSize:"13px",fontWeight:"700",color:"#eee",margin:"0 0 3px"}}>{s.titulo}</p>
+                    <p style={{fontSize:"12px",color:"#777",margin:0,lineHeight:"1.5"}}>{s.desc}</p>
+                  </div>
+                </div>
+              );})}
+            </div>}
+
+            {isGer&&<div style={{marginBottom:"16px"}}>
+              <p style={{fontSize:"11px",color:"#9966ff",fontWeight:"700",
+                letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"12px"}}>
+                COMO GERENTE
+              </p>
+              {[
+                {icon:"🏢",titulo:"Filtrar por gerencia",desc:"Usa los pills azules arriba del dashboard para ver solo los equipos de tu region."},
+                {icon:"📊",titulo:"Exportar activos",desc:"El boton morado debajo de los filtros exporta un CSV de los equipos de tu gerencia."},
+                {icon:"📋",titulo:"Historial",desc:"En la pestana Historial puedes filtrar por equipo o ingeniero y exportar movimientos."},
+                {icon:"🗺",titulo:"Mapa",desc:"El icono de mapa muestra la ubicacion geografica de todos los equipos en tiempo real."},
+              ].map(function(s){return(
+                <div key={s.titulo} style={{display:"flex",gap:"12px",padding:"12px 0",
+                  borderBottom:"1px solid "+C.border}}>
+                  <div style={{fontSize:"24px",flexShrink:0,width:"36px",textAlign:"center"}}>{s.icon}</div>
+                  <div>
+                    <p style={{fontSize:"13px",fontWeight:"700",color:"#eee",margin:"0 0 3px"}}>{s.titulo}</p>
+                    <p style={{fontSize:"12px",color:"#777",margin:0,lineHeight:"1.5"}}>{s.desc}</p>
+                  </div>
+                </div>
+              );})}
+            </div>}
+
+            {/* Tips generales */}
+            <div style={{background:"#0a0a18",borderRadius:"12px",padding:"14px 16px",marginTop:"8px"}}>
+              <p style={{fontSize:"11px",color:"#555",fontWeight:"700",
+                letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:"10px"}}>
+                TIPS
+              </p>
+              {[
+                "La foto es obligatoria en retiro y devolucion — protege al ingeniero",
+                "Badge rojo +5 dias significa que el equipo lleva demasiado tiempo fuera",
+                "Badge azul significa que el equipo viaja por paqueteria hacia ti",
+              ].map(function(t){return(
+                <p key={t} style={{fontSize:"12px",color:"#666",margin:"0 0 6px",
+                  paddingLeft:"14px",position:"relative",lineHeight:"1.5"}}>
+                  <span style={{position:"absolute",left:0,color:C.green}}>·</span>
+                  {t}
+                </p>
+              );})}
+            </div>
+
+            <p style={{textAlign:"center",fontSize:"11px",color:"#333",
+              marginTop:"16px",fontStyle:"italic"}}>
+              Cada activo en su lugar ✦ Lumo v0.27.0
+            </p>
+          </div>
+        </div>
+      </div>
+    </>}
+
   </>);
 }

@@ -141,62 +141,69 @@ function getUserId(session){
 }
 // Leer rol desde JWT app_metadata (no desde perfiles - evita recursión RLS)
 // ─── SONIDOS ─────────────────────────────────────────
-// AudioContext global — se crea en el primer gesto del usuario y persiste
+// ─── AUDIO ────────────────────────────────────────────
 var _audioCtx=null;
-function getAudioCtx(){
-  if(!_audioCtx||_audioCtx.state==="closed"){
-    try{ _audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch{}
-  }
-  // Reanudar si fue suspendido por el navegador
-  if(_audioCtx&&_audioCtx.state==="suspended"){
-    _audioCtx.resume().catch(function(){});
-  }
-  return _audioCtx;
+var _audioReady=false;
+
+function _initAudio(){
+  if(_audioReady) return;
+  try{
+    _audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    // Reproducir silencio para desbloquear en iOS
+    var buf=_audioCtx.createBuffer(1,1,22050);
+    var src=_audioCtx.createBufferSource();
+    src.buffer=buf;
+    src.connect(_audioCtx.destination);
+    src.start(0);
+    _audioReady=true;
+  }catch(e){}
 }
-// Inicializar AudioContext en el primer toque para desbloquear audio en iOS/Safari
-if(typeof window!=="undefined"){
-  var _audioUnlocked=false;
-  function _unlockAudio(){
-    if(_audioUnlocked) return;
-    _audioUnlocked=true;
-    getAudioCtx();
-    document.removeEventListener("touchstart",_unlockAudio);
-    document.removeEventListener("touchend",_unlockAudio);
-    document.removeEventListener("click",_unlockAudio);
-  }
-  document.addEventListener("touchstart",_unlockAudio,{once:true,passive:true});
-  document.addEventListener("touchend",_unlockAudio,{once:true,passive:true});
-  document.addEventListener("click",_unlockAudio,{once:true,passive:true});
-}
+
+// Desbloquear en el primer gesto del usuario
+["touchstart","touchend","click","keydown"].forEach(function(ev){
+  document.addEventListener(ev,function handler(){
+    _initAudio();
+    document.removeEventListener(ev,handler);
+  },{once:true,passive:true});
+});
 
 function playSound(tipo){
   try{
-    var ctx=getAudioCtx();
-    if(!ctx) return;
-    var g=ctx.createGain();
-    g.connect(ctx.destination);
-    var t=ctx.currentTime;
-    function note(freq,start,dur,vol){
-      var o=ctx.createOscillator();
-      o.type="sine";
-      o.frequency.value=freq;
-      o.connect(g);
-      g.gain.setValueAtTime(0,t+start);
-      g.gain.linearRampToValueAtTime(vol||0.18,t+start+0.01);
-      g.gain.exponentialRampToValueAtTime(0.001,t+start+dur);
-      o.start(t+start);
-      o.stop(t+start+dur+0.05);
-    }
-    if(tipo==="checkout"){
-      note(523,0,0.15); note(659,0.16,0.2);
-    } else if(tipo==="checkin"){
-      note(659,0,0.15); note(523,0.16,0.2);
-    } else if(tipo==="guia"){
-      note(880,0,0.08,0.12); note(1046,0.09,0.12,0.1);
-    } else if(tipo==="paqueteria"){
-      note(1046,0,0.1,0.12); note(1318,0.11,0.15,0.1); note(1568,0.22,0.2,0.08);
-    } else if(tipo==="error"){
-      note(220,0,0.2,0.15);
+    // Intentar inicializar si aún no se hizo
+    if(!_audioReady) _initAudio();
+    if(!_audioCtx) return;
+    // Reanudar si Safari lo suspendió
+    var play=function(){
+      var g=_audioCtx.createGain();
+      g.connect(_audioCtx.destination);
+      var t=_audioCtx.currentTime;
+      function note(freq,start,dur,vol){
+        var o=_audioCtx.createOscillator();
+        o.type="sine";
+        o.frequency.value=freq;
+        o.connect(g);
+        g.gain.setValueAtTime(0,t+start);
+        g.gain.linearRampToValueAtTime(vol||0.2,t+start+0.01);
+        g.gain.exponentialRampToValueAtTime(0.001,t+start+dur);
+        o.start(t+start);
+        o.stop(t+start+dur+0.08);
+      }
+      if(tipo==="checkout"){
+        note(523,0,0.15,0.22); note(659,0.17,0.22,0.2);
+      } else if(tipo==="checkin"){
+        note(659,0,0.15,0.22); note(523,0.17,0.22,0.2);
+      } else if(tipo==="guia"){
+        note(880,0,0.1,0.15); note(1046,0.11,0.14,0.12);
+      } else if(tipo==="paqueteria"){
+        note(1046,0,0.12,0.15); note(1318,0.13,0.16,0.12); note(1568,0.25,0.22,0.1);
+      } else if(tipo==="error"){
+        note(220,0,0.25,0.18);
+      }
+    };
+    if(_audioCtx.state==="suspended"){
+      _audioCtx.resume().then(play).catch(function(){});
+    } else {
+      play();
     }
   }catch(e){}
 }

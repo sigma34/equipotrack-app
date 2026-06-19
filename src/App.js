@@ -2196,23 +2196,39 @@ export default function App(){
 
   function showToast(msg,ok=true){setToast({msg,ok});setTimeout(()=>setToast(null),3200);}
 
-  async function cargar(token){
+  async function cargar(token,intento){
     setLoading(true);
     try{
-      const [eqs,regs,hist,prfs]=await Promise.all([
+      // allSettled: si una query falla, las demás siguen funcionando
+      const [eqsR,regsR,histR,prfsR]=await Promise.allSettled([
         supa("equipos",{token,params:{order:"created_at.asc",activo:"eq.true"}}),
         supa("registros",{token,params:{order:"fecha_retiro.desc"}}),
         supa("historial",{token,params:{order:"fecha_devolucion.desc",limit:"50"}}),
         supa("perfiles",{token,params:{order:"nombre.asc",select:"*"}}),
       ]);
-      const eqList=eqs||[];
-      setEquipos(eqList);setRegsArr(regs||[]);setHistorial(hist||[]);setPerfiles(prfs||[]);
+
+      // Extraer valores — usar [] si la query falló
+      var eqList=eqsR.status==="fulfilled"?(eqsR.value||[]):[];
+      var regs=regsR.status==="fulfilled"?(regsR.value||[]):[];
+      var hist=histR.status==="fulfilled"?(histR.value||[]):[];
+      var prfs=prfsR.status==="fulfilled"?(prfsR.value||[]):[];
+
+      // Si todos fallaron y es el primer intento, reintentar una vez silenciosamente
+      var todosFallaron=eqsR.status==="rejected"&&regsR.status==="rejected";
+      if(todosFallaron&&!intento){
+        setLoading(false);
+        setTimeout(function(){cargar(token,1);},1500);
+        return;
+      }
+
+      setEquipos(eqList);setRegsArr(regs);setHistorial(hist);setPerfiles(prfs);
+
       // Si venimos de un QR, abrir ese equipo automáticamente
       if(qrEquipoId){
         const eq=eqList.find(function(e){return e.id===qrEquipoId;});
         if(eq){
           const regsMap={};
-          (regs||[]).forEach(function(r){regsMap[r.equipo_id]=r;});
+          regs.forEach(function(r){regsMap[r.equipo_id]=r;});
           setSel(eq);
           const reg=regsMap[eq.id];
           if(!reg){setModo("checkout");}
@@ -2220,7 +2236,11 @@ export default function App(){
           else{setModo("checkin");}
         }
       }
-    }catch(ex){showToast("Error cargando datos",false);}
+    }catch(ex){
+      // Solo mostrar error si es el segundo intento
+      if(intento){showToast("Error cargando datos. Recarga la página.",false);}
+      else{setTimeout(function(){cargar(token,1);},1500);}
+    }
     finally{setLoading(false);}
   }
 

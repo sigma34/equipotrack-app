@@ -141,39 +141,63 @@ function getUserId(session){
 }
 // Leer rol desde JWT app_metadata (no desde perfiles - evita recursión RLS)
 // ─── SONIDOS ─────────────────────────────────────────
+// AudioContext global — se crea en el primer gesto del usuario y persiste
+var _audioCtx=null;
+function getAudioCtx(){
+  if(!_audioCtx||_audioCtx.state==="closed"){
+    try{ _audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch{}
+  }
+  // Reanudar si fue suspendido por el navegador
+  if(_audioCtx&&_audioCtx.state==="suspended"){
+    _audioCtx.resume().catch(function(){});
+  }
+  return _audioCtx;
+}
+// Inicializar AudioContext en el primer toque para desbloquear audio en iOS/Safari
+if(typeof window!=="undefined"){
+  var _audioUnlocked=false;
+  function _unlockAudio(){
+    if(_audioUnlocked) return;
+    _audioUnlocked=true;
+    getAudioCtx();
+    document.removeEventListener("touchstart",_unlockAudio);
+    document.removeEventListener("touchend",_unlockAudio);
+    document.removeEventListener("click",_unlockAudio);
+  }
+  document.addEventListener("touchstart",_unlockAudio,{once:true,passive:true});
+  document.addEventListener("touchend",_unlockAudio,{once:true,passive:true});
+  document.addEventListener("click",_unlockAudio,{once:true,passive:true});
+}
+
 function playSound(tipo){
   try{
-    var ctx=new (window.AudioContext||window.webkitAudioContext)();
+    var ctx=getAudioCtx();
+    if(!ctx) return;
     var g=ctx.createGain();
     g.connect(ctx.destination);
+    var t=ctx.currentTime;
     function note(freq,start,dur,vol){
       var o=ctx.createOscillator();
       o.type="sine";
       o.frequency.value=freq;
       o.connect(g);
-      g.gain.setValueAtTime(0,ctx.currentTime+start);
-      g.gain.linearRampToValueAtTime(vol||0.18,ctx.currentTime+start+0.01);
-      g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+start+dur);
-      o.start(ctx.currentTime+start);
-      o.stop(ctx.currentTime+start+dur+0.05);
+      g.gain.setValueAtTime(0,t+start);
+      g.gain.linearRampToValueAtTime(vol||0.18,t+start+0.01);
+      g.gain.exponentialRampToValueAtTime(0.001,t+start+dur);
+      o.start(t+start);
+      o.stop(t+start+dur+0.05);
     }
     if(tipo==="checkout"){
-      // Dos notas ascendentes — acción positiva
       note(523,0,0.15); note(659,0.16,0.2);
     } else if(tipo==="checkin"){
-      // Dos notas descendentes — cierre de ciclo
       note(659,0,0.15); note(523,0.16,0.2);
     } else if(tipo==="guia"){
-      // Pop suave — personalidad Lumi
       note(880,0,0.08,0.12); note(1046,0.09,0.12,0.1);
     } else if(tipo==="paqueteria"){
-      // Campanita — evento especial
       note(1046,0,0.1,0.12); note(1318,0.11,0.15,0.1); note(1568,0.22,0.2,0.08);
     } else if(tipo==="error"){
-      // Nota grave corta — feedback de error
       note(220,0,0.2,0.15);
     }
-    setTimeout(function(){try{ctx.close();}catch{}},1000);
   }catch(e){}
 }
 

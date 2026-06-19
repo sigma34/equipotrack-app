@@ -789,16 +789,52 @@ function Login({onLogin}){
   const captchaRef=useRef(null);
   const [showReset,setShowReset]=useState(false);
 
-  // Cargar script hCaptcha una sola vez
+  // Cargar script hCaptcha y renderizar widget programáticamente
   React.useEffect(function(){
-    if(document.getElementById("hcaptcha-script")) return;
-    var s=document.createElement("script");
-    s.id="hcaptcha-script";
-    s.src="https://js.hcaptcha.com/1/api.js";
-    s.async=true; s.defer=true;
-    document.head.appendChild(s);
-    window.onHCaptchaVerify=function(token){setCaptchaToken(token);};
-    window.onHCaptchaExpire=function(){setCaptchaToken(null);};
+    var widgetId=null;
+
+    function renderWidget(){
+      if(!captchaRef.current||!window.hcaptcha) return;
+      // Limpiar contenido previo del div
+      captchaRef.current.innerHTML="";
+      try{
+        widgetId=window.hcaptcha.render(captchaRef.current,{
+          sitekey:"c8541066-98c2-474a-8d3e-0f0c4748f016",
+          theme:"dark",
+          callback:function(token){setCaptchaToken(token);},
+          "expired-callback":function(){setCaptchaToken(null);},
+          "error-callback":function(){setCaptchaToken(null);}
+        });
+      }catch(e){}
+    }
+
+    if(window.hcaptcha){
+      // Script ya cargado — renderizar inmediatamente
+      renderWidget();
+    } else if(!document.getElementById("hcaptcha-script")){
+      // Cargar script por primera vez
+      var s=document.createElement("script");
+      s.id="hcaptcha-script";
+      s.src="https://js.hcaptcha.com/1/api.js?render=explicit&onload=onHCaptchaLoad";
+      s.async=true; s.defer=true;
+      window.onHCaptchaLoad=function(){renderWidget();};
+      document.head.appendChild(s);
+    } else {
+      // Script existe pero aún cargando — esperar
+      var interval=setInterval(function(){
+        if(window.hcaptcha){
+          clearInterval(interval);
+          renderWidget();
+        }
+      },100);
+    }
+
+    // Cleanup al desmontar
+    return function(){
+      if(widgetId!=null&&window.hcaptcha){
+        try{window.hcaptcha.reset(widgetId);}catch{}
+      }
+    };
   },[]);
   if(showReset) return React.createElement(ResetPassword,{onVolver:function(){setShowReset(false);}});
   async function login(e){
@@ -914,12 +950,7 @@ function Login({onLogin}){
           {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",padding:"10px 14px",borderRadius:"9px",margin:0}}>
             ⚠️ {err}</p>}
           <div style={{display:"flex",justifyContent:"center",margin:"4px 0"}}>
-            <div ref={captchaRef}
-              className="h-captcha"
-              data-sitekey="c8541066-98c2-474a-8d3e-0f0c4748f016"
-              data-callback="onHCaptchaVerify"
-              data-expired-callback="onHCaptchaExpire"
-              data-theme="dark"/>
+            <div ref={captchaRef} style={{minHeight:"78px"}}/>
           </div>
           <button type="submit" disabled={loading||!captchaToken} style={{...btnP(loading||!captchaToken),marginTop:"6px"}}>
             {loading?"Verificando…":"Iniciar sesión"}

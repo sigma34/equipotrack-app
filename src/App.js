@@ -1096,7 +1096,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador · v0.27.0
+          ¿Sin acceso? Contacta al administrador · v0.28.0
         </p>
       </div>
     </div>
@@ -1476,7 +1476,19 @@ function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
 
 // - PANEL ADMIN -
 function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
-  const [tab,setTab]=useState("equipos"); // equipos | categorias | ingenieros
+  const [tab,setTab]=useState("equipos"); // equipos | categorias | ingenieros | usuarios
+  // Estados para invitaciones
+  const [invEmail,setInvEmail]=useState("");
+  const [invNombre,setInvNombre]=useState("");
+  const [invRol,setInvRol]=useState("ingeniero");
+  const [invGerencia,setInvGerencia]=useState("");
+  const [invLoading,setInvLoading]=useState(false);
+  const [invMsg,setInvMsg]=useState(null); // {ok:bool, txt:str}
+  const [masiva,setMasiva]=useState(""); // emails uno por línea
+  const [masivaRol,setMasivaRol]=useState("ingeniero");
+  const [masivaGerencia,setMasivaGerencia]=useState("");
+  const [masivaLoading,setMasivaLoading]=useState(false);
+  const [masivaMsg,setMasivaMsg]=useState(null);
   // Equipo form
   const [nombre,setNombre]=useState(""),[serie,setSerie]=useState("");
   const [adminEq,setAdminEq]=useState(""); // admin responsable del equipo
@@ -1503,6 +1515,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
     if(tab==="categorias")cargarCats();
     if(tab==="ingenieros")cargarPerfiles();
     if(tab==="equipos"){cargarEquipos();}
+    // usuarios no necesita carga — usa formulario
   },[tab]);
 
   async function cargarEquipos(){
@@ -1611,6 +1624,69 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
     }catch(ex){alert("Error: "+ex.message);}
   }
 
+  // Invitar usuario individual
+  async function invitarUsuario(){
+    var email=invEmail.trim().toLowerCase();
+    if(!email||!invNombre.trim()){setInvMsg({ok:false,txt:"Email y nombre son requeridos"});return;}
+    if(!email.endsWith("@axtel.com.mx")){setInvMsg({ok:false,txt:"Solo se permiten correos @axtel.com.mx"});return;}
+    setInvLoading(true);setInvMsg(null);
+    try{
+      // Usar Supabase Admin API para invitar
+      const res=await fetch(SUPA_URL+"/auth/v1/invite",{
+        method:"POST",
+        headers:{"apikey":SUPA_KEY,"Content-Type":"application/json","Authorization":"Bearer "+token},
+        body:JSON.stringify({
+          email:email,
+          data:{nombre:invNombre.trim(),rol:invRol,gerencia:invGerencia||null}
+        }),
+      });
+      if(!res.ok){const d=await res.json();throw new Error(d.message||d.msg||"Error al invitar");}
+      // Asignar rol en app_metadata
+      await fetch(SUPA_URL+"/rest/v1/rpc/cambiar_rol_usuario",{
+        method:"POST",
+        headers:{"apikey":SUPA_KEY,"Content-Type":"application/json","Authorization":"Bearer "+token},
+        body:JSON.stringify({target_email:email,nuevo_rol:invRol}),
+      });
+      setInvMsg({ok:true,txt:"Invitacion enviada a "+email+". El usuario recibirá un email para activar su cuenta."});
+      setInvEmail("");setInvNombre("");setInvRol("ingeniero");setInvGerencia("");
+    }catch(ex){setInvMsg({ok:false,txt:ex.message});}
+    finally{setInvLoading(false);}
+  }
+
+  // Invitar múltiples usuarios (carga masiva)
+  async function invitarMasiva(){
+    var lineas=masiva.split("\n").map(function(l){return l.trim().toLowerCase();}).filter(function(l){return l.length>0;});
+    var validos=lineas.filter(function(e){return e.includes("@")&&e.endsWith("@axtel.com.mx");});
+    var invalidos=lineas.filter(function(e){return !e.endsWith("@axtel.com.mx");});
+    if(validos.length===0){setMasivaMsg({ok:false,txt:"No hay emails válidos con dominio @axtel.com.mx"});return;}
+    setMasivaLoading(true);setMasivaMsg(null);
+    var exitos=0,errores=0;
+    for(var i=0;i<validos.length;i++){
+      var email=validos[i];
+      try{
+        const res=await fetch(SUPA_URL+"/auth/v1/invite",{
+          method:"POST",
+          headers:{"apikey":SUPA_KEY,"Content-Type":"application/json","Authorization":"Bearer "+token},
+          body:JSON.stringify({email:email,data:{rol:masivaRol,gerencia:masivaGerencia||null}}),
+        });
+        if(!res.ok)throw new Error("Error");
+        // Asignar rol
+        await fetch(SUPA_URL+"/rest/v1/rpc/cambiar_rol_usuario",{
+          method:"POST",
+          headers:{"apikey":SUPA_KEY,"Content-Type":"application/json","Authorization":"Bearer "+token},
+          body:JSON.stringify({target_email:email,nuevo_rol:masivaRol}),
+        });
+        exitos++;
+      }catch{errores++;}
+    }
+    var msg=exitos+" invitacion"+(exitos!==1?"es enviadas":"enviada");
+    if(errores>0) msg+=", "+errores+" con error";
+    if(invalidos.length>0) msg+=". "+invalidos.length+" email"+(invalidos.length!==1?"s ignorados":"ignorado")+" (dominio incorrecto)";
+    setMasivaMsg({ok:errores===0,txt:msg});
+    if(exitos>0) setMasiva("");
+    setMasivaLoading(false);
+  }
+
   async function cambiarRol(perfil,nuevoRol){
     if(perfil.rol===nuevoRol)return;
     if(!confirm("Cambiar rol de "+perfil.nombre+" a "+nuevoRol+"?"))return;
@@ -1679,8 +1755,9 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
         </div>
 
         {/* Tabs admin */}
-        <div style={{display:"flex",gap:"6px",marginBottom:"20px"}}>
-          {[{k:"equipos",l:"⚡ Equipos"},{k:"categorias",l:"🏷 Categorías"},{k:"ingenieros",l:"👤 Ingenieros"}].map(t=>(
+        <div style={{display:"flex",gap:"6px",marginBottom:"20px",flexWrap:"wrap"}}>
+          {[{k:"equipos",l:"⚡ Equipos"},{k:"categorias",l:"🏷 Categorías"},{k:"ingenieros",l:"👤 Ingenieros"},
+            ...(isSA?[{k:"usuarios",l:"✉️ Usuarios"}]:[])].map(t=>(
             <button key={t.k} onClick={()=>setTab(t.k)}
               style={{flex:1,padding:"8px 4px",background:tab===t.k?C.subtle:"transparent",
                 border:`1px solid ${tab===t.k?C.border:"transparent"}`,
@@ -1982,6 +2059,130 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
           {perfiles.length===0&&<p style={{textAlign:"center",color:C.muted,padding:"20px",fontSize:"13px"}}>
             Sin usuarios registrados aún
           </p>}
+        </div>}
+
+        {/* Tab: Usuarios — solo Super Admin */}
+        {tab==="usuarios"&&isSA&&<div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
+
+          {/* Invitación individual */}
+          <div style={{background:"#0a0a18",border:"1px solid "+C.border,borderRadius:"14px",padding:"16px"}}>
+            <p style={{fontSize:"12px",fontWeight:"700",color:C.blue,letterSpacing:"0.1em",
+              textTransform:"uppercase",marginBottom:"12px"}}>
+              ✉️ Invitar usuario
+            </p>
+            <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
+              <div>
+                <label style={{color:"#999",fontSize:"11px",display:"block",marginBottom:"5px"}}>EMAIL CORPORATIVO</label>
+                <input value={invEmail} onChange={e=>setInvEmail(e.target.value)}
+                  placeholder="usuario@axtel.com.mx"
+                  style={{...inp,fontSize:"13px"}}/>
+                <p style={{color:"#444",fontSize:"10px",marginTop:"3px"}}>
+                  Solo se permiten correos @axtel.com.mx
+                </p>
+              </div>
+              <div>
+                <label style={{color:"#999",fontSize:"11px",display:"block",marginBottom:"5px"}}>NOMBRE COMPLETO</label>
+                <input value={invNombre} onChange={e=>setInvNombre(e.target.value)}
+                  placeholder="Nombre como aparecerá en los registros"
+                  style={{...inp,fontSize:"13px"}}/>
+              </div>
+              <div style={{display:"flex",gap:"10px"}}>
+                <div style={{flex:1}}>
+                  <label style={{color:"#999",fontSize:"11px",display:"block",marginBottom:"5px"}}>ROL</label>
+                  <select value={invRol} onChange={e=>setInvRol(e.target.value)}
+                    style={{...inp,cursor:"pointer",fontSize:"13px"}}>
+                    <option value="ingeniero">Ingeniero</option>
+                    <option value="gerente">Gerente</option>
+                    <option value="admin">Admin</option>
+                    <option value="super_admin">Super Admin</option>
+                  </select>
+                </div>
+                <div style={{flex:1}}>
+                  <label style={{color:"#999",fontSize:"11px",display:"block",marginBottom:"5px"}}>GERENCIA</label>
+                  <select value={invGerencia} onChange={e=>setInvGerencia(e.target.value)}
+                    style={{...inp,cursor:"pointer",fontSize:"13px",color:invGerencia?C.text:C.muted}}>
+                    <option value="">Sin asignar</option>
+                    <option value="Centro-Sur">Centro-Sur</option>
+                    <option value="Norte-Occidente">Norte-Occidente</option>
+                  </select>
+                </div>
+              </div>
+              {invMsg&&<div style={{padding:"10px 14px",borderRadius:"10px",fontSize:"12px",
+                background:invMsg.ok?"#001a0d":"#1a0000",
+                color:invMsg.ok?C.green:C.red,
+                border:"1px solid "+(invMsg.ok?C.green+"44":C.red+"44")}}>
+                {invMsg.ok?"✓ ":"⚠️ "}{invMsg.txt}
+              </div>}
+              <button onClick={invitarUsuario} disabled={invLoading}
+                style={{...btnP(invLoading)}}>
+                {invLoading?"Enviando…":"✉️ Enviar invitacion"}
+              </button>
+            </div>
+          </div>
+
+          {/* Invitación masiva */}
+          <div style={{background:"#0a0a18",border:"1px solid "+C.border,borderRadius:"14px",padding:"16px"}}>
+            <p style={{fontSize:"12px",fontWeight:"700",color:"#9966ff",letterSpacing:"0.1em",
+              textTransform:"uppercase",marginBottom:"4px"}}>
+              📋 Carga masiva
+            </p>
+            <p style={{fontSize:"11px",color:C.muted,marginBottom:"12px"}}>
+              Un email por linea. Solo se procesan correos @axtel.com.mx
+            </p>
+            <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
+              <textarea value={masiva} onChange={e=>setMasiva(e.target.value)}
+                placeholder={"ingeniero1@axtel.com.mx\ningeniero2@axtel.com.mx\ngerente1@axtel.com.mx"}
+                rows={5}
+                style={{...inp,resize:"vertical",lineHeight:"1.6",fontSize:"12px",
+                  fontFamily:"'JetBrains Mono',monospace"}}/>
+              <div style={{display:"flex",gap:"10px"}}>
+                <div style={{flex:1}}>
+                  <label style={{color:"#999",fontSize:"11px",display:"block",marginBottom:"5px"}}>ROL PARA TODOS</label>
+                  <select value={masivaRol} onChange={e=>setMasivaRol(e.target.value)}
+                    style={{...inp,cursor:"pointer",fontSize:"13px"}}>
+                    <option value="ingeniero">Ingeniero</option>
+                    <option value="gerente">Gerente</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <div style={{flex:1}}>
+                  <label style={{color:"#999",fontSize:"11px",display:"block",marginBottom:"5px"}}>GERENCIA</label>
+                  <select value={masivaGerencia} onChange={e=>setMasivaGerencia(e.target.value)}
+                    style={{...inp,cursor:"pointer",fontSize:"13px",color:masivaGerencia?C.text:C.muted}}>
+                    <option value="">Sin asignar</option>
+                    <option value="Centro-Sur">Centro-Sur</option>
+                    <option value="Norte-Occidente">Norte-Occidente</option>
+                  </select>
+                </div>
+              </div>
+              {masiva.trim()&&<p style={{fontSize:"11px",color:C.muted}}>
+                {masiva.split("\n").filter(function(l){return l.trim().endsWith("@axtel.com.mx");}).length} emails validos detectados
+              </p>}
+              {masivaMsg&&<div style={{padding:"10px 14px",borderRadius:"10px",fontSize:"12px",
+                background:masivaMsg.ok?"#001a0d":"#1a0a00",
+                color:masivaMsg.ok?C.green:C.orange,
+                border:"1px solid "+(masivaMsg.ok?C.green+"44":C.orange+"44")}}>
+                {masivaMsg.txt}
+              </div>}
+              <button onClick={invitarMasiva} disabled={masivaLoading||!masiva.trim()}
+                style={{...btnP(masivaLoading||!masiva.trim())}}>
+                {masivaLoading?"Enviando invitaciones...":"📋 Enviar invitaciones masivas"}
+              </button>
+            </div>
+          </div>
+
+          {/* Nota informativa */}
+          <div style={{background:"#020d1a",border:"1px solid "+C.blue+"33",
+            borderRadius:"12px",padding:"14px 16px"}}>
+            <p style={{fontSize:"12px",color:C.blue,fontWeight:"700",marginBottom:"6px"}}>
+              Como funciona la invitacion
+            </p>
+            <p style={{fontSize:"11px",color:"#555",lineHeight:"1.6",margin:0}}>
+              El usuario recibe un email con un enlace para activar su cuenta y definir su contrasena.
+              Al entrar por primera vez, su rol y gerencia ya estan asignados y aparece la guia de Lumi.
+              El enlace de activacion expira en 24 horas.
+            </p>
+          </div>
         </div>}
     </div>
 

@@ -1624,67 +1624,46 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
     }catch(ex){alert("Error: "+ex.message);}
   }
 
-  // Invitar usuario individual
+  // Invitar usuario individual — via Edge Function
   async function invitarUsuario(){
     var email=invEmail.trim().toLowerCase();
     if(!email||!invNombre.trim()){setInvMsg({ok:false,txt:"Email y nombre son requeridos"});return;}
     if(!email.endsWith("@axtel.com.mx")){setInvMsg({ok:false,txt:"Solo se permiten correos @axtel.com.mx"});return;}
     setInvLoading(true);setInvMsg(null);
     try{
-      // Usar Supabase Admin API para invitar
-      const res=await fetch(SUPA_URL+"/auth/v1/invite",{
+      const res=await fetch(SUPA_URL+"/functions/v1/invitar-usuario",{
         method:"POST",
-        headers:{"apikey":SUPA_KEY,"Content-Type":"application/json","Authorization":"Bearer "+token},
-        body:JSON.stringify({
-          email:email,
-          data:{nombre:invNombre.trim(),rol:invRol,gerencia:invGerencia||null}
-        }),
+        headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},
+        body:JSON.stringify({emails:[email],nombre:invNombre.trim(),rol:invRol,gerencia:invGerencia||null}),
       });
-      if(!res.ok){const d=await res.json();throw new Error(d.message||d.msg||"Error al invitar");}
-      // Asignar rol en app_metadata
-      await fetch(SUPA_URL+"/rest/v1/rpc/cambiar_rol_usuario",{
-        method:"POST",
-        headers:{"apikey":SUPA_KEY,"Content-Type":"application/json","Authorization":"Bearer "+token},
-        body:JSON.stringify({target_email:email,nuevo_rol:invRol}),
-      });
-      setInvMsg({ok:true,txt:"Invitacion enviada a "+email+". El usuario recibirá un email para activar su cuenta."});
+      const d=await res.json();
+      if(!d.ok)throw new Error(d.mensaje||"Error al invitar");
+      setInvMsg({ok:true,txt:"Invitacion enviada a "+email+". Recibira un email para activar su cuenta."});
       setInvEmail("");setInvNombre("");setInvRol("ingeniero");setInvGerencia("");
     }catch(ex){setInvMsg({ok:false,txt:ex.message});}
     finally{setInvLoading(false);}
   }
 
-  // Invitar múltiples usuarios (carga masiva)
+  // Invitar múltiples usuarios — via Edge Function (procesa todos en una sola llamada)
   async function invitarMasiva(){
     var lineas=masiva.split("\n").map(function(l){return l.trim().toLowerCase();}).filter(function(l){return l.length>0;});
     var validos=lineas.filter(function(e){return e.includes("@")&&e.endsWith("@axtel.com.mx");});
-    var invalidos=lineas.filter(function(e){return !e.endsWith("@axtel.com.mx");});
-    if(validos.length===0){setMasivaMsg({ok:false,txt:"No hay emails válidos con dominio @axtel.com.mx"});return;}
+    var invalidos=lineas.filter(function(e){return e.length>0&&!e.endsWith("@axtel.com.mx");});
+    if(validos.length===0){setMasivaMsg({ok:false,txt:"No hay emails validos con dominio @axtel.com.mx"});return;}
     setMasivaLoading(true);setMasivaMsg(null);
-    var exitos=0,errores=0;
-    for(var i=0;i<validos.length;i++){
-      var email=validos[i];
-      try{
-        const res=await fetch(SUPA_URL+"/auth/v1/invite",{
-          method:"POST",
-          headers:{"apikey":SUPA_KEY,"Content-Type":"application/json","Authorization":"Bearer "+token},
-          body:JSON.stringify({email:email,data:{rol:masivaRol,gerencia:masivaGerencia||null}}),
-        });
-        if(!res.ok)throw new Error("Error");
-        // Asignar rol
-        await fetch(SUPA_URL+"/rest/v1/rpc/cambiar_rol_usuario",{
-          method:"POST",
-          headers:{"apikey":SUPA_KEY,"Content-Type":"application/json","Authorization":"Bearer "+token},
-          body:JSON.stringify({target_email:email,nuevo_rol:masivaRol}),
-        });
-        exitos++;
-      }catch{errores++;}
-    }
-    var msg=exitos+" invitacion"+(exitos!==1?"es enviadas":"enviada");
-    if(errores>0) msg+=", "+errores+" con error";
-    if(invalidos.length>0) msg+=". "+invalidos.length+" email"+(invalidos.length!==1?"s ignorados":"ignorado")+" (dominio incorrecto)";
-    setMasivaMsg({ok:errores===0,txt:msg});
-    if(exitos>0) setMasiva("");
-    setMasivaLoading(false);
+    try{
+      const res=await fetch(SUPA_URL+"/functions/v1/invitar-usuario",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},
+        body:JSON.stringify({emails:validos,rol:masivaRol,gerencia:masivaGerencia||null}),
+      });
+      const d=await res.json();
+      var msg=d.mensaje||"Error desconocido";
+      if(invalidos.length>0) msg+=". "+invalidos.length+" email"+(invalidos.length!==1?"s ignorados":"ignorado")+" por dominio incorrecto";
+      setMasivaMsg({ok:d.ok,txt:msg});
+      if(d.exitos>0) setMasiva("");
+    }catch(ex){setMasivaMsg({ok:false,txt:ex.message});}
+    finally{setMasivaLoading(false);}
   }
 
   async function cambiarRol(perfil,nuevoRol){

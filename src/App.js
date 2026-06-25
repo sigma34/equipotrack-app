@@ -849,8 +849,10 @@ function ResetPassword({onVolver}){
   const [loading,setLoading]=useState(false);
   const [enviado,setEnviado]=useState(false);
   const [err,setErr]=useState("");
+  const [captchaToken,setCaptchaToken]=useState(null);
+  const captchaRef=useRef(null);
 
-  // useEffect ANTES de cualquier return condicional
+  // Lumi style + hCaptcha — ANTES de cualquier return condicional
   React.useEffect(function(){
     if(document.getElementById("lumi-style")) return;
     var s=document.createElement("style");
@@ -859,21 +861,54 @@ function ResetPassword({onVolver}){
     document.head.appendChild(s);
   },[]);
 
+  React.useEffect(function(){
+    var widgetId=null;
+    function renderWidget(){
+      if(!captchaRef.current||!window.hcaptcha) return;
+      captchaRef.current.innerHTML="";
+      try{
+        widgetId=window.hcaptcha.render(captchaRef.current,{
+          sitekey:"c8541066-98c2-474a-8d3e-0f0c4748f016",
+          theme:"dark",
+          callback:function(token){setCaptchaToken(token);},
+          "expired-callback":function(){setCaptchaToken(null);},
+          "error-callback":function(){setCaptchaToken(null);}
+        });
+      }catch(e){}
+    }
+    if(window.hcaptcha){renderWidget();}
+    else{
+      var interval=setInterval(function(){
+        if(window.hcaptcha){clearInterval(interval);renderWidget();}
+      },100);
+    }
+    return function(){
+      if(widgetId!=null&&window.hcaptcha){try{window.hcaptcha.reset(widgetId);}catch{}}
+    };
+  },[]);
+
   async function enviar(e){
-    e.preventDefault();setLoading(true);setErr("");
+    e.preventDefault();
+    if(!captchaToken){setErr("Por favor completa la verificación de seguridad.");return;}
+    setLoading(true);setErr("");
     try{
       const res=await fetch(SUPA_URL+"/auth/v1/recover",{
         method:"POST",
         headers:{"apikey":SUPA_KEY,"Content-Type":"application/json"},
-        body:JSON.stringify({email:email}),
+        body:JSON.stringify({email:email,gotrue_meta_security:{captcha_token:captchaToken}}),
       });
       if(!res.ok){const d=await res.json();throw new Error(d.error_description||d.msg||"Error");}
       setEnviado(true);
     }catch(ex){
       setErr(ex.message);
+      setCaptchaToken(null);
+      if(window.hcaptcha&&captchaRef.current){
+        try{window.hcaptcha.reset();}catch{}
+      }
     }
     finally{setLoading(false);}
   }
+
   if(enviado) return(
     <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
       justifyContent:"center",padding:"20px",fontFamily:"'Sora',sans-serif"}}>
@@ -909,9 +944,13 @@ function ResetPassword({onVolver}){
             <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
               placeholder="ingeniero@empresa.com" style={inp} required/>
           </div>
+          <div style={{display:"flex",justifyContent:"center",margin:"4px 0"}}>
+            <div ref={captchaRef} style={{minHeight:"78px"}}/>
+          </div>
           {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",
             padding:"10px 14px",borderRadius:"9px",margin:0}}>⚠️ {err}</p>}
-          <button type="submit" disabled={loading||!email} style={btnP(loading||!email)}>
+          <button type="submit" disabled={loading||!email||!captchaToken}
+            style={btnP(loading||!email||!captchaToken)}>
             {loading?"Enviando…":"Enviar enlace"}
           </button>
         </form>

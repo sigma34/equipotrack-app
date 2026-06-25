@@ -719,9 +719,48 @@ function NuevaContrasena({token}){
   const [loading,setLoading]=useState(false);
   const [listo,setListo]=useState(false);
   const [err,setErr]=useState("");
+  const [realToken,setRealToken]=useState(null);
+
+  // Inicializar realToken según el formato recibido
+  React.useEffect(function(){
+    if(!token) return;
+    if(token.startsWith("hash:")){
+      // Formato token_hash — verificar contra Supabase
+      var tokenHash=token.replace("hash:","");
+      fetch(SUPA_URL+"/auth/v1/verify",{
+        method:"POST",
+        headers:{"apikey":SUPA_KEY,"Content-Type":"application/json"},
+        body:JSON.stringify({token_hash:tokenHash,type:"recovery"}),
+      }).then(function(r){return r.json();}).then(function(d){
+        if(d.access_token){setRealToken(d.access_token);}
+        else{setErr("Link inválido o expirado. Solicita un nuevo link de recuperación.");}
+      }).catch(function(){
+        setErr("Error verificando el link. Solicita un nuevo link de recuperación.");
+      });
+    } else if(token==="recovery_pending"){
+      // Intentar extraer del hash de la URL
+      var h=window.location.hash;
+      var m=h.match(/access_token=([^&]+)/);
+      if(m){setRealToken(decodeURIComponent(m[1]));}
+      else{setErr("Link inválido. Solicita un nuevo link de recuperación.");}
+    } else {
+      // Token directo — usar tal cual
+      setRealToken(token);
+    }
+  },[token]);
+
+  // Inyectar animación CSS para Lumi — ANTES de cualquier return condicional
+  React.useEffect(function(){
+    if(document.getElementById("lumi-style")) return;
+    var s=document.createElement("style");
+    s.id="lumi-style";
+    s.textContent="@keyframes lumiPulse{0%,100%{box-shadow:0 0 0 0 #00e87a33}50%{box-shadow:0 0 0 5px #00e87a00}}";
+    document.head.appendChild(s);
+  },[]);
 
   async function guardar(e){
     e.preventDefault();
+    if(!realToken){setErr("Token no disponible. Solicita un nuevo link.");return;}
     if(pass.length<6){setErr("Mínimo 6 caracteres");return;}
     if(pass!==pass2){setErr("Las contraseñas no coinciden");return;}
     setLoading(true);setErr("");
@@ -731,7 +770,7 @@ function NuevaContrasena({token}){
         headers:{
           "apikey":SUPA_KEY,
           "Content-Type":"application/json",
-          "Authorization":"Bearer "+token,
+          "Authorization":"Bearer "+realToken,
         },
         body:JSON.stringify({password:pass}),
       });
@@ -742,11 +781,6 @@ function NuevaContrasena({token}){
       setListo(true);
     }catch(ex){
       setErr(ex.message);
-      // Reset captcha para que el usuario pueda intentar de nuevo
-      setCaptchaToken(null);
-      if(window.hcaptcha&&captchaRef.current){
-        try{window.hcaptcha.reset(captchaRef.current);}catch{}
-      }
     }
     finally{setLoading(false);}
   }
@@ -767,15 +801,6 @@ function NuevaContrasena({token}){
       </div>
     </div>
   );
-
-  // Inyectar animación CSS para Lumi
-  React.useEffect(function(){
-    if(document.getElementById("lumi-style")) return;
-    var s=document.createElement("style");
-    s.id="lumi-style";
-    s.textContent="@keyframes lumiPulse{0%,100%{box-shadow:0 0 0 0 #00e87a33}50%{box-shadow:0 0 0 5px #00e87a00}}";
-    document.head.appendChild(s);
-  },[]);
 
   return(
     <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
@@ -824,6 +849,16 @@ function ResetPassword({onVolver}){
   const [loading,setLoading]=useState(false);
   const [enviado,setEnviado]=useState(false);
   const [err,setErr]=useState("");
+
+  // useEffect ANTES de cualquier return condicional
+  React.useEffect(function(){
+    if(document.getElementById("lumi-style")) return;
+    var s=document.createElement("style");
+    s.id="lumi-style";
+    s.textContent="@keyframes lumiPulse{0%,100%{box-shadow:0 0 0 0 #00e87a33}50%{box-shadow:0 0 0 5px #00e87a00}}";
+    document.head.appendChild(s);
+  },[]);
+
   async function enviar(e){
     e.preventDefault();setLoading(true);setErr("");
     try{
@@ -858,15 +893,6 @@ function ResetPassword({onVolver}){
       </div>
     </div>
   );
-  // Inyectar animación CSS para Lumi
-  React.useEffect(function(){
-    if(document.getElementById("lumi-style")) return;
-    var s=document.createElement("style");
-    s.id="lumi-style";
-    s.textContent="@keyframes lumiPulse{0%,100%{box-shadow:0 0 0 0 #00e87a33}50%{box-shadow:0 0 0 5px #00e87a00}}";
-    document.head.appendChild(s);
-  },[]);
-
   return(
     <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
       justifyContent:"center",padding:"20px",fontFamily:"'Sora',sans-serif"}}>
@@ -959,6 +985,16 @@ function Login({onLogin}){
       }
     };
   },[]);
+
+  // Inyectar animación CSS para Lumi — ANTES de cualquier return condicional
+  React.useEffect(function(){
+    if(document.getElementById("lumi-style")) return;
+    var s=document.createElement("style");
+    s.id="lumi-style";
+    s.textContent="@keyframes lumiPulse{0%,100%{box-shadow:0 0 0 0 #00e87a33}50%{box-shadow:0 0 0 5px #00e87a00}}";
+    document.head.appendChild(s);
+  },[]);
+
   if(showReset) return React.createElement(ResetPassword,{onVolver:function(){setShowReset(false);}});
   async function login(e){
     e.preventDefault();setLoading(true);setErr("");
@@ -1019,14 +1055,6 @@ function Login({onLogin}){
     }
     finally{setLoading(false);}
   }
-  // Inyectar animación CSS para Lumi
-  React.useEffect(function(){
-    if(document.getElementById("lumi-style")) return;
-    var s=document.createElement("style");
-    s.id="lumi-style";
-    s.textContent="@keyframes lumiPulse{0%,100%{box-shadow:0 0 0 0 #00e87a33}50%{box-shadow:0 0 0 5px #00e87a00}}";
-    document.head.appendChild(s);
-  },[]);
 
   return(
     <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
@@ -2385,13 +2413,28 @@ function MapaModal({registros,equipos,onCerrar}){ // font heredado de App via So
 
 // - APP -
 export default function App(){
-  // Detectar token de recovery ANTES del primer render usando lazy useState
+  // Detectar token de recovery — soporta formato hash (#) y query string (?)
   const [recoveryToken] = useState(function(){
     try{
+      // Formato 1: #access_token=XXX&type=recovery (formato clásico Supabase)
       var h = window.location.hash;
-      if(h.indexOf("type=recovery")===-1) return null;
-      var m = h.match(/access_token=([^&]+)/);
-      return m ? decodeURIComponent(m[1]) : null;
+      if(h.indexOf("type=recovery")!==-1){
+        var m = h.match(/access_token=([^&]+)/);
+        if(m) return decodeURIComponent(m[1]);
+      }
+      // Formato 2: ?token_hash=XXX&type=recovery (formato nuevo Supabase)
+      var params = new URLSearchParams(window.location.search);
+      if(params.get("type")==="recovery"){
+        var tokenHash = params.get("token_hash");
+        if(tokenHash) return "hash:"+tokenHash; // prefijo para distinguir el tipo
+        var accessToken = params.get("access_token");
+        if(accessToken) return accessToken;
+      }
+      // Formato 3: #type=recovery sin access_token (Supabase PKCE flow)
+      if(h.indexOf("type=recovery")!==-1){
+        return "recovery_pending";
+      }
+      return null;
     }catch(e){ return null; }
   });
 

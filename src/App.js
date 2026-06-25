@@ -871,11 +871,6 @@ function ResetPassword({onVolver}){
       setEnviado(true);
     }catch(ex){
       setErr(ex.message);
-      // Reset captcha para que el usuario pueda intentar de nuevo
-      setCaptchaToken(null);
-      if(window.hcaptcha&&captchaRef.current){
-        try{window.hcaptcha.reset(captchaRef.current);}catch{}
-      }
     }
     finally{setLoading(false);}
   }
@@ -995,7 +990,23 @@ function Login({onLogin}){
     document.head.appendChild(s);
   },[]);
 
-  if(showReset) return React.createElement(ResetPassword,{onVolver:function(){setShowReset(false);}});
+  if(showReset) return React.createElement(ResetPassword,{onVolver:function(){
+    setShowReset(false);
+    // Re-renderizar captcha al volver al login
+    setTimeout(function(){
+      if(!captchaRef.current||!window.hcaptcha) return;
+      captchaRef.current.innerHTML="";
+      try{
+        window.hcaptcha.render(captchaRef.current,{
+          sitekey:"c8541066-98c2-474a-8d3e-0f0c4748f016",
+          theme:"dark",
+          callback:function(token){setCaptchaToken(token);},
+          "expired-callback":function(){setCaptchaToken(null);},
+          "error-callback":function(){setCaptchaToken(null);}
+        });
+      }catch(e){}
+    },100);
+  }});
   async function login(e){
     e.preventDefault();setLoading(true);setErr("");
     try{
@@ -1733,11 +1744,6 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
       setNombre("");setSerie("");setCat("");setEstadoB("");setCiudadB("");setSitio("");
     }catch(ex){
       setErr(ex.message);
-      // Reset captcha para que el usuario pueda intentar de nuevo
-      setCaptchaToken(null);
-      if(window.hcaptcha&&captchaRef.current){
-        try{window.hcaptcha.reset(captchaRef.current);}catch{}
-      }
     }
     finally{setLoading(false);}
   }

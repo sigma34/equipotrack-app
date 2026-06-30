@@ -713,6 +713,218 @@ function RegistroNombre({sessionTemp,token,onComplete}){
 }
 
 // - NUEVA CONTRASEÑA (desde link de email) -
+// - ACTIVAR CUENTA (primera vez, desde invitación) -
+function ActivarCuenta({token}){
+  const [pass,setPass]=useState("");
+  const [pass2,setPass2]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [listo,setListo]=useState(false);
+  const [err,setErr]=useState("");
+  const [realToken,setRealToken]=useState(null);
+  const [nombreUsuario,setNombreUsuario]=useState("");
+  const [emailUsuario,setEmailUsuario]=useState("");
+  const [verificando,setVerificando]=useState(true);
+
+  // Lumi style — antes de cualquier return condicional
+  React.useEffect(function(){
+    if(document.getElementById("lumi-style")) return;
+    var s=document.createElement("style");
+    s.id="lumi-style";
+    s.textContent="@keyframes lumiPulse{0%,100%{box-shadow:0 0 0 0 #00e87a33}50%{box-shadow:0 0 0 5px #00e87a00}}";
+    document.head.appendChild(s);
+  },[]);
+
+  // Resolver el token real y obtener datos del usuario (nombre, email)
+  React.useEffect(function(){
+    if(!token){setVerificando(false);return;}
+
+    function leerUsuarioDesdeJWT(jwt){
+      try{
+        var parts=jwt.split(".");
+        var payload=JSON.parse(atob(parts[1].replace(/-/g,"+").replace(/_/g,"/")));
+        setNombreUsuario((payload.user_metadata&&payload.user_metadata.nombre)||"");
+        setEmailUsuario(payload.email||"");
+      }catch(e){}
+    }
+
+    if(token==="pending"){
+      // Intentar extraer del hash actual
+      var h=window.location.hash;
+      var m=h.match(/access_token=([^&]+)/);
+      if(m){
+        var t=decodeURIComponent(m[1]);
+        setRealToken(t);
+        leerUsuarioDesdeJWT(t);
+        setVerificando(false);
+      }else{
+        setErr("Link inválido. Solicita una nueva invitación al administrador.");
+        setVerificando(false);
+      }
+    } else if(token.startsWith("hash:")){
+      var tokenHash=token.replace("hash:","");
+      fetch(SUPA_URL+"/auth/v1/verify",{
+        method:"POST",
+        headers:{"apikey":SUPA_KEY,"Content-Type":"application/json"},
+        body:JSON.stringify({token_hash:tokenHash,type:"invite"}),
+      }).then(function(r){return r.json();}).then(function(d){
+        if(d.access_token){
+          setRealToken(d.access_token);
+          leerUsuarioDesdeJWT(d.access_token);
+        }else{
+          setErr("Link inválido o expirado. Solicita una nueva invitación.");
+        }
+        setVerificando(false);
+      }).catch(function(){
+        setErr("Error verificando el link. Solicita una nueva invitación.");
+        setVerificando(false);
+      });
+    } else {
+      setRealToken(token);
+      leerUsuarioDesdeJWT(token);
+      setVerificando(false);
+    }
+  },[token]);
+
+  // Validación de contraseña segura
+  function validarPassword(p){
+    if(p.length<8) return "Mínimo 8 caracteres";
+    if(!/[A-Z]/.test(p)) return "Debe incluir al menos una mayúscula";
+    if(!/[a-z]/.test(p)) return "Debe incluir al menos una minúscula";
+    if(!/[0-9]/.test(p)) return "Debe incluir al menos un número";
+    return null;
+  }
+
+  var passErr=pass?validarPassword(pass):null;
+  var requisitos=[
+    {ok:pass.length>=8,label:"8+ caracteres"},
+    {ok:/[A-Z]/.test(pass),label:"1 mayúscula"},
+    {ok:/[a-z]/.test(pass),label:"1 minúscula"},
+    {ok:/[0-9]/.test(pass),label:"1 número"},
+  ];
+
+  async function activar(e){
+    e.preventDefault();
+    if(!realToken){setErr("Token no disponible. Solicita una nueva invitación.");return;}
+    var vErr=validarPassword(pass);
+    if(vErr){setErr(vErr);return;}
+    if(pass!==pass2){setErr("Las contraseñas no coinciden");return;}
+    setLoading(true);setErr("");
+    try{
+      const res=await fetch(SUPA_URL+"/auth/v1/user",{
+        method:"PUT",
+        headers:{
+          "apikey":SUPA_KEY,
+          "Content-Type":"application/json",
+          "Authorization":"Bearer "+realToken,
+        },
+        body:JSON.stringify({password:pass}),
+      });
+      if(!res.ok){const d=await res.json();throw new Error(d.error_description||d.msg||"Error");}
+      if(window.history&&window.history.replaceState){
+        window.history.replaceState(null,null," ");
+      }
+      setListo(true);
+    }catch(ex){
+      setErr(ex.message);
+    }
+    finally{setLoading(false);}
+  }
+
+  if(verificando) return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
+      justifyContent:"center",padding:"20px",fontFamily:"'Sora',sans-serif"}}>
+      <p style={{color:C.muted,fontSize:"14px"}}>Verificando invitación…</p>
+    </div>
+  );
+
+  if(listo) return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
+      justifyContent:"center",padding:"20px",fontFamily:"'Sora',sans-serif"}}>
+      <div style={{width:"100%",maxWidth:"360px",textAlign:"center"}}>
+        <div style={{fontSize:"64px",marginBottom:"16px"}}>✅</div>
+        <h2 style={{fontSize:"20px",fontWeight:"800",color:C.text,marginBottom:"10px"}}>Cuenta activada</h2>
+        <p style={{color:C.muted,fontSize:"13px",lineHeight:1.6,marginBottom:"20px"}}>
+          Tu contraseña fue creada correctamente. Ya puedes iniciar sesión en Lumo.
+        </p>
+        <button onClick={function(){window.location.href=window.location.pathname;}}
+          style={btnP(false)}>Ir al login</button>
+      </div>
+    </div>
+  );
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
+      justifyContent:"center",padding:"20px",fontFamily:"'Sora',sans-serif"}}>
+      <div style={{width:"100%",maxWidth:"360px"}}>
+        <div style={{textAlign:"center",marginBottom:"24px"}}>
+          <div style={{width:"64px",height:"64px",margin:"0 auto 14px",
+            background:"radial-gradient(circle at 38% 32%, #003322, #000d07)",
+            border:"1px solid #00e87a44",
+            borderRadius:"20px",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+            <svg width="48" height="48" viewBox="0 0 28 28" fill="none">
+              <defs>
+                <radialGradient id="acs" cx="38%" cy="32%" r="68%"><stop offset="0%" stopColor="#003322"/><stop offset="100%" stopColor="#000d07"/></radialGradient>
+                <radialGradient id="acd" cx="38%" cy="28%" r="65%"><stop offset="0%" stopColor="#00ff88"/><stop offset="55%" stopColor="#00e87a"/><stop offset="100%" stopColor="#00a854"/></radialGradient>
+              </defs>
+              <circle cx="14" cy="14" r="13" fill="url(#acs)"/>
+              <path d="M 14 4 C 14 4 22 11 22 16 C 22 21 18.4 24 14 24 C 9.6 24 6 21 6 16 C 6 11 14 4 14 4 Z" fill="url(#acd)"/>
+              <circle cx="11" cy="15.5" r="2.2" fill="#001a0d"/><circle cx="17" cy="15.5" r="2.2" fill="#001a0d"/>
+              <circle cx="12" cy="14" r="1" fill="white" opacity="0.9"/><circle cx="18" cy="14" r="1" fill="white" opacity="0.9"/>
+              <path d="M 10 19 Q 14 22 18 19" stroke="#001a0d" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
+              <line x1="14" y1="4" x2="14" y2="1.5" stroke="#00e87a" strokeWidth="1.5" strokeLinecap="round"/>
+              <circle cx="14" cy="1" r="1.5" fill="#00e87a"/>
+            </svg>
+          </div>
+          <h1 style={{fontSize:"22px",fontWeight:"800",margin:"0 0 4px",color:C.text}}>Bienvenido a Lumo</h1>
+          {nombreUsuario&&<p style={{color:C.green,fontSize:"15px",fontWeight:"700",marginBottom:"4px"}}>
+            {nombreUsuario}
+          </p>}
+          {emailUsuario&&<p style={{color:"#555",fontSize:"12px",marginBottom:"10px"}}>
+            {emailUsuario}
+          </p>}
+          <p style={{color:C.muted,fontSize:"13px",lineHeight:1.5}}>
+            Crea tu contraseña para activar tu cuenta.
+          </p>
+        </div>
+        <form onSubmit={activar} style={{display:"flex",flexDirection:"column",gap:"12px"}}>
+          <div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+              NUEVA CONTRASEÑA
+            </label>
+            <input type="password" value={pass} onChange={e=>setPass(e.target.value)}
+              placeholder="••••••••" style={inp} required/>
+          </div>
+          {pass&&<div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>
+            {requisitos.map(function(r){return(
+              <span key={r.label} style={{fontSize:"10px",padding:"3px 9px",borderRadius:"20px",
+                fontWeight:"700",background:r.ok?"#001a0d":"#1a0000",
+                color:r.ok?C.green:"#666",border:"1px solid "+(r.ok?C.green+"44":"transparent")}}>
+                {r.ok?"✓":"·"} {r.label}
+              </span>
+            );})}
+          </div>}
+          <div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+              CONFIRMAR CONTRASEÑA
+            </label>
+            <input type="password" value={pass2} onChange={e=>setPass2(e.target.value)}
+              placeholder="••••••••" style={inp} required/>
+            {pass2&&pass!==pass2&&<p style={{color:C.red,fontSize:"11px",marginTop:"5px"}}>
+              Las contraseñas no coinciden
+            </p>}
+          </div>
+          {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",
+            padding:"10px 14px",borderRadius:"9px",margin:0}}>⚠️ {err}</p>}
+          <button type="submit" disabled={loading||!!passErr||pass!==pass2||!pass}
+            style={btnP(loading||!!passErr||pass!==pass2||!pass)}>
+            {loading?"Activando…":"Activar mi cuenta"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function NuevaContrasena({token}){
   const [pass,setPass]=useState("");
   const [pass2,setPass2]=useState("");
@@ -2458,30 +2670,36 @@ function MapaModal({registros,equipos,onCerrar}){ // font heredado de App via So
 
 // - APP -
 export default function App(){
-  // Detectar token de recovery — soporta formato hash (#) y query string (?)
-  const [recoveryToken] = useState(function(){
+  // Detectar token de recovery/invite/signup — soporta formato hash (#) y query string (?)
+  const [authToken, authTokenType] = (function(){
     try{
-      // Formato 1: #access_token=XXX&type=recovery (formato clásico Supabase)
       var h = window.location.hash;
-      if(h.indexOf("type=recovery")!==-1){
-        var m = h.match(/access_token=([^&]+)/);
-        if(m) return decodeURIComponent(m[1]);
-      }
-      // Formato 2: ?token_hash=XXX&type=recovery (formato nuevo Supabase)
       var params = new URLSearchParams(window.location.search);
-      if(params.get("type")==="recovery"){
+
+      // Formato 1: #access_token=XXX&type=recovery|invite|signup (formato clásico)
+      var hashTypeMatch = h.match(/type=(recovery|invite|signup)/);
+      if(hashTypeMatch){
+        var tipo = hashTypeMatch[1];
+        var m = h.match(/access_token=([^&]+)/);
+        if(m) return [decodeURIComponent(m[1]), tipo];
+        return ["pending", tipo];
+      }
+
+      // Formato 2: ?token_hash=XXX&type=recovery|invite|signup (formato nuevo Supabase)
+      var qType = params.get("type");
+      if(qType==="recovery"||qType==="invite"||qType==="signup"){
         var tokenHash = params.get("token_hash");
-        if(tokenHash) return "hash:"+tokenHash; // prefijo para distinguir el tipo
+        if(tokenHash) return ["hash:"+tokenHash, qType];
         var accessToken = params.get("access_token");
-        if(accessToken) return accessToken;
+        if(accessToken) return [accessToken, qType];
+        return ["pending", qType];
       }
-      // Formato 3: #type=recovery sin access_token (Supabase PKCE flow)
-      if(h.indexOf("type=recovery")!==-1){
-        return "recovery_pending";
-      }
-      return null;
-    }catch(e){ return null; }
-  });
+
+      return [null, null];
+    }catch(e){ return [null, null]; }
+  })();
+  const [recoveryToken] = useState(authToken && authTokenType==="recovery" ? authToken : null);
+  const [inviteToken] = useState(authToken && (authTokenType==="invite"||authTokenType==="signup") ? authToken : null);
 
   // Detectar equipoId en URL (?equipo=EQ-001) para QR
   const [qrEquipoId] = useState(function(){
@@ -2711,6 +2929,7 @@ export default function App(){
   const disponibles=equiposFiltradosGer.length-enUso-enReparacion;
 
   // Si hay token de recovery, mostrar pantalla de nueva contraseña
+  if(inviteToken) return <ActivarCuenta token={inviteToken}/>;
   if(recoveryToken) return <NuevaContrasena token={recoveryToken}/>;
 
   if(!session)return <Login onLogin={handleLogin}/>;
@@ -3345,7 +3564,7 @@ export default function App(){
 
             <p style={{textAlign:"center",fontSize:"11px",color:"#333",
               marginTop:"20px",fontStyle:"italic",fontFamily:"'Sora',sans-serif"}}>
-              Cada activo en su lugar ✦ Lumo v0.27.0
+              Cada activo en su lugar ✦ Lumo v0.28.0
             </p>
           </div>
         </div>

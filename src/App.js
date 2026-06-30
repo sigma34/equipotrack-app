@@ -970,10 +970,27 @@ function NuevaContrasena({token}){
     document.head.appendChild(s);
   },[]);
 
+  // Validación de contraseña segura — misma regla que ActivarCuenta
+  function validarPassword(p){
+    if(p.length<8) return "Mínimo 8 caracteres";
+    if(!/[A-Z]/.test(p)) return "Debe incluir al menos una mayúscula";
+    if(!/[a-z]/.test(p)) return "Debe incluir al menos una minúscula";
+    if(!/[0-9]/.test(p)) return "Debe incluir al menos un número";
+    return null;
+  }
+  var passErr=pass?validarPassword(pass):null;
+  var requisitos=[
+    {ok:pass.length>=8,label:"8+ caracteres"},
+    {ok:/[A-Z]/.test(pass),label:"1 mayúscula"},
+    {ok:/[a-z]/.test(pass),label:"1 minúscula"},
+    {ok:/[0-9]/.test(pass),label:"1 número"},
+  ];
+
   async function guardar(e){
     e.preventDefault();
     if(!realToken){setErr("Token no disponible. Solicita un nuevo link.");return;}
-    if(pass.length<6){setErr("Mínimo 6 caracteres");return;}
+    var vErr=validarPassword(pass);
+    if(vErr){setErr(vErr);return;}
     if(pass!==pass2){setErr("Las contraseñas no coinciden");return;}
     setLoading(true);setErr("");
     try{
@@ -1035,18 +1052,30 @@ function NuevaContrasena({token}){
             <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",
               display:"block",marginBottom:"6px"}}>NUEVA CONTRASEÑA</label>
             <input type="password" value={pass} onChange={e=>setPass(e.target.value)}
-              placeholder="Mínimo 6 caracteres" style={inp} required/>
+              placeholder="••••••••" style={inp} required/>
           </div>
+          {pass&&<div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>
+            {requisitos.map(function(r){return(
+              <span key={r.label} style={{fontSize:"10px",padding:"3px 9px",borderRadius:"20px",
+                fontWeight:"700",background:r.ok?"#001a0d":"#1a0000",
+                color:r.ok?C.green:"#666",border:"1px solid "+(r.ok?C.green+"44":"transparent")}}>
+                {r.ok?"✓":"·"} {r.label}
+              </span>
+            );})}
+          </div>}
           <div>
             <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",
               display:"block",marginBottom:"6px"}}>CONFIRMAR CONTRASEÑA</label>
             <input type="password" value={pass2} onChange={e=>setPass2(e.target.value)}
               placeholder="Repite la contraseña" style={inp} required/>
+            {pass2&&pass!==pass2&&<p style={{color:C.red,fontSize:"11px",marginTop:"5px"}}>
+              Las contraseñas no coinciden
+            </p>}
           </div>
           {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",
             padding:"10px 14px",borderRadius:"9px",margin:0}}>⚠️ {err}</p>}
-          <button type="submit" disabled={loading||!pass||!pass2}
-            style={btnP(loading||!pass||!pass2)}>
+          <button type="submit" disabled={loading||!!passErr||pass!==pass2||!pass}
+            style={btnP(loading||!!passErr||pass!==pass2||!pass)}>
             {loading?"Guardando…":"Guardar contraseña"}
           </button>
         </form>

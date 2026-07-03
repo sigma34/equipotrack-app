@@ -436,7 +436,7 @@ function QRLabel({equipo,onCerrar}){
     function genQR(){
       if(!qrRef.current||!window.QRCode) return;
       while(qrRef.current.firstChild){qrRef.current.removeChild(qrRef.current.firstChild);}
-      new window.QRCode(qrRef.current,{text:url,width:140,height:140,
+      new window.QRCode(qrRef.current,{text:url,width:96,height:96,
         colorDark:"#111",colorLight:"#fff",correctLevel:window.QRCode.CorrectLevel.H});
     }
     if(window.QRCode){genQR();}
@@ -448,149 +448,161 @@ function QRLabel({equipo,onCerrar}){
   },[]);
 
   function imprimir(){
-    // Extraer QR como imagen PNG desde canvas (sin innerHTML)
     var qrCanvas=qrRef.current?qrRef.current.querySelector("canvas"):null;
     var qrDataUrl=qrCanvas?qrCanvas.toDataURL("image/png"):"";
 
-    // Construir HTML de impresión con createElement (sin document.write)
     var w=window.open("","_blank");
     if(!w)return;
     var doc=w.document;
     doc.open();
     var style=doc.createElement("style");
+
+    // DYMO S-11288: 1 1/8" x 3 1/2" = 28.6mm x 88.9mm
+    // Orientación vertical — ancho fijo 28mm, alto 89mm
     style.textContent=[
-      "body{margin:0;padding:0;font-family:'Sora',sans-serif;background:#07070f}",
-      ".et{border:2px solid #111;border-radius:8px;overflow:hidden;max-width:280px;margin:0 auto;}",
-      ".eh{background:#111;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;}",
-      ".logo{display:flex;align-items:center;gap:6px;}",
-      ".icon{width:22px;height:22px;background:#00e87a;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;}",
-      ".brand{color:#fff;font-size:13px;font-weight:800;}",
-      ".eid{color:#00e87a;font-size:12px;font-weight:700;font-family:monospace;}",
-      ".eb{padding:14px;display:flex;gap:14px;align-items:flex-start;}",
-      ".qrimg{width:140px;height:140px;flex-shrink:0;}",
-      ".name{font-size:14px;font-weight:800;color:#111;margin-bottom:4px;}",
-      ".serie{font-size:11px;color:#333;font-family:monospace;font-weight:600;}",
-      ".cat{font-size:10px;color:#555;background:#f5f5f5;padding:2px 8px;border-radius:20px;display:inline-block;margin-top:4px;}",
-      ".ef{background:#f8f8f8;border-top:1px solid #eee;padding:7px 12px;}",
-      ".scan{font-size:10px;color:#444;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;}",
-      "@media print{body{padding:0;}}"
+      "@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;700;800&display=swap');",
+      "*{box-sizing:border-box;margin:0;padding:0;}",
+      "html,body{width:28.6mm;height:88.9mm;background:#fff;font-family:'Sora',Arial,sans-serif;}",
+      "@page{size:28.6mm 88.9mm;margin:0;}",
+      ".et{width:28.6mm;height:88.9mm;display:flex;flex-direction:column;border:1.5px solid #111;overflow:hidden;}",
+      // Header: Lumo + ID
+      ".eh{background:#111;padding:3px 4px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}",
+      ".logo{display:flex;align-items:center;gap:3px;}",
+      ".brand{color:#fff;font-size:7px;font-weight:800;letter-spacing:0.05em;}",
+      ".eid{color:#00e87a;font-size:6px;font-weight:700;font-family:monospace;}",
+      // QR centrado
+      ".qrwrap{display:flex;justify-content:center;align-items:center;padding:4px 2px 2px;flex-shrink:0;}",
+      ".qrimg{width:88px;height:88px;display:block;}",
+      // Info: nombre + serie + categoria
+      ".info{padding:2px 4px;flex:1;display:flex;flex-direction:column;gap:1px;}",
+      ".name{font-size:6.5px;font-weight:800;color:#111;line-height:1.2;}",
+      ".serie{font-size:5.5px;color:#333;font-family:monospace;font-weight:600;}",
+      ".cat{font-size:5px;color:#555;background:#f5f5f5;padding:1px 4px;border-radius:10px;display:inline-block;}",
+      // Footer: escanea
+      ".ef{background:#f0f0f0;border-top:1px solid #ddd;padding:3px 4px;flex-shrink:0;text-align:center;}",
+      ".scan{font-size:5.5px;color:#444;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;}",
+      "@media print{html,body{width:28.6mm;height:88.9mm;}}"
     ].join("");
 
     var html=doc.createElement("html");
     var head=doc.createElement("head");
-    var meta=doc.createElement("meta");
-    meta.setAttribute("charset","UTF-8");
-    head.appendChild(meta);
-    head.appendChild(style);
+    var meta=doc.createElement("meta"); meta.setAttribute("charset","UTF-8");
+    var metaV=doc.createElement("meta"); metaV.setAttribute("name","viewport"); metaV.setAttribute("content","width=device-width");
+    head.appendChild(meta); head.appendChild(metaV); head.appendChild(style);
     html.appendChild(head);
 
     var body=doc.createElement("body");
-
-    // Construir etiqueta con textContent (seguro, sin XSS)
     var et=doc.createElement("div"); et.className="et";
+
+    // Header
     var eh=doc.createElement("div"); eh.className="eh";
     var logo=doc.createElement("div"); logo.className="logo";
-    var icon=doc.createElement("div"); icon.className="icon";
-    icon.style.cssText="width:24px;height:24px;background:radial-gradient(circle at 38% 32%, #003322, #000d07);border:1px solid #00e87a33;border-radius:6px;display:flex;align-items:center;justify-content:center;overflow:hidden;";
-    icon.innerHTML='<svg width="20" height="20" viewBox="0 0 28 28" fill="none"><defs><radialGradient id="ps" cx="38%" cy="32%" r="68%"><stop offset="0%" stop-color="#003322"/><stop offset="100%" stop-color="#000d07"/></radialGradient><radialGradient id="pd" cx="38%" cy="28%" r="65%"><stop offset="0%" stop-color="#00ff88"/><stop offset="55%" stop-color="#00e87a"/><stop offset="100%" stop-color="#00a854"/></radialGradient></defs><circle cx="14" cy="14" r="13" fill="url(#ps)"/><path d="M 14 4 C 14 4 22 11 22 16 C 22 21 18.4 24 14 24 C 9.6 24 6 21 6 16 C 6 11 14 4 14 4 Z" fill="url(#pd)"/><circle cx="11" cy="15.5" r="2" fill="#001a0d"/><circle cx="17" cy="15.5" r="2" fill="#001a0d"/><circle cx="12" cy="14" r=".9" fill="white" opacity=".9"/><circle cx="18" cy="14" r=".9" fill="white" opacity=".9"/><line x1="14" y1="4" x2="14" y2="1.5" stroke="#00e87a" stroke-width="1.5" stroke-linecap="round"/><circle cx="14" cy="1" r="1.5" fill="#00e87a"/></svg>';
+    var icon=doc.createElement("div");
+    icon.style.cssText="width:14px;height:14px;background:radial-gradient(circle at 38% 32%,#003322,#000d07);border-radius:3px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;";
+    icon.innerHTML='<svg width="11" height="11" viewBox="0 0 28 28" fill="none"><defs><radialGradient id="ps" cx="38%" cy="32%" r="68%"><stop offset="0%" stop-color="#003322"/><stop offset="100%" stop-color="#000d07"/></radialGradient><radialGradient id="pd" cx="38%" cy="28%" r="65%"><stop offset="0%" stop-color="#00ff88"/><stop offset="55%" stop-color="#00e87a"/><stop offset="100%" stop-color="#00a854"/></radialGradient></defs><circle cx="14" cy="14" r="13" fill="url(#ps)"/><path d="M 14 4 C 14 4 22 11 22 16 C 22 21 18.4 24 14 24 C 9.6 24 6 21 6 16 C 6 11 14 4 14 4 Z" fill="url(#pd)"/><circle cx="11" cy="15.5" r="2" fill="#001a0d"/><circle cx="17" cy="15.5" r="2" fill="#001a0d"/><circle cx="12" cy="14" r=".9" fill="white" opacity=".9"/><circle cx="18" cy="14" r=".9" fill="white" opacity=".9"/><line x1="14" y1="4" x2="14" y2="1.5" stroke="#00e87a" stroke-width="1.5" stroke-linecap="round"/><circle cx="14" cy="1" r="1.5" fill="#00e87a"/></svg>';
     var brand=doc.createElement("span"); brand.className="brand"; brand.textContent="Lumo";
     logo.appendChild(icon); logo.appendChild(brand);
     var eid=doc.createElement("span"); eid.className="eid"; eid.textContent=equipo.id;
     eh.appendChild(logo); eh.appendChild(eid);
 
-    var eb=doc.createElement("div"); eb.className="eb";
-    var qrDiv=doc.createElement("div");
+    // QR
+    var qrwrap=doc.createElement("div"); qrwrap.className="qrwrap";
     if(qrDataUrl){
       var img=doc.createElement("img");
       img.className="qrimg"; img.src=qrDataUrl; img.alt="QR";
-      qrDiv.appendChild(img);
+      qrwrap.appendChild(img);
     }
-    var info=doc.createElement("div");
+
+    // Info
+    var info=doc.createElement("div"); info.className="info";
     var name=doc.createElement("div"); name.className="name"; name.textContent=equipo.nombre;
     var serie=doc.createElement("div"); serie.className="serie"; serie.textContent="S/N: "+equipo.serie;
     var cat=doc.createElement("div"); cat.className="cat"; cat.textContent=equipo.categoria;
     info.appendChild(name); info.appendChild(serie); info.appendChild(cat);
-    eb.appendChild(qrDiv); eb.appendChild(info);
 
+    // Footer
     var ef=doc.createElement("div"); ef.className="ef";
     var scan=doc.createElement("span"); scan.className="scan"; scan.textContent="📱 Escanea para registrar";
     ef.appendChild(scan);
 
-    et.appendChild(eh); et.appendChild(eb); et.appendChild(ef);
+    et.appendChild(eh); et.appendChild(qrwrap); et.appendChild(info); et.appendChild(ef);
     body.appendChild(et);
     html.appendChild(body);
     doc.appendChild(html);
     doc.close();
-
-    setTimeout(function(){w.print();},600);
+    setTimeout(function(){w.print();},800);
   }
 
   return(
     <div style={{position:"fixed",inset:0,zIndex:20000,background:"rgba(0,0,0,0.97)",
       display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
       <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"20px",
-        padding:"24px",width:"100%",maxWidth:"380px"}}>
+        padding:"24px",width:"100%",maxWidth:"340px"}}>
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:"18px"}}>
           <div>
             <p style={{color:C.green,fontSize:"11px",letterSpacing:"0.15em",textTransform:"uppercase",margin:"0 0 3px"}}>
-              ETIQUETA QR
+              ETIQUETA QR — DYMO 1-1/8" x 3-1/2"
             </p>
             <h2 style={{color:C.text,margin:0,fontSize:"16px",fontWeight:"800"}}>{equipo.nombre}</h2>
           </div>
           <button onClick={onCerrar} style={{background:"none",border:"none",color:C.muted,fontSize:"22px",cursor:"pointer"}}>✕</button>
         </div>
 
-        {/* Preview etiqueta */}
-        <div style={{border:`2px solid ${C.border}`,borderRadius:"12px",overflow:"hidden",marginBottom:"16px"}}>
-          <div style={{background:"#111",padding:"8px 12px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
-              <div style={{width:"24px",height:"24px",
-                background:"radial-gradient(circle at 38% 32%, #003322, #000d07)",
-                border:"1px solid #00e87a33",borderRadius:"6px",
-                display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
-                <svg width="20" height="20" viewBox="0 0 28 28" fill="none">
-                  <defs>
-                    <radialGradient id="qls" cx="38%" cy="32%" r="68%"><stop offset="0%" stop-color="#003322"/><stop offset="100%" stop-color="#000d07"/></radialGradient>
-                    <radialGradient id="qld" cx="38%" cy="28%" r="65%"><stop offset="0%" stop-color="#00ff88"/><stop offset="55%" stop-color="#00e87a"/><stop offset="100%" stop-color="#00a854"/></radialGradient>
-                  </defs>
-                  <circle cx="14" cy="14" r="13" fill="url(#qls)"/>
-                  <path d="M 14 4 C 14 4 22 11 22 16 C 22 21 18.4 24 14 24 C 9.6 24 6 21 6 16 C 6 11 14 4 14 4 Z" fill="url(#qld)"/>
-                  <circle cx="11" cy="15.5" r="2" fill="#001a0d"/>
-                  <circle cx="17" cy="15.5" r="2" fill="#001a0d"/>
-                  <circle cx="12" cy="14" r=".9" fill="white" opacity=".9"/>
-                  <circle cx="18" cy="14" r=".9" fill="white" opacity=".9"/>
-                  <line x1="14" y1="4" x2="14" y2="1.5" stroke="#00e87a" stroke-width="1.5" stroke-linecap="round"/>
-                  <circle cx="14" cy="1" r="1.5" fill="#00e87a"/>
-                </svg>
+        {/* Preview — proporción real 28mm x 89mm escalada a pantalla */}
+        <div style={{display:"flex",justifyContent:"center",marginBottom:"16px"}}>
+          <div style={{border:"2px solid #333",borderRadius:"6px",overflow:"hidden",
+            width:"120px", background:"#fff", display:"flex",flexDirection:"column"}}>
+            {/* Header */}
+            <div style={{background:"#111",padding:"3px 5px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div style={{display:"flex",alignItems:"center",gap:"3px"}}>
+                <div style={{width:"14px",height:"14px",
+                  background:"radial-gradient(circle at 38% 32%, #003322, #000d07)",
+                  borderRadius:"3px",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+                  <svg width="11" height="11" viewBox="0 0 28 28" fill="none">
+                    <defs>
+                      <radialGradient id="pqs" cx="38%" cy="32%" r="68%"><stop offset="0%" stopColor="#003322"/><stop offset="100%" stopColor="#000d07"/></radialGradient>
+                      <radialGradient id="pqd" cx="38%" cy="28%" r="65%"><stop offset="0%" stopColor="#00ff88"/><stop offset="55%" stopColor="#00e87a"/><stop offset="100%" stopColor="#00a854"/></radialGradient>
+                    </defs>
+                    <circle cx="14" cy="14" r="13" fill="url(#pqs)"/>
+                    <path d="M 14 4 C 14 4 22 11 22 16 C 22 21 18.4 24 14 24 C 9.6 24 6 21 6 16 C 6 11 14 4 14 4 Z" fill="url(#pqd)"/>
+                    <circle cx="11" cy="15.5" r="2" fill="#001a0d"/><circle cx="17" cy="15.5" r="2" fill="#001a0d"/>
+                    <circle cx="12" cy="14" r=".9" fill="white" opacity=".9"/><circle cx="18" cy="14" r=".9" fill="white" opacity=".9"/>
+                    <line x1="14" y1="4" x2="14" y2="1.5" stroke="#00e87a" strokeWidth="1.5" strokeLinecap="round"/>
+                    <circle cx="14" cy="1" r="1.5" fill="#00e87a"/>
+                  </svg>
+                </div>
+                <span style={{color:"#fff",fontSize:"7px",fontWeight:"800"}}>Lumo</span>
               </div>
-              <span style={{color:"#fff",fontSize:"12px",fontWeight:"800"}}>Lumo</span>
+              <span style={{color:C.green,fontSize:"6px",fontWeight:"700",fontFamily:"monospace"}}>{equipo.id}</span>
             </div>
-            <span style={{fontFamily:"'JetBrains Mono',monospace",color:C.green,fontSize:"11px",fontWeight:"700"}}>
-              {equipo.id}
-            </span>
-          </div>
-          <div style={{padding:"14px",display:"flex",gap:"12px",alignItems:"flex-start",background:"#fff"}}>
-            <div ref={qrRef} style={{width:"140px",height:"140px",flexShrink:0}}/>
-            <div>
-              <p style={{fontWeight:"800",fontSize:"13px",color:"#111",lineHeight:1.3,marginBottom:"4px"}}>{equipo.nombre}</p>
-              <p style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"11px",color:"#444",fontWeight:"600"}}>S/N: {equipo.serie}</p>
-              <span style={{fontSize:"10px",color:"#555",background:"#f5f5f5",padding:"2px 8px",
-                borderRadius:"20px",display:"inline-block",marginTop:"4px"}}>{equipo.categoria}</span>
+            {/* QR centrado */}
+            <div style={{display:"flex",justifyContent:"center",padding:"4px 2px 2px"}}>
+              <div ref={qrRef} style={{width:"96px",height:"96px",flexShrink:0}}/>
             </div>
-          </div>
-          <div style={{background:"#f8f8f8",borderTop:"1px solid #eee",padding:"6px 12px",
-            display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <span style={{fontSize:"9px",color:"#999",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:"600"}}>
-              📱 Escanea para registrar
-            </span>
+            {/* Info */}
+            <div style={{padding:"2px 5px",flex:1}}>
+              <p style={{fontWeight:"800",fontSize:"6.5px",color:"#111",lineHeight:1.2,marginBottom:"1px"}}>{equipo.nombre}</p>
+              <p style={{fontFamily:"monospace",fontSize:"5.5px",color:"#333",fontWeight:"600"}}>S/N: {equipo.serie}</p>
+              <span style={{fontSize:"5px",color:"#555",background:"#f5f5f5",padding:"1px 3px",
+                borderRadius:"8px",display:"inline-block",marginTop:"1px"}}>{equipo.categoria}</span>
+            </div>
+            {/* Footer */}
+            <div style={{background:"#f0f0f0",borderTop:"1px solid #ddd",padding:"3px 4px",textAlign:"center"}}>
+              <span style={{fontSize:"5.5px",color:"#444",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:"700"}}>
+                📱 Escanea para registrar
+              </span>
+            </div>
           </div>
         </div>
-
+        <p style={{color:C.muted,fontSize:"11px",textAlign:"center",marginBottom:"16px"}}>
+          Proporción real: 1-1/8" x 3-1/2" (DYMO S-11288)
+        </p>
         <button onClick={imprimir} style={{...btnP(false)}}>🖨️ Imprimir etiqueta</button>
       </div>
     </div>
   );
 }
+
 
 // - PANTALLA REGISTRO DE NOMBRE -
 function RegistroNombre({sessionTemp,token,onComplete}){
@@ -3593,7 +3605,7 @@ export default function App(){
 
             <p style={{textAlign:"center",fontSize:"11px",color:"#333",
               marginTop:"20px",fontStyle:"italic",fontFamily:"'Sora',sans-serif"}}>
-              Cada activo en su lugar ✦ Lumo v0.28.0
+              Cada activo en su lugar ✦ Lumo v0.27.0
             </p>
           </div>
         </div>

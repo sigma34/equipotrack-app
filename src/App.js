@@ -2028,16 +2028,34 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
   function descargarPlantilla(){
     var headers=["nombre","serie","categoria","gerencia","estado_base","ciudad_base","sitio_base","notas","admin_email"];
     var ejemplo=[
-      "Medidor de ancho de banda EXFO EX10","1297543","Óptico","Centro-Sur",
-      "Ciudad de México","Benito Juárez","La Paz Piso 7","Cable SC-SC incluido","admin@axtel.com.mx"
+      "Medidor de ancho de banda EXFO EX10",
+      "1297543",
+      "Optico",
+      "Centro-Sur",
+      "Ciudad de Mexico",
+      "Benito Juarez",
+      "La Paz Piso 7",
+      "Cable SC-SC incluido",
+      "admin@axtel.com.mx"
     ];
-    var csv=[headers.join(","),ejemplo.map(function(v){return '"'+v+'"';}).join(",")].join("\n");
-    var blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+    // Construir CSV línea por línea con CRLF para compatibilidad con Excel en Windows
+    var linea1=headers.join(",");
+    var linea2=ejemplo.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(",");
+    var csv=linea1+"\r\n"+linea2+"\r\n";
+    // Usar Uint8Array con BOM para forzar UTF-8 en Excel
+    var BOM='\uFEFF';
+    var blob=new Blob([BOM+csv],{type:"text/csv;charset=utf-8;"});
     var url=URL.createObjectURL(blob);
-    var a=document.createElement("a"); a.href=url;
+    var a=document.createElement("a");
+    a.style.display="none";
+    a.href=url;
     a.download="lumo_plantilla_equipos.csv";
-    document.body.appendChild(a); a.click();
-    document.body.removeChild(a); URL.revokeObjectURL(url);
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    },100);
   }
 
   function parsearCSV(texto){

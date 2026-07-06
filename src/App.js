@@ -1839,7 +1839,12 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
 
   // Lista de equipos
   const [listaEqs,setListaEqs]=useState([]),[loadEqs,setLoadEqs]=useState(false);
-  const [subTab,setSubTab]=useState("lista"); // lista | nuevo
+  const [subTab,setSubTab]=useState("lista"); // lista | nuevo | importar
+  // Estados para importación CSV
+  const [csvRows,setCsvRows]=useState([]); // filas parseadas del CSV
+  const [csvError,setCsvError]=useState("");
+  const [csvImporting,setCsvImporting]=useState(false);
+  const [csvResult,setCsvResult]=useState(null); // {ok, errores, total}
   const [editEq,setEditEq]=useState(null); // equipo en edición
 
   useEffect(()=>{
@@ -2019,6 +2024,121 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
     }catch(ex){alert("Error: "+ex.message);}
   }
 
+  // ── IMPORTACIÓN CSV ──────────────────────────────
+  function descargarPlantilla(){
+    var headers=["nombre","serie","categoria","gerencia","estado_base","ciudad_base","sitio_base","notas","admin_email"];
+    var ejemplo=[
+      "Medidor de ancho de banda EXFO EX10","1297543","Óptico","Centro-Sur",
+      "Ciudad de México","Benito Juárez","La Paz Piso 7","Cable SC-SC incluido","admin@axtel.com.mx"
+    ];
+    var csv=[headers.join(","),ejemplo.map(function(v){return '"'+v+'"';}).join(",")].join("\n");
+    var blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement("a"); a.href=url;
+    a.download="lumo_plantilla_equipos.csv";
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+
+  function parsearCSV(texto){
+    // Parsear CSV con soporte de campos entre comillas
+    function parseLine(line){
+      var result=[],cur="",inQ=false;
+      for(var i=0;i<line.length;i++){
+        var c=line[i];
+        if(c==='"'){
+          if(inQ&&line[i+1]==='"'){cur+='"';i++;}
+          else{inQ=!inQ;}
+        } else if(c===','&&!inQ){result.push(cur.trim());cur="";}
+        else{cur+=c;}
+      }
+      result.push(cur.trim());
+      return result;
+    }
+    var lineas=texto.replace(/\r\n/g,"\n").replace(/\r/g,"\n").split("\n").filter(function(l){return l.trim();});
+    if(lineas.length<2) return {error:"El archivo está vacío o no tiene datos"};
+    var headers=parseLine(lineas[0]).map(function(h){return h.toLowerCase().replace(/\s+/g,"_");});
+    var requeridos=["nombre","serie","categoria","gerencia","estado_base","ciudad_base"];
+    for(var i=0;i<requeridos.length;i++){
+      if(headers.indexOf(requeridos[i])===-1) return {error:"Falta la columna: "+requeridos[i]};
+    }
+    var rows=[];
+    for(var r=1;r<lineas.length;r++){
+      var vals=parseLine(lineas[r]);
+      var row={};
+      headers.forEach(function(h,i){row[h]=vals[i]||"";});
+      // Validaciones
+      var errs=[];
+      if(!row.nombre.trim()) errs.push("nombre vacío");
+      if(!row.serie.trim()) errs.push("serie vacío");
+      if(!row.categoria.trim()) errs.push("categoría vacía");
+      if(!row.gerencia.trim()||!["Centro-Sur","Norte-Occidente"].includes(row.gerencia.trim()))
+        errs.push("gerencia inválida (use Centro-Sur o Norte-Occidente)");
+      if(!row.estado_base.trim()) errs.push("estado_base vacío");
+      if(!row.ciudad_base.trim()) errs.push("ciudad_base vacío");
+      rows.push({...row,_fila:r,_errores:errs,_catNueva:false});
+    }
+    return {rows};
+  }
+
+  function onCSVFile(e){
+    setCsvError(""); setCsvRows([]); setCsvResult(null);
+    var file=e.target.files[0];
+    if(!file) return;
+    if(!file.name.endsWith(".csv")){setCsvError("Solo se aceptan archivos .csv");return;}
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      var texto=ev.target.result;
+      var resultado=parsearCSV(texto);
+      if(resultado.error){setCsvError(resultado.error);return;}
+      // Marcar categorías nuevas
+      var catsExistentes=cats.map(function(c){return c.nombre.toLowerCase();});
+      resultado.rows.forEach(function(row){
+        if(row.categoria&&!catsExistentes.includes(row.categoria.trim().toLowerCase())){
+          row._catNueva=true;
+        }
+      });
+      setCsvRows(resultado.rows);
+    };
+    reader.readAsText(file,"UTF-8");
+    e.target.value="";
+  }
+
+  async function importarCSV(){
+    var validas=csvRows.filter(function(r){return r._errores.length===0;});
+    if(validas.length===0){setCsvError("No hay filas válidas para importar");return;}
+    setCsvImporting(true); setCsvResult(null);
+    var ok=0,errores=0,catsCreadads=[];
+    for(var i=0;i<validas.length;i++){
+      var row=validas[i];
+      try{
+        // Crear categoría si es nueva
+        if(row._catNueva&&!catsCreadads.includes(row.categoria.trim().toLowerCase())){
+          await supa("categorias",{token,method:"POST",
+            body:{nombre:row.categoria.trim()}});
+          catsCreadads.push(row.categoria.trim().toLowerCase());
+        }
+        // Crear equipo via RPC para que asigne ID automático
+        await supa("equipos",{token,method:"POST",body:{
+          nombre:sanitize(row.nombre.trim()),
+          serie:sanitize(row.serie.trim()),
+          categoria:sanitize(row.categoria.trim()),
+          gerencia:row.gerencia.trim(),
+          estado_base:sanitize(row.estado_base.trim()),
+          ciudad_base:sanitize(row.ciudad_base.trim()),
+          sitio_base:sanitize(row.sitio_base||""),
+          notas:sanitize(row.notas||""),
+          admin_email:row.admin_email||"",
+          activo:true,estatus:"activo"
+        }});
+        ok++;
+      }catch(ex){errores++;console.error("Error importando fila",row._fila,":",ex.message);}
+    }
+    setCsvImporting(false);
+    setCsvResult({ok,errores,total:validas.length});
+    if(ok>0){cargarEquipos();setCsvRows([]);}
+  }
+
   async function crearEquipo(){
     if(!nombre||!serie||!cat||!estadoB||!ciudadB||!sitio){setErr("Todos los campos son requeridos");return;}
     setLoading(true);setErr("");
@@ -2076,7 +2196,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
         {/* Tab: Equipos  sub-tabs */}
         {tab==="equipos"&&<div>
           <div style={{display:"flex",gap:"6px",marginBottom:"14px"}}>
-            {[{k:"lista",l:"📋 Lista"},{k:"nuevo",l:"➕ Nuevo"}].map(t=>(
+            {[{k:"lista",l:"📋 Lista"},{k:"nuevo",l:"➕ Nuevo"},{k:"importar",l:"📥 CSV"}].map(t=>(
               <button key={t.k} onClick={()=>setSubTab(t.k)}
                 style={{flex:1,padding:"9px",
                   background:subTab===t.k?C.green:"transparent",
@@ -2176,7 +2296,153 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
             </div>
           )}
 
-          {/* Sub-tab: Nuevo equipo */}
+          {/* Sub-tab: Importar CSV */}
+          {subTab==="importar"&&<div style={{display:"flex",flexDirection:"column",gap:"14px"}}>
+
+            {/* Instrucciones y plantilla */}
+            <div style={{background:"#0a0a18",border:"1px solid "+C.border,borderRadius:"12px",padding:"16px"}}>
+              <p style={{fontSize:"12px",fontWeight:"700",color:C.green,
+                letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"8px"}}>
+                📥 Carga masiva de equipos
+              </p>
+              <p style={{fontSize:"12px",color:"#888",lineHeight:1.6,marginBottom:"12px"}}>
+                Descarga la plantilla, llénala en Excel y sube el archivo CSV.
+                Las categorías nuevas se crean automáticamente.
+                Columnas requeridas: nombre, serie, categoria, gerencia, estado_base, ciudad_base.
+              </p>
+              <button onClick={descargarPlantilla}
+                style={{width:"100%",padding:"10px",background:"transparent",
+                  border:"1px solid "+C.blue+"66",borderRadius:"10px",
+                  color:C.blue,fontSize:"12px",fontWeight:"700",
+                  cursor:"pointer",fontFamily:"inherit"}}>
+                ⬇️ Descargar plantilla CSV
+              </button>
+            </div>
+
+            {/* Upload */}
+            <div style={{background:"#0a0a18",border:"1px dashed "+C.border,borderRadius:"12px",padding:"20px",textAlign:"center"}}>
+              <p style={{fontSize:"28px",marginBottom:"8px"}}>📄</p>
+              <p style={{fontSize:"13px",color:"#888",marginBottom:"12px"}}>
+                Selecciona el archivo CSV con tus equipos
+              </p>
+              <label style={{display:"inline-block",padding:"10px 20px",
+                background:C.green,borderRadius:"10px",color:"#001a0d",
+                fontSize:"13px",fontWeight:"700",cursor:"pointer"}}>
+                Seleccionar archivo
+                <input type="file" accept=".csv" onChange={onCSVFile}
+                  style={{display:"none"}}/>
+              </label>
+            </div>
+
+            {csvError&&<div style={{background:"#1a0000",border:"1px solid "+C.red+"44",
+              borderRadius:"10px",padding:"12px 14px",color:C.red,fontSize:"12px"}}>
+              ⚠️ {csvError}
+            </div>}
+
+            {/* Preview de filas */}
+            {csvRows.length>0&&<div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+                <p style={{fontSize:"12px",fontWeight:"700",color:C.text}}>
+                  {csvRows.length} equipos detectados
+                </p>
+                <div style={{display:"flex",gap:"8px",fontSize:"11px"}}>
+                  <span style={{color:C.green}}>
+                    ✓ {csvRows.filter(function(r){return r._errores.length===0;}).length} válidos
+                  </span>
+                  {csvRows.filter(function(r){return r._catNueva;}).length>0&&
+                    <span style={{color:C.orange}}>
+                      ★ {csvRows.filter(function(r){return r._catNueva&&r._errores.length===0;}).length} cat. nuevas
+                    </span>}
+                  {csvRows.filter(function(r){return r._errores.length>0;}).length>0&&
+                    <span style={{color:C.red}}>
+                      ✗ {csvRows.filter(function(r){return r._errores.length>0;}).length} con error
+                    </span>}
+                </div>
+              </div>
+
+              {/* Leyenda */}
+              <div style={{display:"flex",gap:"10px",marginBottom:"8px",flexWrap:"wrap"}}>
+                {[
+                  {color:C.green,label:"Listo para importar"},
+                  {color:C.orange,label:"Categoría nueva (se creará)"},
+                  {color:C.red,label:"Error — no se importará"},
+                ].map(function(l){return(
+                  <span key={l.label} style={{fontSize:"10px",color:l.color,display:"flex",alignItems:"center",gap:"4px"}}>
+                    <span style={{width:"8px",height:"8px",borderRadius:"50%",
+                      background:l.color,display:"inline-block"}}/>
+                    {l.label}
+                  </span>
+                );})}
+              </div>
+
+              <div style={{display:"flex",flexDirection:"column",gap:"6px",maxHeight:"300px",overflowY:"auto"}}>
+                {csvRows.map(function(row){
+                  var hasErr=row._errores.length>0;
+                  var borderCol=hasErr?C.red:row._catNueva?"#ff950066":C.green+"44";
+                  var bg=hasErr?"#1a0000":row._catNueva?"#1a0e00":"#0a0a18";
+                  return(
+                    <div key={row._fila} style={{background:bg,border:"1px solid "+borderCol,
+                      borderRadius:"10px",padding:"10px 12px"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",gap:"8px"}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <p style={{fontSize:"12px",fontWeight:"700",color:C.text,
+                            marginBottom:"2px",overflow:"hidden",textOverflow:"ellipsis",
+                            whiteSpace:"nowrap"}}>{row.nombre||"—"}</p>
+                          <p style={{fontSize:"10px",color:"#666",fontFamily:"monospace"}}>
+                            S/N: {row.serie} · {row.categoria}
+                            {row._catNueva&&<span style={{color:C.orange}}> ★ nueva</span>}
+                          </p>
+                          <p style={{fontSize:"10px",color:"#555"}}>
+                            {row.gerencia} · {row.ciudad_base}, {row.estado_base}
+                          </p>
+                        </div>
+                        <div style={{flexShrink:0}}>
+                          {hasErr
+                            ?<span style={{fontSize:"10px",color:C.red}}>✗</span>
+                            :<span style={{fontSize:"10px",color:C.green}}>✓</span>}
+                        </div>
+                      </div>
+                      {hasErr&&<p style={{fontSize:"10px",color:C.red,marginTop:"4px"}}>
+                        {row._errores.join(" · ")}
+                      </p>}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {csvRows.filter(function(r){return r._catNueva&&r._errores.length===0;}).length>0&&
+                <div style={{background:"#1a0e00",border:"1px solid #ff950033",
+                  borderRadius:"10px",padding:"10px 12px",marginTop:"8px"}}>
+                  <p style={{fontSize:"11px",color:C.orange,marginBottom:"4px",fontWeight:"700"}}>
+                    ★ Categorías nuevas que se crearán automáticamente:
+                  </p>
+                  <p style={{fontSize:"11px",color:"#888"}}>
+                    {[...new Set(csvRows
+                      .filter(function(r){return r._catNueva&&r._errores.length===0;})
+                      .map(function(r){return r.categoria.trim();}))
+                    ].join(" · ")}
+                  </p>
+                </div>}
+
+              {csvResult&&<div style={{
+                background:csvResult.errores===0?"#001a0d":"#1a0e00",
+                border:"1px solid "+(csvResult.errores===0?C.green:C.orange)+"44",
+                borderRadius:"10px",padding:"12px 14px",
+                color:csvResult.errores===0?C.green:C.orange,fontSize:"12px",fontWeight:"700"}}>
+                {csvResult.errores===0
+                  ?"✓ "+csvResult.ok+" equipos importados correctamente"
+                  :"✓ "+csvResult.ok+" importados · ✗ "+csvResult.errores+" con error"}
+              </div>}
+
+              {csvRows.filter(function(r){return r._errores.length===0;}).length>0&&!csvResult&&
+                <button onClick={importarCSV} disabled={csvImporting}
+                  style={btnP(csvImporting)}>
+                  {csvImporting
+                    ?"Importando..."
+                    :"📥 Importar "+csvRows.filter(function(r){return r._errores.length===0;}).length+" equipos"}
+                </button>}
+            </div>}
+          </div>}
           {subTab==="nuevo"&&<div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
             <div>
               <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>

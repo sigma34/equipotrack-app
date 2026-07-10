@@ -3249,49 +3249,68 @@ export default function App(){
     }
   }
 
-  const ciudadesEnUso=[...new Set(regsArr.map(r=>r.ciudad))].sort();
-  const filtrados=equipos.filter(eq=>{
-    const mb=eq.nombre.toLowerCase().includes(busq.toLowerCase())||eq.id.toLowerCase().includes(busq.toLowerCase());
-    const reg=registros[eq.id];
-    const enRep=eq.estatus==="reparacion";
-    const mc=filtro==="todas"
-      ||(filtro==="disponibles"&&!reg&&!enRep)
-      ||(filtro==="reparacion"&&enRep)
-      ||(reg&&reg.ciudad===filtro);
-    // Filtro por gerencia (si está activo)
-    const mg=!filtroGerencia||(eq.gerencia||"")=== filtroGerencia;
-    return mb&&mc&&mg;
-  });
+  const ciudadesEnUso=React.useMemo(function(){
+    return [...new Set(regsArr.map(function(r){return r.ciudad;}))].sort();
+  },[regsArr]);
 
-  // Historial filtrado por gerencia también
-  const equiposPorGerencia=filtroGerencia
-    ?equipos.filter(function(e){return (e.gerencia||"")===filtroGerencia;}).map(function(e){return e.id;})
-    :null;
+  const filtrados=React.useMemo(function(){
+    return equipos.filter(function(eq){
+      var mb=eq.nombre.toLowerCase().includes(busq.toLowerCase())||
+             eq.id.toLowerCase().includes(busq.toLowerCase());
+      var reg=registros[eq.id];
+      var enRep=eq.estatus==="reparacion";
+      var mc=filtro==="todas"
+        ||(filtro==="disponibles"&&!reg&&!enRep)
+        ||(filtro==="reparacion"&&enRep)
+        ||(reg&&reg.ciudad===filtro);
+      var mg=!filtroGerencia||(eq.gerencia||"")===filtroGerencia;
+      return mb&&mc&&mg;
+    });
+  },[equipos,registros,busq,filtro,filtroGerencia]);
 
-  // Historial filtrado
-  const historialFiltrado=historial.filter(function(h){
-    var matchEq=!filtroHistEq||
-      h.equipo_nombre.toLowerCase().includes(filtroHistEq.toLowerCase())||
-      h.equipo_id.toLowerCase().includes(filtroHistEq.toLowerCase());
-    var matchIng=!filtroHistIng||
-      h.ingeniero.toLowerCase().includes(filtroHistIng.toLowerCase());
-    // Filtro por gerencia en historial
-    var matchGer=!equiposPorGerencia||equiposPorGerencia.indexOf(h.equipo_id)!==-1;
-    return matchEq&&matchIng&&matchGer;
-  });
+  const equiposPorGerencia=React.useMemo(function(){
+    return filtroGerencia
+      ?equipos.filter(function(e){return (e.gerencia||"")===filtroGerencia;})
+             .map(function(e){return e.id;})
+      :null;
+  },[equipos,filtroGerencia]);
 
-  // Equipos filtrados por gerencia para los indicadores
-  const equiposFiltradosGer=filtroGerencia
-    ?equipos.filter(function(e){return (e.gerencia||"")===filtroGerencia;})
-    :equipos;
-  const regsArrFiltrados=filtroGerencia
-    ?regsArr.filter(function(r){
-        var eq=equipos.find(function(e){return e.id===r.equipo_id;});
-        return eq&&(eq.gerencia||"")===filtroGerencia;
-      })
-    :regsArr;
+  const historialFiltrado=React.useMemo(function(){
+    return historial.filter(function(h){
+      var matchEq=!filtroHistEq||
+        h.equipo_nombre.toLowerCase().includes(filtroHistEq.toLowerCase())||
+        h.equipo_id.toLowerCase().includes(filtroHistEq.toLowerCase());
+      var matchIng=!filtroHistIng||
+        h.ingeniero.toLowerCase().includes(filtroHistIng.toLowerCase());
+      var matchGer=!equiposPorGerencia||equiposPorGerencia.indexOf(h.equipo_id)!==-1;
+      return matchEq&&matchIng&&matchGer;
+    });
+  },[historial,filtroHistEq,filtroHistIng,equiposPorGerencia]);
+
+  // Construir Set de IDs en uso para O(1) lookup
+  const registrosIds=React.useMemo(function(){
+    return new Set(Object.keys(registros));
+  },[registros]);
+
+  const equiposFiltradosGer=React.useMemo(function(){
+    return filtroGerencia
+      ?equipos.filter(function(e){return (e.gerencia||"")===filtroGerencia;})
+      :equipos;
+  },[equipos,filtroGerencia]);
+
+  const regsArrFiltrados=React.useMemo(function(){
+    if(!filtroGerencia) return regsArr;
+    // Usar Set para O(1) lookup en lugar de find() O(n)
+    var idsGer=new Set(equiposFiltradosGer.map(function(e){return e.id;}));
+    return regsArr.filter(function(r){return idsGer.has(r.equipo_id);});
+  },[regsArr,filtroGerencia,equiposFiltradosGer]);
+
   const enUso=regsArrFiltrados.length;
-  const enReparacion=equiposFiltradosGer.filter(function(e){return e.estatus==="reparacion"&&!registros[e.id];}).length;
+  const enReparacion=React.useMemo(function(){
+    return equiposFiltradosGer.filter(function(e){
+      return e.estatus==="reparacion"&&!registrosIds.has(e.id);
+    }).length;
+  },[equiposFiltradosGer,registrosIds]);
   const disponibles=equiposFiltradosGer.length-enUso-enReparacion;
 
   // Si hay token de recovery, mostrar pantalla de nueva contraseña

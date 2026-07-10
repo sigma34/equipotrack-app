@@ -3094,6 +3094,25 @@ export default function App(){
   const [filtroHistIng,setFiltroHistIng]=useState("");
   const [imgZoom,setImgZoom]=useState(null);
   const [filtroGerencia,setFiltroGerencia]=useState(""); // filtro por gerencia
+  const [rendering,setRendering]=useState(false); // indicador de transición
+  const [histPage,setHistPage]=useState(1); // paginación historial
+  const [eqPage,setEqPage]=useState(1); // paginación equipos
+  const EQ_PER_PAGE=30; // equipos por página
+  const HIST_PER_PAGE=25; // historial por página
+
+  function cambiarVista(v){
+    setRendering(true);
+    setEqPage(1);
+    setTimeout(function(){setVista(v);setRendering(false);},0);
+  }
+
+  function cambiarGerencia(g){
+    setRendering(true);
+    setEqPage(1);
+    setHistPage(1);
+    // useTransition via setTimeout para no bloquear el hilo
+    setTimeout(function(){setFiltroGerencia(g);setRendering(false);},0);
+  }
 
   function exportarActivosCSV(){
     // Exporta equipos filtrados por gerencia actual
@@ -3164,7 +3183,7 @@ export default function App(){
       const [eqsR,regsR,histR,prfsR]=await Promise.allSettled([
         supa("equipos",{token,params:{order:"created_at.asc",activo:"eq.true"}}),
         supa("registros",{token,params:{order:"fecha_retiro.desc"}}),
-        supa("historial",{token,params:{order:"fecha_devolucion.desc",limit:"50"}}),
+        supa("historial",{token,params:{order:"fecha_devolucion.desc",limit:"200"}}),
         supa("perfiles",{token,params:{order:"nombre.asc",select:"*"}}),
       ]);
 
@@ -3460,7 +3479,7 @@ export default function App(){
       {/* Tabs — SIEMPRE primero */}
       <div style={{display:"flex",padding:"0 16px 12px"}}>
         {["equipos","historial"].map(v=>(
-          <button key={v} onClick={()=>setVista(v)}
+          <button key={v} onClick={function(){cambiarVista(v);}}
             style={{flex:1,padding:"10px",background:vista===v?C.card:"transparent",
               border:"1px solid",borderColor:vista===v?C.border:"transparent",
               borderRadius:v==="equipos"?"10px 0 0 10px":"0 10px 10px 0",
@@ -3500,7 +3519,7 @@ export default function App(){
             {(isAdmin||isGer)&&["","Centro-Sur","Norte-Occidente"].map(function(g){
               var activo=filtroGerencia===g;
               return(
-                <button key={g||"nac"} onClick={function(){setFiltroGerencia(g);}}
+                <button key={g||"nac"} onClick={function(){cambiarGerencia(g);}}
                   style={{flexShrink:0,padding:"7px 13px",borderRadius:"20px",fontSize:"12px",fontWeight:"700",
                     cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",
                     border:"1px solid "+(activo?"#4a9eff":"#1a1a3a"),
@@ -3534,7 +3553,7 @@ export default function App(){
     </div>
 
       {/* Lista equipos */}
-      {vista==="equipos"&&(loading?<Spin/>:
+      {vista==="equipos"&&(loading||rendering?<Spin/>:
         <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:"10px"}}>
           {filtrados.length===0&&(
             <div style={{textAlign:"center",padding:"50px 20px",color:C.muted}}>
@@ -3542,7 +3561,7 @@ export default function App(){
               <p style={{fontSize:"14px"}}>Sin resultados</p>
             </div>
           )}
-          {filtrados.map((eq,i)=>{
+          {filtrados.slice(0,(eqPage*EQ_PER_PAGE)).map((eq,i)=>{
             const reg=registros[eq.id];
             const alerta=reg&&getDiasNum(reg.fecha_retiro)>5;
             const esPaq=reg&&reg.tipo==="paqueteria";
@@ -3555,7 +3574,7 @@ export default function App(){
                   borderRadius:"16px",padding:"16px",
                   cursor:enRep?"default":"pointer",
                   opacity:enRep?0.7:1,
-                  animation:"slideUp 0.3s ease "+(i*0.04)+"s both",
+                  animation:"slideUp 0.15s ease both",
                   position:"relative",overflow:"hidden"}}>
                 {enRep&&<div style={{position:"absolute",top:0,left:0,right:0,height:"2px",
                   background:"linear-gradient(90deg,"+C.orange+",#ffcc00)"}}/>}
@@ -3606,17 +3625,30 @@ export default function App(){
               </div>
             );
           })}
+          {/* Ver más equipos */}
+          {filtrados.length>eqPage*EQ_PER_PAGE&&<button
+            onClick={function(){setEqPage(function(p){return p+1;});}}
+            style={{width:"100%",padding:"12px",background:"transparent",
+              border:"1px solid "+C.border,borderRadius:"12px",
+              color:C.muted,fontSize:"12px",fontWeight:"700",
+              cursor:"pointer",fontFamily:"inherit",marginBottom:"8px"}}>
+            Ver más ({filtrados.length-eqPage*EQ_PER_PAGE} equipos restantes)
+          </button>}
+          {filtrados.length>0&&eqPage*EQ_PER_PAGE>=filtrados.length&&filtrados.length>EQ_PER_PAGE&&
+            <p style={{textAlign:"center",fontSize:"11px",color:"#333",paddingBottom:"8px"}}>
+              Mostrando los {filtrados.length} equipos
+            </p>}
         </div>
       )}
 
       {/* Historial */}
-      {vista==="historial"&&(loading?<Spin/>:
+      {vista==="historial"&&(loading||rendering?<Spin/>:
         <div style={{padding:"0 16px"}}>
           {historial.length>0&&<div style={{display:"flex",flexDirection:"column",gap:"8px",marginBottom:"12px"}}>
-            <input value={filtroHistEq} onChange={e=>setFiltroHistEq(e.target.value)}
+            <input value={filtroHistEq} onChange={e=>{setFiltroHistEq(e.target.value);setHistPage(1);}}
               placeholder="Filtrar por equipo..."
               style={{...inp,fontSize:"13px",padding:"10px 14px"}}/>
-            <input value={filtroHistIng} onChange={e=>setFiltroHistIng(e.target.value)}
+            <input value={filtroHistIng} onChange={e=>{setFiltroHistIng(e.target.value);setHistPage(1);}}
               placeholder="Filtrar por ingeniero..."
               style={{...inp,fontSize:"13px",padding:"10px 14px"}}/>
             {(filtroHistEq||filtroHistIng)&&<p style={{fontSize:"11px",color:C.muted}}>
@@ -3637,10 +3669,10 @@ export default function App(){
             </div>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
-              {historialFiltrado.map((h,i)=>(
+              {historialFiltrado.slice(0,histPage*HIST_PER_PAGE).map((h,i)=>(
                 <div key={h.id} style={{background:C.card,border:`1px solid ${C.border}`,
                   borderRadius:"14px",overflow:"hidden",
-                  animation:`slideUp 0.3s ease ${i*0.04}s both`}}>
+                  animation:`slideUp 0.15s ease both`}}>
                   <div style={{padding:"14px"}}>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:"8px"}}>
                       <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",color:C.muted,
@@ -3677,6 +3709,15 @@ export default function App(){
                   )}
                 </div>
               ))}
+              {/* Ver más historial */}
+              {historialFiltrado.length>histPage*HIST_PER_PAGE&&<button
+                onClick={function(){setHistPage(function(p){return p+1;});}}
+                style={{width:"100%",padding:"12px",background:"transparent",
+                  border:"1px solid "+C.border,borderRadius:"12px",
+                  color:C.muted,fontSize:"12px",fontWeight:"700",
+                  cursor:"pointer",fontFamily:"inherit",marginTop:"4px"}}>
+                Ver más ({historialFiltrado.length-histPage*HIST_PER_PAGE} registros restantes)
+              </button>}
             </div>
           )}
         </div>

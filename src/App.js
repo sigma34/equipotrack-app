@@ -2126,7 +2126,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
     var validas=csvRows.filter(function(r){return r._errores.length===0;});
     if(validas.length===0){setCsvError("No hay filas válidas para importar");return;}
     setCsvImporting(true); setCsvResult(null);
-    var ok=0,errores=0,catsCreadads=[];
+    var ok=0,errores=0,catsCreadads=[],ultimoError="";
 
     // Obtener el último ID existente para continuar la secuencia
     var nextNum=1;
@@ -2136,7 +2136,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
         var num=parseInt(existentes[0].id.replace("EQ-",""))||0;
         nextNum=num+1;
       }
-    }catch(e){console.error("Error obteniendo último ID:",e.message);}
+    }catch(e){ultimoError="Error obteniendo IDs: "+e.message;}
 
     for(var i=0;i<validas.length;i++){
       var row=validas[i];
@@ -2167,12 +2167,12 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
         ok++;
       }catch(ex){
         errores++;
-        console.error("Error importando fila",row._fila,":",ex.message);
-        nextNum--; // revertir si falló para no saltar IDs
+        ultimoError=ex.message;
+        nextNum--;
       }
     }
     setCsvImporting(false);
-    setCsvResult({ok,errores,total:validas.length});
+    setCsvResult({ok,errores,total:validas.length,ultimoError});
     if(ok>0){cargarEquipos();setCsvRows([]);}
   }
 
@@ -2464,11 +2464,16 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
               {csvResult&&<div style={{
                 background:csvResult.errores===0?"#001a0d":"#1a0e00",
                 border:"1px solid "+(csvResult.errores===0?C.green:C.orange)+"44",
-                borderRadius:"10px",padding:"12px 14px",
-                color:csvResult.errores===0?C.green:C.orange,fontSize:"12px",fontWeight:"700"}}>
-                {csvResult.errores===0
-                  ?"✓ "+csvResult.ok+" equipos importados correctamente"
-                  :"✓ "+csvResult.ok+" importados · ✗ "+csvResult.errores+" con error"}
+                borderRadius:"10px",padding:"12px 14px",fontSize:"12px"}}>
+                <p style={{color:csvResult.errores===0?C.green:C.orange,fontWeight:"700",marginBottom:"4px"}}>
+                  {csvResult.errores===0
+                    ?"✓ "+csvResult.ok+" equipos importados correctamente"
+                    :"✓ "+csvResult.ok+" importados · ✗ "+csvResult.errores+" con error"}
+                </p>
+                {csvResult.ultimoError&&csvResult.errores>0&&
+                  <p style={{color:"#888",fontSize:"11px",wordBreak:"break-all"}}>
+                    Último error: {csvResult.ultimoError}
+                  </p>}
               </div>}
 
               {csvRows.filter(function(r){return r._errores.length===0;}).length>0&&!csvResult&&

@@ -2138,13 +2138,30 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
       }
     }catch(e){ultimoError="Error obteniendo IDs: "+e.message;}
 
+    // Pre-cargar categorías existentes actualizadas antes de importar
+    try{
+      var catsActuales=await supa("categorias",{token,params:{select:"nombre"}});
+      if(catsActuales){
+        catsActuales.forEach(function(c){
+          catsCreadads.push(c.nombre.toLowerCase());
+        });
+      }
+    }catch(e){}
+
     for(var i=0;i<validas.length;i++){
       var row=validas[i];
       try{
-        // Crear categoría si es nueva
+        // Crear categoría si es nueva — usar upsert para evitar duplicados
         if(row._catNueva&&!catsCreadads.includes(row.categoria.trim().toLowerCase())){
-          await supa("categorias",{token,method:"POST",
-            body:{nombre:row.categoria.trim()}});
+          try{
+            await supa("categorias",{token,method:"POST",body:{nombre:row.categoria.trim()},
+              params:{on_conflict:"nombre"}});
+          }catch(catErr){
+            // Si ya existe (constraint), ignorar y continuar
+            if(!catErr.message.includes("duplicate")&&!catErr.message.includes("23505")){
+              throw catErr;
+            }
+          }
           catsCreadads.push(row.categoria.trim().toLowerCase());
         }
         // Generar ID secuencial EQ-XXX

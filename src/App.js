@@ -2127,6 +2127,17 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
     if(validas.length===0){setCsvError("No hay filas válidas para importar");return;}
     setCsvImporting(true); setCsvResult(null);
     var ok=0,errores=0,catsCreadads=[];
+
+    // Obtener el último ID existente para continuar la secuencia
+    var nextNum=1;
+    try{
+      var existentes=await supa("equipos",{token,params:{select:"id",order:"created_at.desc",limit:"1"}});
+      if(existentes&&existentes.length>0){
+        var num=parseInt(existentes[0].id.replace("EQ-",""))||0;
+        nextNum=num+1;
+      }
+    }catch(e){console.error("Error obteniendo último ID:",e.message);}
+
     for(var i=0;i<validas.length;i++){
       var row=validas[i];
       try{
@@ -2136,10 +2147,14 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
             body:{nombre:row.categoria.trim()}});
           catsCreadads.push(row.categoria.trim().toLowerCase());
         }
-        // Crear equipo via RPC para que asigne ID automático
+        // Generar ID secuencial EQ-XXX
+        var equId="EQ-"+String(nextNum).padStart(3,"0");
+        nextNum++;
+        // Crear equipo con ID explícito
         await supa("equipos",{token,method:"POST",body:{
+          id:equId,
           nombre:sanitize(row.nombre.trim()),
-          serie:sanitize(row.serie.trim()),
+          serie:sanitize(String(row.serie).trim()),
           categoria:sanitize(row.categoria.trim()),
           gerencia:row.gerencia.trim(),
           estado_base:sanitize(row.estado_base.trim()),
@@ -2150,7 +2165,11 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
           activo:true,estatus:"activo"
         }});
         ok++;
-      }catch(ex){errores++;console.error("Error importando fila",row._fila,":",ex.message);}
+      }catch(ex){
+        errores++;
+        console.error("Error importando fila",row._fila,":",ex.message);
+        nextNum--; // revertir si falló para no saltar IDs
+      }
     }
     setCsvImporting(false);
     setCsvResult({ok,errores,total:validas.length});

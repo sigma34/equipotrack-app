@@ -937,6 +937,174 @@ function ActivarCuenta({token}){
   );
 }
 
+// ─── CAMBIAR CONTRASEÑA PRIMER LOGIN ─────────────────
+function CambiarContrasenaPrimerLogin({session, onComplete}){
+  const [pass,setPass]=useState("");
+  const [pass2,setPass2]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [err,setErr]=useState("");
+  // Pedir nombre si no tiene nombre real (con apellido)
+  var nombreReal=session.nombre&&session.nombre.includes(" ");
+  const [nombreInput,setNombreInput]=useState(nombreReal?session.nombre:"");
+
+  // Hooks siempre antes de cualquier return condicional
+  React.useEffect(function(){
+    if(document.getElementById("lumi-style")) return;
+    var s=document.createElement("style");
+    s.id="lumi-style";
+    s.textContent="@keyframes lumiPulse{0%,100%{box-shadow:0 0 0 0 #00e87a33}50%{box-shadow:0 0 0 5px #00e87a00}}";
+    document.head.appendChild(s);
+  },[]);
+
+  function validarPassword(p){
+    if(p.length<8) return "Mínimo 8 caracteres";
+    if(!/[A-Z]/.test(p)) return "Debe incluir al menos una mayúscula";
+    if(!/[a-z]/.test(p)) return "Debe incluir al menos una minúscula";
+    if(!/[0-9]/.test(p)) return "Debe incluir al menos un número";
+    return null;
+  }
+
+  var passErr=pass?validarPassword(pass):null;
+  var requisitos=[
+    {ok:pass.length>=8,label:"8+ caracteres"},
+    {ok:/[A-Z]/.test(pass),label:"1 mayúscula"},
+    {ok:/[a-z]/.test(pass),label:"1 minúscula"},
+    {ok:/[0-9]/.test(pass),label:"1 número"},
+  ];
+
+  async function guardar(e){
+    e.preventDefault();
+    if(!nombreReal&&!nombreInput.trim()){setErr("Por favor ingresa tu nombre completo.");return;}
+    if(!nombreReal&&!nombreInput.trim().includes(" ")){setErr("Ingresa tu nombre y apellido.");return;}
+    var vErr=validarPassword(pass);
+    if(vErr){setErr(vErr);return;}
+    if(pass!==pass2){setErr("Las contraseñas no coinciden");return;}
+    setLoading(true);setErr("");
+    try{
+      const res=await fetch(SUPA_URL+"/auth/v1/user",{
+        method:"PUT",
+        headers:{
+          "apikey":SUPA_KEY,
+          "Content-Type":"application/json",
+          "Authorization":"Bearer "+session.token,
+        },
+        body:JSON.stringify({
+          password:pass,
+          data:{
+            debe_cambiar_password:false,
+            nombre:nombreInput.trim()||session.nombre
+          }
+        }),
+      });
+      if(!res.ok){const d=await res.json();throw new Error(d.error_description||d.msg||"Error");}
+      // Actualizar nombre en perfiles si cambió
+      if(!nombreReal&&nombreInput.trim()){
+        try{
+          await fetch(SUPA_URL+"/rest/v1/perfiles?email=eq."+encodeURIComponent(session.email),{
+            method:"PATCH",
+            headers:{
+              "apikey":SUPA_KEY,
+              "Content-Type":"application/json",
+              "Authorization":"Bearer "+session.token,
+              "Prefer":"return=minimal"
+            },
+            body:JSON.stringify({nombre:nombreInput.trim()}),
+          });
+        }catch(pe){}
+      }
+      onComplete();
+    }catch(ex){setErr(ex.message);}
+    finally{setLoading(false);}
+  }
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
+      justifyContent:"center",padding:"20px",fontFamily:"'Sora',sans-serif"}}>
+      <div style={{width:"100%",maxWidth:"360px"}}>
+        <div style={{textAlign:"center",marginBottom:"24px"}}>
+          <div style={{width:"64px",height:"64px",margin:"0 auto 14px",
+            background:"radial-gradient(circle at 38% 32%, #003322, #000d07)",
+            border:"1px solid #00e87a44",borderRadius:"20px",
+            display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+            <svg width="48" height="48" viewBox="0 0 28 28" fill="none">
+              <defs>
+                <radialGradient id="ccs" cx="38%" cy="32%" r="68%"><stop offset="0%" stopColor="#003322"/><stop offset="100%" stopColor="#000d07"/></radialGradient>
+                <radialGradient id="ccd" cx="38%" cy="28%" r="65%"><stop offset="0%" stopColor="#00ff88"/><stop offset="55%" stopColor="#00e87a"/><stop offset="100%" stopColor="#00a854"/></radialGradient>
+              </defs>
+              <circle cx="14" cy="14" r="13" fill="url(#ccs)"/>
+              <path d="M 14 4 C 14 4 22 11 22 16 C 22 21 18.4 24 14 24 C 9.6 24 6 21 6 16 C 6 11 14 4 14 4 Z" fill="url(#ccd)"/>
+              <circle cx="11" cy="15.5" r="2.2" fill="#001a0d"/><circle cx="17" cy="15.5" r="2.2" fill="#001a0d"/>
+              <circle cx="12" cy="14" r="1" fill="white" opacity="0.9"/><circle cx="18" cy="14" r="1" fill="white" opacity="0.9"/>
+              <path d="M 10 19 Q 14 22 18 19" stroke="#001a0d" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
+              <line x1="14" y1="4" x2="14" y2="1.5" stroke="#00e87a" strokeWidth="1.5" strokeLinecap="round"/>
+              <circle cx="14" cy="1" r="1.5" fill="#00e87a"/>
+            </svg>
+          </div>
+          <h1 style={{fontSize:"22px",fontWeight:"800",margin:"0 0 6px",color:C.text}}>
+            ¡Bienvenido a Lumo!
+          </h1>
+          <div style={{background:"#1a0e00",border:"1px solid #ff950044",borderRadius:"10px",
+            padding:"10px 14px",margin:"10px 0"}}>
+            <p style={{color:C.orange,fontSize:"12px",fontWeight:"700",marginBottom:"2px"}}>
+              🔐 Crea tu contraseña personal
+            </p>
+            <p style={{color:"#888",fontSize:"11px",margin:0}}>
+              Por seguridad debes cambiar la contraseña temporal antes de continuar.
+            </p>
+          </div>
+          <p style={{color:"#555",fontSize:"11px"}}>{session.email}</p>
+        </div>
+        <form onSubmit={guardar} style={{display:"flex",flexDirection:"column",gap:"12px"}}>
+          {/* Nombre — solo si no tiene nombre real */}
+          {!nombreReal&&<div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",
+              display:"block",marginBottom:"6px"}}>TU NOMBRE COMPLETO</label>
+            <input type="text" value={nombreInput}
+              onChange={e=>setNombreInput(e.target.value)}
+              placeholder="Nombre y apellidos"
+              style={inp} required/>
+            <p style={{color:"#444",fontSize:"10px",marginTop:"4px"}}>
+              Así aparecerás en todos los registros del sistema
+            </p>
+          </div>}
+          <div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",
+              display:"block",marginBottom:"6px"}}>NUEVA CONTRASEÑA</label>
+            <input type="password" value={pass} onChange={e=>setPass(e.target.value)}
+              placeholder="••••••••" style={inp} required/>
+          </div>
+          {pass&&<div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>
+            {requisitos.map(function(r){return(
+              <span key={r.label} style={{fontSize:"10px",padding:"3px 9px",borderRadius:"20px",
+                fontWeight:"700",
+                background:r.ok?"#001a0d":"#1a0000",
+                color:r.ok?C.green:"#666",
+                border:"1px solid "+(r.ok?C.green+"44":"transparent")}}>
+                {r.ok?"✓":"·"} {r.label}
+              </span>
+            );})}
+          </div>}
+          <div>
+            <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",
+              display:"block",marginBottom:"6px"}}>CONFIRMAR CONTRASEÑA</label>
+            <input type="password" value={pass2} onChange={e=>setPass2(e.target.value)}
+              placeholder="••••••••" style={inp} required/>
+            {pass2&&pass!==pass2&&<p style={{color:C.red,fontSize:"11px",marginTop:"5px"}}>
+              Las contraseñas no coinciden
+            </p>}
+          </div>
+          {err&&<p style={{color:C.red,fontSize:"13px",background:"#1a0000",
+            padding:"10px 14px",borderRadius:"9px",margin:0}}>⚠️ {err}</p>}
+          <button type="submit" disabled={loading||!!passErr||pass!==pass2||!pass}
+            style={btnP(loading||!!passErr||pass!==pass2||!pass)}>
+            {loading?"Guardando…":"Crear mi contraseña"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function NuevaContrasena({token}){
   const [pass,setPass]=useState("");
   const [pass2,setPass2]=useState("");
@@ -1337,6 +1505,13 @@ function Login({onLogin}){
       const rolFinal=jwtRol==="admin"?"admin":pRol;
       const userEmail=(data.user&&data.user.email)||email;
 
+      // Detectar si debe cambiar contraseña (primer login con contraseña asignada por admin)
+      var debeContraseña=false;
+      try{
+        var rawMeta=data.user&&data.user.user_metadata?data.user.user_metadata:{};
+        debeContraseña=rawMeta.debe_cambiar_password===true;
+      }catch{}
+
       const sessionData={
         token:data.access_token,
         email:userEmail,
@@ -1344,7 +1519,8 @@ function Login({onLogin}){
         nombre:pNombre,
         rol:rolFinal,
         gerencia:perfil&&perfil.gerencia?perfil.gerencia:"",
-        necesitaNombre:!pNombre
+        necesitaNombre:!pNombre,
+        debeContraseña:debeContraseña
       };
       onLogin(sessionData);
     }catch(ex){
@@ -3337,6 +3513,15 @@ export default function App(){
   if(recoveryToken) return <NuevaContrasena token={recoveryToken}/>;
 
   if(!session)return <Login onLogin={handleLogin}/>;
+  if(session.debeContraseña)return <CambiarContrasenaPrimerLogin
+    session={session}
+    onComplete={function(){
+      // Marcar como completado y continuar al dashboard
+      var s=Object.assign({},session,{debeContraseña:false});
+      sessionRef.current=s;
+      setSession(s);
+      cargar(s.token);
+    }}/>;
   if(session.necesitaNombre)return <RegistroNombre sessionTemp={session}
     token={sessionRef.current?sessionRef.current.token:session.token}
     onComplete={function(s){ sessionRef.current=s; setSession(s); cargar(s.token); }}/>;

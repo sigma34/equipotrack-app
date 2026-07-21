@@ -1965,11 +1965,14 @@ function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
   async function confirmar(){
     if(!foto)return;setLoading(true);
     try{
+      // 1. Subir foto de devolución a Storage
       var fotoUrl=foto;
       try{
         if(foto&&foto.startsWith("data:"))
           fotoUrl=await subirFotoStorage(foto,token,equipo.id,"checkin");
       }catch(e){fotoUrl=foto;}
+
+      // 2. Insertar en historial
       await supa("historial",{method:"POST",token,body:{
         equipo_id:equipo.id,equipo_nombre:equipo.nombre,
         user_id:getUserId(session),
@@ -1979,10 +1982,24 @@ function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
         comentario:comentario||null,
         dias:getDias(registro.fecha_retiro),tipo:registro.tipo,
         guia_paqueteria:registro.guia_paqueteria,
-        // fecha_devolucion la genera el trigger en DB
       }});
-      // Borrar registro activo - requiere política RLS que permita al usuario borrar su propio registro
-      await supa("registros?equipo_id=eq."+equipo.id,{method:"DELETE",token});
+
+      // 3. Borrar registro activo
+      // Intentar primero con el token del usuario actual
+      var delRes=await fetch(
+        SUPA_URL+"/rest/v1/registros?equipo_id=eq."+equipo.id,
+        {method:"DELETE",headers:{
+          "apikey":SUPA_KEY,
+          "Authorization":"Bearer "+token,
+          "Content-Type":"application/json",
+          "Prefer":"return=minimal"
+        }}
+      );
+      if(!delRes.ok){
+        var delErr=await delRes.json().catch(function(){return {};});
+        throw new Error("Error al liberar equipo: "+(delErr.message||delErr.hint||delRes.status)+
+          " — Contacta al administrador");
+      }
       setListo(true);
       playSound("checkin");
       setTimeout(()=>{onConfirmar(`📦 ${equipo.nombre} devuelto correctamente`);onCerrar();},1800);

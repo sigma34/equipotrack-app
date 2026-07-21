@@ -1680,31 +1680,28 @@ function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
   async function confirmar(){
     setLoading(true);
     try{
-      // NOTA: el trigger set_ingeniero en DB fue actualizado para no sobreescribir si ya viene valor
-      // ingeniero = nombre seleccionado del dropdown (admin) o propio (ingeniero)
-      // enviado_por = quien hace el registro (siempre el usuario logueado)
-      await supa("registros",{method:"POST",token,body:{
-        equipo_id:equipo.id,
-        user_id:getUserId(session),
-        ingeniero:ingeniero||session.nombre,
-        estado,ciudad,
-        tipo,guia_paqueteria:guia||null,
-        foto_retiro:fotoUrl,
-          comentario:comentario||null,
-        enviado_por:session.nombre,
-        // fecha_retiro la genera el trigger en DB
-      }});
-      // Subir foto a Storage en lugar de base64
+      // 1. Primero subir foto a Storage
       var fotoUrl=foto;
       try{
         if(foto&&foto.startsWith("data:")){
           fotoUrl=await subirFotoStorage(foto,token,equipo.id,"checkout");
         }
       }catch(storageErr){
-        // Fallback a base64 si falla Storage
         console.error("Storage error, usando base64:",storageErr.message);
         fotoUrl=foto;
       }
+      // 2. Luego guardar en DB con la URL correcta
+      await supa("registros",{method:"POST",token,body:{
+        equipo_id:equipo.id,
+        user_id:getUserId(session),
+        ingeniero:ingeniero||session.nombre,
+        estado,ciudad,
+        tipo,guia_paqueteria:guia||null,
+        foto_retiro:fotoUrl||null,
+        comentario:comentario||null,
+        enviado_por:session.nombre,
+        // fecha_retiro la genera el trigger en DB
+      }});
       playSound("checkout");
       onConfirmar(`✅ ${equipo.nombre} asignado a ${ingeniero}`);
     }catch(ex){

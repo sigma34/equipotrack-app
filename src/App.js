@@ -22,6 +22,60 @@ async function supa(path, opts = {}) {
   return text ? JSON.parse(text) : null;
 }
 
+// ─── STORAGE ─────────────────────────────────────────
+async function subirFotoStorage(dataUrl, token, equipoId, tipo){
+  // Convertir dataUrl base64 a Blob
+  var arr=dataUrl.split(",");
+  var mime=arr[0].match(/:(.*?);/)[1];
+  var bstr=atob(arr[1]);
+  var n=bstr.length;
+  var u8=new Uint8Array(n);
+  while(n--){u8[n]=bstr.charCodeAt(n);}
+  var blob=new Blob([u8],{type:mime});
+
+  // Nombre único: equipoId/tipo_timestamp.jpg
+  var ext=mime==="image/png"?"png":"jpg";
+  var filename=equipoId+"/"+tipo+"_"+Date.now()+"."+ext;
+
+  // Upload a Supabase Storage
+  var res=await fetch(
+    SUPA_URL+"/storage/v1/object/fotos-equipos/"+filename,
+    {
+      method:"POST",
+      headers:{
+        "apikey":SUPA_KEY,
+        "Authorization":"Bearer "+token,
+        "Content-Type":mime,
+        "x-upsert":"true",
+      },
+      body:blob,
+    }
+  );
+  if(!res.ok){
+    var err=await res.json().catch(function(){return {};});
+    throw new Error("Error subiendo foto: "+(err.message||res.status));
+  }
+  // Construir URL pública firmada (privada con token)
+  var urlRes=await fetch(
+    SUPA_URL+"/storage/v1/object/sign/fotos-equipos/"+filename,
+    {
+      method:"POST",
+      headers:{
+        "apikey":SUPA_KEY,
+        "Authorization":"Bearer "+token,
+        "Content-Type":"application/json",
+      },
+      body:JSON.stringify({expiresIn:60*60*24*365*5}), // 5 años
+    }
+  );
+  if(urlRes.ok){
+    var urlData=await urlRes.json();
+    return SUPA_URL+"/storage/v1"+urlData.signedURL;
+  }
+  // Fallback: URL directa (si el bucket es público)
+  return SUPA_URL+"/storage/v1/object/fotos-equipos/"+filename;
+}
+
 async function authReq(path, body) {
   const res = await fetch(`${SUPA_URL}/auth/v1/${path}`, {
     method: "POST",
@@ -1618,6 +1672,7 @@ function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
   const [estado,setEstado]=useState(""),[ciudad,setCiudad]=useState("");
   const [tipo,setTipo]=useState("directo"),[guia,setGuia]=useState("");
   const [foto,setFoto]=useState(null),[showCam,setShowCam]=useState(false);
+  const [comentario,setComentario]=useState("");
   const [loading,setLoading]=useState(false);
 
   const ok1=ingeniero&&estado&&ciudad;
@@ -1634,10 +1689,22 @@ function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
         ingeniero:ingeniero||session.nombre,
         estado,ciudad,
         tipo,guia_paqueteria:guia||null,
-        foto_retiro:foto,
+        foto_retiro:fotoUrl,
+          comentario:comentario||null,
         enviado_por:session.nombre,
         // fecha_retiro la genera el trigger en DB
       }});
+      // Subir foto a Storage en lugar de base64
+      var fotoUrl=foto;
+      try{
+        if(foto&&foto.startsWith("data:")){
+          fotoUrl=await subirFotoStorage(foto,token,equipo.id,"checkout");
+        }
+      }catch(storageErr){
+        // Fallback a base64 si falla Storage
+        console.error("Storage error, usando base64:",storageErr.message);
+        fotoUrl=foto;
+      }
       playSound("checkout");
       onConfirmar(`✅ ${equipo.nombre} asignado a ${ingeniero}`);
     }catch(ex){
@@ -1776,6 +1843,10 @@ function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
             <Row label="Fecha" value={fmt(new Date().toISOString())} last/>
           </div>
           {foto&&<img src={foto} alt="ev" style={{width:"100%",borderRadius:"13px",marginBottom:"14px",display:"block",opacity:0.9}}/>}
+          <textarea value={comentario} onChange={e=>setComentario(e.target.value)}
+            placeholder="Comentario opcional — accesorios, observaciones..."
+            rows={2} style={{...inp,resize:"none",fontSize:"12px",
+              fontFamily:"inherit",marginBottom:"10px",lineHeight:"1.5"}}/>
           <button onClick={confirmar} disabled={loading} style={btnP(loading)}>
             {loading?"Guardando…":"✅ Confirmar retiro"}
           </button>
@@ -1788,16 +1859,23 @@ function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
 function ModalRecepcion({equipo,registro,token,session,onConfirmar,onCerrar}){
   const [estado,setEstado]=useState(""),[ciudad,setCiudad]=useState("");
   const [foto,setFoto]=useState(null),[showCam,setShowCam]=useState(false);
+  const [comentario,setComentario]=useState("");
   const [loading,setLoading]=useState(false);
 
   async function confirmar(){
     if(!foto||!estado||!ciudad)return;
     setLoading(true);
     try{
+      var fotoUrl=foto;
+      try{
+        if(foto&&foto.startsWith("data:"))
+          fotoUrl=await subirFotoStorage(foto,token,equipo.id,"recepcion");
+      }catch(e){fotoUrl=foto;}
       // Actualizar registro: cambia tipo a "directo" y actualiza ciudad de recepción
       await supa("registros?equipo_id=eq."+equipo.id,{method:"PATCH",token,body:{
         tipo:"directo",estado,ciudad,
-        foto_retiro:foto,
+        foto_retiro:fotoUrl,
+        comentario:comentario||null,
         fecha_retiro:new Date().toISOString(),
         ingeniero:session.nombre,
         user_id:getUserId(session), // actualizar user_id al receptor
@@ -1868,6 +1946,10 @@ function ModalRecepcion({equipo,registro,token,session,onConfirmar,onCerrar}){
           </div>
         )}
 
+        <textarea value={comentario} onChange={e=>setComentario(e.target.value)}
+          placeholder="Comentario opcional — estado de recepción, observaciones..."
+          rows={2} style={{...inp,resize:"none",fontSize:"12px",
+            fontFamily:"inherit",marginBottom:"10px",lineHeight:"1.5"}}/>
         <button onClick={confirmar} disabled={!foto||!estado||!ciudad||loading}
           style={{...btnP(!foto||!estado||!ciudad||loading),
             background:(!foto||!estado||!ciudad||loading)?C.subtle:`linear-gradient(135deg,${C.blue},#2266cc)`}}>
@@ -1880,17 +1962,24 @@ function ModalRecepcion({equipo,registro,token,session,onConfirmar,onCerrar}){
 // - MODAL CHECKIN -
 function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
   const [foto,setFoto]=useState(null),[showCam,setShowCam]=useState(false);
+  const [comentario,setComentario]=useState("");
   const [loading,setLoading]=useState(false),[listo,setListo]=useState(false);
 
   async function confirmar(){
     if(!foto)return;setLoading(true);
     try{
+      var fotoUrl=foto;
+      try{
+        if(foto&&foto.startsWith("data:"))
+          fotoUrl=await subirFotoStorage(foto,token,equipo.id,"checkin");
+      }catch(e){fotoUrl=foto;}
       await supa("historial",{method:"POST",token,body:{
         equipo_id:equipo.id,equipo_nombre:equipo.nombre,
         user_id:getUserId(session),
         ingeniero:registro.ingeniero,estado:registro.estado,ciudad:registro.ciudad,
         fecha_retiro:registro.fecha_retiro,
-        foto_retiro:registro.foto_retiro,foto_devolucion:foto,
+        foto_retiro:registro.foto_retiro,foto_devolucion:fotoUrl,
+        comentario:comentario||null,
         dias:getDias(registro.fecha_retiro),tipo:registro.tipo,
         guia_paqueteria:registro.guia_paqueteria,
         // fecha_devolucion la genera el trigger en DB
@@ -1974,6 +2063,10 @@ function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
           </div>
         )}
 
+        <textarea value={comentario} onChange={e=>setComentario(e.target.value)}
+          placeholder="Comentario opcional — estado de devolución, observaciones..."
+          rows={2} style={{...inp,resize:"none",fontSize:"12px",
+            fontFamily:"inherit",marginBottom:"10px",lineHeight:"1.5"}}/>
         <button onClick={confirmar} disabled={!foto||loading} style={btnP(!foto||loading)}>
           {loading?"Guardando…":foto?"📦 Confirmar devolución":"📷 Foto requerida"}
         </button>

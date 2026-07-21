@@ -72,14 +72,13 @@ async function subirFotoStorage(dataUrl, token, equipoId, tipo){
 
   if(signRes.ok){
     var signData=await signRes.json();
-    // Supabase devuelve signedURL como path relativo: /object/sign/bucket/file?token=...
-    // Solo necesitamos agregar el base de Storage
+    // signedURL es path relativo: /object/sign/bucket/file?token=...
+    // Necesita /storage/v1 entre el dominio y el path
     var signed=signData.signedURL||signData.signedUrl||"";
     if(signed){
-      // Si ya es URL completa la devolvemos tal cual
       if(signed.startsWith("http")) return signed;
-      // Si es path relativo agregamos solo el dominio base de Supabase
-      return SUPA_URL+signed;
+      // Siempre agregar /storage/v1 ya que Supabase devuelve path sin ese prefijo
+      return SUPA_URL+"/storage/v1"+signed;
     }
   }
 

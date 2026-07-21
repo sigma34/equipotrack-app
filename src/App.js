@@ -2152,6 +2152,22 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
   // Lista de equipos
   const [listaEqs,setListaEqs]=useState([]),[loadEqs,setLoadEqs]=useState(false);
   const [subTab,setSubTab]=useState("lista"); // lista | nuevo | importar
+  const [busqAdmin,setBusqAdmin]=useState("");
+  const [soloMios,setSoloMios]=useState(false);
+
+  // Filtrado de equipos en AdminPanel — useMemo para no recalcular en cada render
+  const eqsFiltrados=React.useMemo(function(){
+    var myEmail="";
+    try{myEmail=JSON.parse(atob(token.split(".")[1])).email||"";}catch(e){}
+    return listaEqs.filter(function(eq){
+      var mb=!busqAdmin||
+        eq.nombre.toLowerCase().includes(busqAdmin.toLowerCase())||
+        String(eq.serie||"").toLowerCase().includes(busqAdmin.toLowerCase())||
+        eq.id.toLowerCase().includes(busqAdmin.toLowerCase());
+      var mm=!soloMios||(eq.admin_email||"").toLowerCase()===myEmail;
+      return mb&&mm;
+    });
+  },[listaEqs,busqAdmin,soloMios,token]);
   // Estados para importación CSV
   const [csvRows,setCsvRows]=useState([]); // filas parseadas del CSV
   const [csvError,setCsvError]=useState("");
@@ -2578,6 +2594,22 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
           {/* Sub-tab: Lista */}
           {subTab==="lista"&&(loadEqs?<Spin/>:
             <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
+              {/* Buscador y toggle Mis equipos */}
+              <input value={busqAdmin} onChange={e=>setBusqAdmin(e.target.value)}
+                placeholder="Buscar por nombre, serie o código..."
+                style={{...inp,fontSize:"13px"}}/>
+              <div style={{display:"flex",gap:"6px"}}>
+                {[{k:false,l:"🌐 Todos"},{k:true,l:"👤 Mis equipos"}].map(function(t){return(
+                  <button key={String(t.k)} onClick={function(){setSoloMios(t.k);}}
+                    style={{flex:1,padding:"8px",borderRadius:"10px",fontSize:"12px",
+                      fontWeight:"700",cursor:"pointer",fontFamily:"inherit",
+                      border:"1px solid "+(soloMios===t.k?C.blue+"66":C.border),
+                      background:soloMios===t.k?"#020d1a":"transparent",
+                      color:soloMios===t.k?C.blue:C.muted}}>
+                    {t.l}
+                  </button>
+                );})}
+              </div>
               {listaEqs.length>0&&<button onClick={exportarCSV}
                 style={{width:"100%",padding:"10px",background:"transparent",
                   border:"1px solid "+C.green+"44",borderRadius:"10px",
@@ -2585,10 +2617,15 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                   fontWeight:"700",fontFamily:"inherit",marginBottom:"4px"}}>
                 📊 Exportar CSV de auditoría ({listaEqs.length} equipos)
               </button>}
-              {listaEqs.length===0&&<p style={{textAlign:"center",color:C.muted,padding:"20px",fontSize:"13px"}}>
-                Sin equipos registrados
+              {eqsFiltrados.length===0&&<p style={{textAlign:"center",color:C.muted,padding:"20px",fontSize:"13px"}}>
+                {busqAdmin||soloMios?"Sin resultados para este filtro":"Sin equipos registrados"}
               </p>}
-              {listaEqs.map(function(eq){
+              {eqsFiltrados.length>0&&(busqAdmin||soloMios)&&
+                <p style={{fontSize:"11px",color:C.muted,textAlign:"right",paddingRight:"4px",marginBottom:"4px"}}>
+                  {eqsFiltrados.length} equipo{eqsFiltrados.length!==1?"s":""}
+                  {soloMios?" · asignados a ti":""}{busqAdmin?" · \""+busqAdmin+"\"":""}
+                </p>}
+              {eqsFiltrados.map(function(eq){
                 var enRep=eq.estatus==="reparacion";
                 var inactivo=!eq.activo;
                 return(
@@ -2610,10 +2647,12 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                         <p style={{fontSize:"13px",fontWeight:"700",color:C.text,margin:"0 0 2px",
                           overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{eq.nombre}</p>
                         <p style={{fontSize:"11px",color:C.muted,margin:0}}>{eq.categoria}</p>
-                        <p style={{fontSize:"10px",color:C.muted,margin:"2px 0 0",
-                          fontFamily:"'JetBrains Mono',monospace",fontSize:"12px"}}>Base: {eq.ciudad_base} · {eq.sitio_base}{eq.gerencia&&<span style={{color:"#9966ff",marginLeft:"8px",fontSize:"11px"}}>· {eq.gerencia}</span>}</p>
+                        <p style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",color:C.muted,margin:"2px 0 0"}}>
+                          Base: {eq.ciudad_base} · {eq.sitio_base}
+                          {eq.gerencia&&<span style={{color:"#9966ff",marginLeft:"8px",fontSize:"11px"}}>· {eq.gerencia}</span>}
+                        </p>
                         {eq.admin_email&&<p style={{fontSize:"10px",color:C.blue,margin:"2px 0 0"}}>
-                          👤 Admin: {eq.admin_email}
+                          👤 {eq.admin_email}
                         </p>}
                       </div>
                     </div>
@@ -3406,6 +3445,7 @@ export default function App(){
   const [filtroHistIng,setFiltroHistIng]=useState("");
   const [imgZoom,setImgZoom]=useState(null);
   const [filtroGerencia,setFiltroGerencia]=useState(""); // filtro por gerencia
+  const [filtroMios,setFiltroMios]=useState(false); // filtro mis equipos (admin)
   const [rendering,setRendering]=useState(false); // indicador de transición
   const [histPage,setHistPage]=useState(1); // paginación historial
   const [eqPage,setEqPage]=useState(1); // paginación equipos
@@ -3585,6 +3625,10 @@ export default function App(){
   },[regsArr]);
 
   const filtrados=React.useMemo(function(){
+    // Email del usuario actual extraído del JWT
+    var myEmail=session?(function(){
+      try{return JSON.parse(atob(session.token.split(".")[1])).email||"";}catch{return "";}
+    })():"";
     return equipos.filter(function(eq){
       var mb=eq.nombre.toLowerCase().includes(busq.toLowerCase())||
              eq.id.toLowerCase().includes(busq.toLowerCase());
@@ -3595,9 +3639,10 @@ export default function App(){
         ||(filtro==="reparacion"&&enRep)
         ||(reg&&reg.ciudad===filtro);
       var mg=!filtroGerencia||(eq.gerencia||"")===filtroGerencia;
-      return mb&&mc&&mg;
+      var mm=!filtroMios||(eq.admin_email||"").toLowerCase()===myEmail;
+      return mb&&mc&&mg&&mm;
     });
-  },[equipos,registros,busq,filtro,filtroGerencia]);
+  },[equipos,registros,busq,filtro,filtroGerencia,filtroMios,session]);
 
   const equiposPorGerencia=React.useMemo(function(){
     return filtroGerencia
@@ -3766,6 +3811,7 @@ export default function App(){
               setEquipos([]); setRegsArr([]); setHistorial([]); setPerfiles([]);
               setFiltro("todas"); setBusq("");
               setFiltroGerencia("");
+              setFiltroMios(false);
               setFiltroHistEq(""); setFiltroHistIng("");
               setVista("equipos");
               setSel(null); setModo(null);
@@ -3838,9 +3884,9 @@ export default function App(){
           scrollbarWidth:"none",WebkitOverflowScrolling:"touch",msOverflowStyle:"none"}}>
           <div style={{display:"flex",gap:"6px",paddingRight:"16px",width:"max-content",minWidth:"100%"}}>
             {(isAdmin||isGer)&&["","Centro-Sur","Norte-Occidente"].map(function(g){
-              var activo=filtroGerencia===g;
+              var activo=filtroGerencia===g&&!filtroMios;
               return(
-                <button key={g||"nac"} onClick={function(){cambiarGerencia(g);}}
+                <button key={g||"nac"} onClick={function(){cambiarGerencia(g);setFiltroMios(false);}}
                   style={{flexShrink:0,padding:"7px 13px",borderRadius:"20px",fontSize:"12px",fontWeight:"700",
                     cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",
                     border:"1px solid "+(activo?"#4a9eff":"#1a1a3a"),
@@ -3850,6 +3896,14 @@ export default function App(){
                 </button>
               );
             })}
+            {isAdmin&&<button onClick={function(){setFiltroMios(!filtroMios);}}
+              style={{flexShrink:0,padding:"7px 13px",borderRadius:"20px",fontSize:"12px",fontWeight:"700",
+                cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",
+                border:"1px solid "+(filtroMios?C.green+"66":"#1a1a3a"),
+                background:filtroMios?"#001a0d":"transparent",
+                color:filtroMios?C.green:"#445"}}>
+              👤 Mis equipos
+            </button>}
             {(isAdmin||isGer)&&<div style={{width:"1px",background:"#2a2a4a",flexShrink:0,margin:"4px 2px"}}/>}
             {[{key:"todas",label:"Todos"},{key:"disponibles",label:"Disponibles"},
               {key:"reparacion",label:"🔧 Reparación"},

@@ -2593,15 +2593,16 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
 
           {/* Sub-tab: Lista */}
           {subTab==="lista"&&(loadEqs?<Spin/>:
-            <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
-              {/* Buscador y toggle Mis equipos */}
+            <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
+              {/* Buscador */}
               <input value={busqAdmin} onChange={e=>setBusqAdmin(e.target.value)}
-                placeholder="Buscar por nombre, serie o código..."
-                style={{...inp,fontSize:"13px"}}/>
-              <div style={{display:"flex",gap:"6px"}}>
+                placeholder="🔍 Buscar por nombre, serie o código..."
+                style={{...inp,fontSize:"13px",marginBottom:"0"}}/>
+              {/* Toggle Todos / Mis equipos */}
+              <div style={{display:"flex",gap:"6px",marginBottom:"4px"}}>
                 {[{k:false,l:"🌐 Todos"},{k:true,l:"👤 Mis equipos"}].map(function(t){return(
                   <button key={String(t.k)} onClick={function(){setSoloMios(t.k);}}
-                    style={{flex:1,padding:"8px",borderRadius:"10px",fontSize:"12px",
+                    style={{flex:1,padding:"9px",borderRadius:"10px",fontSize:"12px",
                       fontWeight:"700",cursor:"pointer",fontFamily:"inherit",
                       border:"1px solid "+(soloMios===t.k?C.blue+"66":C.border),
                       background:soloMios===t.k?"#020d1a":"transparent",

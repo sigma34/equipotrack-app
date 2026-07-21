@@ -3896,7 +3896,7 @@ export default function App(){
                 </button>
               );
             })}
-            {isAdmin&&<button onClick={function(){setFiltroMios(!filtroMios);}}
+            {(isAdmin||isSA)&&<button onClick={function(){setFiltroMios(!filtroMios);setFiltroGerencia("");}}
               style={{flexShrink:0,padding:"7px 13px",borderRadius:"20px",fontSize:"12px",fontWeight:"700",
                 cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",
                 border:"1px solid "+(filtroMios?C.green+"66":"#1a1a3a"),

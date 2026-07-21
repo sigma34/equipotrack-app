@@ -33,11 +33,10 @@ async function subirFotoStorage(dataUrl, token, equipoId, tipo){
   while(n--){u8[n]=bstr.charCodeAt(n);}
   var blob=new Blob([u8],{type:mime});
 
-  // Nombre único: equipoId/tipo_timestamp.jpg
   var ext=mime==="image/png"?"png":"jpg";
   var filename=equipoId+"/"+tipo+"_"+Date.now()+"."+ext;
 
-  // Upload a Supabase Storage
+  // 1. Upload
   var res=await fetch(
     SUPA_URL+"/storage/v1/object/fotos-equipos/"+filename,
     {
@@ -55,8 +54,10 @@ async function subirFotoStorage(dataUrl, token, equipoId, tipo){
     var err=await res.json().catch(function(){return {};});
     throw new Error("Error subiendo foto: "+(err.message||res.status));
   }
-  // Construir URL pública firmada (privada con token)
-  var urlRes=await fetch(
+
+  // 2. Generar URL firmada (bucket privado, sin necesidad de hacerlo público)
+  // Expira en 5 años — prácticamente permanente para uso interno
+  var signRes=await fetch(
     SUPA_URL+"/storage/v1/object/sign/fotos-equipos/"+filename,
     {
       method:"POST",
@@ -65,15 +66,44 @@ async function subirFotoStorage(dataUrl, token, equipoId, tipo){
         "Authorization":"Bearer "+token,
         "Content-Type":"application/json",
       },
-      body:JSON.stringify({expiresIn:60*60*24*365*5}), // 5 años
+      body:JSON.stringify({expiresIn:157680000}), // 5 años en segundos
     }
   );
-  if(urlRes.ok){
-    var urlData=await urlRes.json();
-    return SUPA_URL+"/storage/v1"+urlData.signedURL;
+
+  if(signRes.ok){
+    var signData=await signRes.json();
+    // Supabase devuelve signedURL como path relativo: /object/sign/bucket/file?token=...
+    // Solo necesitamos agregar el base de Storage
+    var signed=signData.signedURL||signData.signedUrl||"";
+    if(signed){
+      // Si ya es URL completa la devolvemos tal cual
+      if(signed.startsWith("http")) return signed;
+      // Si es path relativo agregamos solo el dominio base de Supabase
+      return SUPA_URL+signed;
+    }
   }
-  // Fallback: URL directa (si el bucket es público)
-  return SUPA_URL+"/storage/v1/object/fotos-equipos/"+filename;
+
+  // 3. Fallback — guardar el path relativo y construir la URL al mostrar
+  // Esto evita depender de que la firma funcione en el momento del upload
+  return "storage:fotos-equipos/"+filename;
+}
+
+// Componente que resuelve URLs de Storage (firmadas o path relativo)
+function FotoImg({src, alt, style, onClick}){
+  const [url,setUrl]=useState(src);
+  React.useEffect(function(){
+    if(!src) return;
+    // Si ya es URL completa o base64, usarla directamente
+    if(src.startsWith("http")||src.startsWith("data:")){setUrl(src);return;}
+    // Si es path relativo storage:bucket/path, generar URL firmada
+    if(src.startsWith("storage:")){
+      var path=src.replace("storage:","");
+      // Construir URL pública (bucket privado con RLS de lectura para auth)
+      setUrl(SUPA_URL+"/storage/v1/object/authenticated/"+path);
+    }
+  },[src]);
+  if(!url) return null;
+  return <img src={url} alt={alt||""} style={style} onClick={onClick}/>;
 }
 
 async function authReq(path, body) {
@@ -3983,7 +4013,7 @@ export default function App(){
                     <div style={{display:"flex",gap:"2px"}}>
                       {h.foto_retiro&&<div style={{flex:1,position:"relative",cursor:"pointer"}}
                         onClick={()=>setImgZoom(h.foto_retiro)}>
-                        <img src={h.foto_retiro} alt="r" style={{width:"100%",height:"72px",objectFit:"cover",display:"block"}}/>
+                        <FotoImg src={h.foto_retiro} alt="r" style={{width:"100%",height:"72px",objectFit:"cover",display:"block"}}/>
                         <span style={{position:"absolute",bottom:"4px",left:"4px",background:"rgba(0,0,0,0.75)",
                           fontSize:"9px",color:"#aaa",padding:"2px 5px",borderRadius:"4px"}}>📤 Retiro</span>
                         <span style={{position:"absolute",top:"4px",right:"4px",background:"rgba(0,0,0,0.6)",
@@ -3991,7 +4021,7 @@ export default function App(){
                       </div>}
                       {h.foto_devolucion&&<div style={{flex:1,position:"relative",cursor:"pointer"}}
                         onClick={()=>setImgZoom(h.foto_devolucion)}>
-                        <img src={h.foto_devolucion} alt="d" style={{width:"100%",height:"72px",objectFit:"cover",display:"block"}}/>
+                        <FotoImg src={h.foto_devolucion} alt="d" style={{width:"100%",height:"72px",objectFit:"cover",display:"block"}}/>
                         <span style={{position:"absolute",bottom:"4px",left:"4px",background:"rgba(0,0,0,0.75)",
                           fontSize:"9px",color:"#aaa",padding:"2px 5px",borderRadius:"4px"}}>📦 Dev.</span>
                         <span style={{position:"absolute",top:"4px",right:"4px",background:"rgba(0,0,0,0.6)",
@@ -4021,7 +4051,7 @@ export default function App(){
       display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}}
       onClick={()=>setImgZoom(null)}>
       <div style={{position:"relative",maxWidth:"100%",maxHeight:"100%"}}>
-        <img src={imgZoom} alt="zoom" style={{maxWidth:"100%",maxHeight:"85vh",
+        <FotoImg src={imgZoom} alt="zoom" style={{maxWidth:"100%",maxHeight:"85vh",
           borderRadius:"12px",display:"block",objectFit:"contain"}}/>
         <button onClick={()=>setImgZoom(null)}
           style={{position:"absolute",top:"-12px",right:"-12px",width:"32px",height:"32px",

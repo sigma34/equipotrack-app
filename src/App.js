@@ -2008,7 +2008,8 @@ function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
         ingeniero:registro.ingeniero,estado:registro.estado,ciudad:registro.ciudad,
         fecha_retiro:registro.fecha_retiro,
         foto_retiro:registro.foto_retiro,foto_devolucion:fotoUrl,
-        comentario:comentario||null,
+        // Combinar comentario del checkout (registro) y del checkin (este modal)
+        comentario:[registro.comentario,comentario].filter(Boolean).join(" | ")||null,
         dias:getDias(registro.fecha_retiro),tipo:registro.tipo,
         guia_paqueteria:registro.guia_paqueteria,
       }});

@@ -2177,7 +2177,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
 
   useEffect(()=>{
     if(tab==="categorias")cargarCats();
-    if(tab==="ingenieros")cargarPerfiles();
+    if(tab==="ingenieros"){ cargarPerfiles(); }
     if(tab==="equipos"){cargarEquipos();}
     // usuarios no necesita carga — usa formulario
   },[tab]);
@@ -2272,8 +2272,14 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
   async function cargarPerfiles(){
     try{
       // Cargar todos los perfiles  la política RLS permite al admin ver todos
+      // Cargar perfiles — si RLS restringe, al menos siempre incluir los perfilesAdmin que vienen del App
       const r=await supa("perfiles",{token,params:{order:"nombre.asc",select:"*"}});
-      setPerfiles(r||[]);
+      var lista=r||[];
+      // Si no devolvió nada (RLS restrictiva), usar perfilesAdmin como fallback
+      if(lista.length===0&&perfilesAdmin&&perfilesAdmin.length>0){
+        lista=perfilesAdmin;
+      }
+      setPerfiles(lista);
     }catch(ex){console.error("Error cargando perfiles:",ex.message);}
   }
 
@@ -2645,8 +2651,12 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                           {!enRep&&!inactivo&&<span style={{fontSize:"10px",color:C.green,background:C.greenDk,
                             padding:"2px 8px",borderRadius:"20px",fontWeight:"700"}}>✓ Activo</span>}
                         </div>
-                        <p style={{fontSize:"13px",fontWeight:"700",color:C.text,margin:"0 0 2px",
+                        <p style={{fontSize:"13px",fontWeight:"700",color:C.text,margin:"0 0 1px",
                           overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{eq.nombre}</p>
+                        <p style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",
+                          color:"#556",margin:"0 0 2px",letterSpacing:"0.02em"}}>
+                          S/N: {eq.serie||"—"}
+                        </p>
                         <p style={{fontSize:"11px",color:C.muted,margin:0}}>{eq.categoria}</p>
                         <p style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",color:C.muted,margin:"2px 0 0"}}>
                           Base: {eq.ciudad_base} · {eq.sitio_base}
@@ -3427,7 +3437,23 @@ export default function App(){
     }catch(e){ return null; }
   });
 
-  const [session,setSession]=useState(null);
+  // Restaurar sesión desde localStorage al cargar la página
+  const [session,setSession]=useState(function(){
+    try{
+      var saved=localStorage.getItem("lumo_session");
+      if(!saved) return null;
+      var s=JSON.parse(saved);
+      // Verificar que el token no haya expirado (JWT exp claim)
+      var parts=s.token.split(".");
+      if(parts.length<2) return null;
+      var payload=JSON.parse(atob(parts[1]));
+      if(payload.exp&&Date.now()/1000>payload.exp){
+        localStorage.removeItem("lumo_session");
+        return null;
+      }
+      return s;
+    }catch(e){return null;}
+  });
   const sessionRef=useRef(null); // ref síncrono para evitar stale en RegistroNombre
   const [equipos,setEquipos]=useState([]);
   const [regsArr,setRegsArr]=useState([]);
@@ -3578,6 +3604,7 @@ export default function App(){
   }
 
   function handleLogin(s){
+    try{localStorage.setItem("lumo_session",JSON.stringify(s));}catch(e){}
     sessionRef.current=s;
     setSession(s);
     // Si es gerente con gerencia asignada, pre-filtrar su dashboard
@@ -3808,6 +3835,7 @@ export default function App(){
             </button>
             <button onClick={function(){
               // Limpiar todos los estados al cerrar sesión
+              try{localStorage.removeItem("lumo_session");}catch(e){}
               setSession(null);
               setEquipos([]); setRegsArr([]); setHistorial([]); setPerfiles([]);
               setFiltro("todas"); setBusq("");

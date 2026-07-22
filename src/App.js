@@ -4111,7 +4111,16 @@ export default function App(){
                     <Row label="Ciudad" value={`${h.ciudad}, ${h.estado}`}/>
                     {h.guia_paqueteria&&<Row label="Guía" value={h.guia_paqueteria}/>}
                     <Row label="Retiro" value={fmt(h.fecha_retiro)}/>
-                    <Row label="Devolución" value={fmt(h.fecha_devolucion)} last/>
+                    <Row label="Devolución" value={fmt(h.fecha_devolucion)} last={!h.comentario}/>
+                    {h.comentario&&<div style={{marginTop:"8px",padding:"8px 10px",
+                      background:"#0d0d1a",border:"1px solid #2a2a4a",
+                      borderRadius:"8px",borderLeft:"3px solid "+C.blue}}>
+                      <p style={{fontSize:"10px",color:C.blue,fontWeight:"700",
+                        letterSpacing:"0.08em",marginBottom:"3px"}}>💬 COMENTARIO</p>
+                      <p style={{fontSize:"12px",color:"#ccc",lineHeight:1.5,margin:0}}>
+                        {h.comentario}
+                      </p>
+                    </div>}
                   </div>
                   {(h.foto_retiro||h.foto_devolucion)&&(
                     <div style={{display:"flex",gap:"2px"}}>

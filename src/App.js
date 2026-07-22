@@ -3619,6 +3619,20 @@ export default function App(){
     }
     if(!s.necesitaNombre) cargar(s.token);
   }
+
+  // Cargar datos cuando la sesión viene de localStorage (recarga de página)
+  React.useEffect(function(){
+    if(!session) return;
+    if(!sessionRef.current){
+      sessionRef.current=session;
+      if(getRolFromSession(session)==="gerente"&&session.gerencia){
+        setFiltroGerencia(session.gerencia);
+      }
+      if(!session.necesitaNombre&&!session.debeContraseña){
+        cargar(session.token);
+      }
+    }
+  },[]);
   function cerrar(){
     setSel(null);setModo(null);
     // Limpiar ?equipo=XXX de la URL al cerrar modal
@@ -4144,7 +4158,7 @@ export default function App(){
 
     {/* Modales */}
     {showAdmin&&<AdminPanel token={session.token}
-      perfilesAdmin={perfiles.filter(function(p){return p.rol==="admin"||p.rol==="super_admin";})}
+      perfilesAdmin={perfiles}
       isSA={isSA}
       onClose={()=>setShowAdmin(false)}
       onEquipoCreado={()=>cargar(session.token)}/>}

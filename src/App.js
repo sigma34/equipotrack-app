@@ -2120,6 +2120,14 @@ function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
 // - PANEL ADMIN -
 function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
   const [tab,setTab]=useState("equipos"); // equipos | categorias | ingenieros | usuarios
+  // Derivar isAdmin del prop isSA y del token
+  const isAdmin=isSA||token?(function(){
+    try{
+      var p=JSON.parse(atob(token.split(".")[1]));
+      var rol=p.app_metadata&&p.app_metadata.rol;
+      return rol==="admin"||rol==="super_admin";
+    }catch(e){return false;}
+  })():false;
   // Estados para invitaciones
   const [invEmail,setInvEmail]=useState("");
   const [invNombre,setInvNombre]=useState("");

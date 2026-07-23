@@ -2227,7 +2227,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
   }
   function selTodos(){
     var todos={};
-    eqsFiltrados.slice(0,20).forEach(function(eq){todos[eq.id]=true;});
+    eqsFiltrados.slice(0,12).forEach(function(eq){todos[eq.id]=true;});
     setSelEtiquetas(todos);
   }
   function deselTodos(){setSelEtiquetas({});}
@@ -2236,29 +2236,32 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
     var APP_URL="https://equipotrack-app.vercel.app";
     var equiposSel=selCount>0
       ?eqsFiltrados.filter(function(eq){return selEtiquetas[eq.id];})
-      :eqsFiltrados.slice(0,20);
+      :eqsFiltrados.slice(0,12);
 
     if(equiposSel.length===0){alert("Selecciona al menos un equipo o filtra la lista");return;}
 
     var estilos=[
       "*{box-sizing:border-box;margin:0;padding:0;}",
-      "body{font-family:Arial,sans-serif;background:#fff;}",
-      "@page{size:letter portrait;margin:6mm;}",
-      ".hoja{display:grid;grid-template-columns:repeat(4,47mm);gap:3mm;padding:2mm;width:200mm;margin:0 auto;}",
-      ".et{width:47mm;height:90mm;border:1px dashed #bbb;border-radius:3mm;overflow:hidden;display:flex;flex-direction:column;background:#fff;page-break-inside:avoid;}",
-      ".eh{background:#111;padding:2mm 2.5mm;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;height:9mm;}",
-      ".brand{color:#fff;font-size:8pt;font-weight:800;}",
-      ".eid{color:#00e87a;font-size:6.5pt;font-family:monospace;font-weight:700;}",
-      ".qrwrap{display:flex;justify-content:center;align-items:center;height:37mm;flex-shrink:0;}",
-      ".info{padding:1mm 2mm;flex:1;overflow:hidden;}",
-      ".ename{font-size:6.5pt;font-weight:800;color:#111;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}",
-      ".eserie{font-size:5.5pt;color:#444;font-family:monospace;margin-top:0.5mm;}",
-      ".ecat{font-size:5pt;color:#555;background:#f0f0f0;padding:0.4mm 1.5mm;border-radius:4mm;display:inline-block;margin-top:0.5mm;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
-      ".eger{font-size:5pt;color:#9966ff;font-weight:700;margin-top:0.5mm;}",
-      ".ebase{font-size:5pt;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:0.3mm;}",
-      ".ef{background:#f5f5f5;border-top:1px solid #ddd;flex-shrink:0;height:8mm;display:flex;align-items:center;justify-content:center;}",
-      ".scan{font-size:5.5pt;color:#444;text-transform:uppercase;letter-spacing:0.5pt;font-weight:700;}",
-      "@media print{.et{border-color:#ccc;}}"
+      "html,body{width:216mm;margin:0;padding:0;font-family:Arial,sans-serif;background:#fff;}",
+      "@page{size:letter portrait;margin:8mm;}",
+      // 4 cols × 38mm + 3 gaps × 3mm = 152+9 = 161mm — entra bien en 200mm útil
+      // 3 rows × 90mm + 2 gaps × 3mm = 270+6 = 276mm — entra en 262mm útil (carta menos márgenes)
+      // Ajuste: 3 filas × 87mm = 261mm + gaps = OK
+      ".hoja{display:grid;grid-template-columns:repeat(4,38mm);grid-template-rows:repeat(3,87mm);gap:3mm;padding:2mm;margin:0 auto;width:164mm;}",
+      ".et{width:38mm;height:87mm;border:1px dashed #bbb;border-radius:2.5mm;overflow:hidden;display:flex;flex-direction:column;background:#fff;page-break-inside:avoid;}",
+      ".eh{background:#111;padding:1.5mm 2mm;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;height:8mm;}",
+      ".brand{color:#fff;font-size:7pt;font-weight:800;}",
+      ".eid{color:#00e87a;font-size:5.5pt;font-family:monospace;font-weight:700;}",
+      ".qrwrap{display:flex;justify-content:center;align-items:center;height:38mm;flex-shrink:0;padding:1mm;}",
+      ".info{padding:1mm 1.5mm;flex:1;overflow:hidden;}",
+      ".ename{font-size:5.5pt;font-weight:800;color:#111;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}",
+      ".eserie{font-size:4.5pt;color:#444;font-family:monospace;margin-top:0.5mm;}",
+      ".ecat{font-size:4pt;color:#555;background:#f0f0f0;padding:0.3mm 1mm;border-radius:3mm;display:inline-block;margin-top:0.4mm;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
+      ".eger{font-size:4pt;color:#9966ff;font-weight:700;margin-top:0.3mm;}",
+      ".ebase{font-size:4pt;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:0.2mm;}",
+      ".ef{background:#f5f5f5;border-top:1px solid #ddd;flex-shrink:0;height:7mm;display:flex;align-items:center;justify-content:center;}",
+      ".scan{font-size:4.5pt;color:#444;text-transform:uppercase;letter-spacing:0.3pt;font-weight:700;}",
+      "@media print{html,body{width:216mm;}.et{border-color:#ccc;}}"
     ].join("");
 
     var etiquetasData=equiposSel.map(function(eq){
@@ -2299,7 +2302,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
         'var id="q"+D[i].id.replace("-","");'+
         'var el=document.getElementById(id);'+
         'if(el&&window.QRCode){'+
-          'new QRCode(el,{text:D[i].url,width:120,height:120,colorDark:"#111",colorLight:"#fff",correctLevel:QRCode.CorrectLevel.H});'+
+          'new QRCode(el,{text:D[i].url,width:100,height:100,colorDark:"#111",colorLight:"#fff",correctLevel:QRCode.CorrectLevel.H});'+
         '}'+
         'i++;setTimeout(next,60);'+
       '}'+
@@ -2758,7 +2761,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                   style={{flex:1,padding:"6px",background:"transparent",fontSize:"11px",
                     border:"1px solid #333",borderRadius:"8px",color:C.muted,
                     cursor:"pointer",fontFamily:"inherit"}}>
-                  ☑ Seleccionar 20
+                  ☑ Seleccionar 12
                 </button>
                 {selCount>0&&<button onClick={deselTodos}
                   style={{flex:1,padding:"6px",background:"transparent",fontSize:"11px",

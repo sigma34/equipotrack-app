@@ -2241,27 +2241,29 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
     if(equiposSel.length===0){alert("Selecciona al menos un equipo o filtra la lista");return;}
 
     var estilos=[
-      "*{box-sizing:border-box;margin:0;padding:0;}",
+      "*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;}",
       "html,body{width:216mm;margin:0;padding:0;font-family:Arial,sans-serif;background:#fff;}",
       "@page{size:letter portrait;margin:8mm;}",
-      // 4 cols × 38mm + 3 gaps × 3mm = 152+9 = 161mm — entra bien en 200mm útil
-      // 3 rows × 90mm + 2 gaps × 3mm = 270+6 = 276mm — entra en 262mm útil (carta menos márgenes)
-      // Ajuste: 3 filas × 87mm = 261mm + gaps = OK
       ".hoja{display:grid;grid-template-columns:repeat(4,38mm);grid-template-rows:repeat(3,87mm);gap:3mm;padding:2mm;margin:0 auto;width:164mm;}",
-      ".et{width:38mm;height:87mm;border:1px dashed #bbb;border-radius:2.5mm;overflow:hidden;display:flex;flex-direction:column;background:#fff;page-break-inside:avoid;}",
-      ".eh{background:#111;padding:1.5mm 2mm;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;height:8mm;}",
-      ".brand{color:#fff;font-size:7pt;font-weight:800;}",
-      ".eid{color:#00e87a;font-size:5.5pt;font-family:monospace;font-weight:700;}",
+      ".et{width:38mm;height:87mm;border:1.5px solid #222;border-radius:2.5mm;overflow:hidden;display:flex;flex-direction:column;background:#fff;page-break-inside:avoid;}",
+      ".eh{background:#111111 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:1.5mm 2mm;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;height:8mm;}",
+      ".brand{color:#ffffff !important;font-size:7pt;font-weight:800;}",
+      ".eid{color:#00e87a !important;font-size:5.5pt;font-family:monospace;font-weight:700;}",
       ".qrwrap{display:flex;justify-content:center;align-items:center;height:38mm;flex-shrink:0;padding:1mm;}",
       ".info{padding:1mm 1.5mm;flex:1;overflow:hidden;}",
       ".ename{font-size:5.5pt;font-weight:800;color:#111;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}",
       ".eserie{font-size:4.5pt;color:#444;font-family:monospace;margin-top:0.5mm;}",
-      ".ecat{font-size:4pt;color:#555;background:#f0f0f0;padding:0.3mm 1mm;border-radius:3mm;display:inline-block;margin-top:0.4mm;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
-      ".eger{font-size:4pt;color:#9966ff;font-weight:700;margin-top:0.3mm;}",
-      ".ebase{font-size:4pt;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:0.2mm;}",
-      ".ef{background:#f5f5f5;border-top:1px solid #ddd;flex-shrink:0;height:7mm;display:flex;align-items:center;justify-content:center;}",
-      ".scan{font-size:4.5pt;color:#444;text-transform:uppercase;letter-spacing:0.3pt;font-weight:700;}",
-      "@media print{html,body{width:216mm;}.et{border-color:#ccc;}}"
+      ".ecat{font-size:4pt;color:#333;border:0.5pt solid #bbb;padding:0.3mm 1mm;border-radius:3mm;display:inline-block;margin-top:0.4mm;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
+      ".eger{font-size:4pt;color:#6633cc;font-weight:700;margin-top:0.3mm;}",
+      ".ebase{font-size:4pt;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:0.2mm;}",
+      ".ef{border-top:1pt solid #ccc;flex-shrink:0;height:7mm;display:flex;align-items:center;justify-content:center;background:#f0f0f0 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}",
+      ".scan{font-size:4.5pt;color:#333;text-transform:uppercase;letter-spacing:0.3pt;font-weight:700;}",
+      "@media print{",
+      "  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}",
+      "  .eh{background:#111111!important;}",
+      "  .brand{color:#ffffff!important;}",
+      "  .eid{color:#00e87a!important;}",
+      "}"
     ].join("");
 
     var etiquetasData=equiposSel.map(function(eq){

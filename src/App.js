@@ -2238,115 +2238,106 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
       ?eqsFiltrados.filter(function(eq){return selEtiquetas[eq.id];})
       :eqsFiltrados.slice(0,20);
 
-    if(equiposSel.length===0){alert("Selecciona al menos un equipo");return;}
+    if(equiposSel.length===0){alert("Selecciona al menos un equipo o filtra la lista");return;}
 
-    // Generar QRs con canvas usando la librería que ya está en la app
-    function genQRDataUrl(text,cb){
-      var div=document.createElement("div");
-      document.body.appendChild(div);
-      var qr=new window.QRCode(div,{
-        text:text,width:160,height:160,
-        colorDark:"#111111",colorLight:"#ffffff",
-        correctLevel:window.QRCode&&window.QRCode.CorrectLevel?window.QRCode.CorrectLevel.H:1
-      });
-      setTimeout(function(){
-        var canvas=div.querySelector("canvas");
-        var url=canvas?canvas.toDataURL("image/png"):"";
-        document.body.removeChild(div);
-        cb(url);
-      },300);
-    }
+    // Abrir ventana INMEDIATAMENTE (requerido por Safari iOS — solo en respuesta directa al tap)
+    var w=window.open("","_blank");
+    if(!w){alert("Permite ventanas emergentes para imprimir");return;}
 
-    // Generar todos los QRs primero, luego abrir la ventana
-    var qrUrls={};
-    var pending=equiposSel.length;
-    equiposSel.forEach(function(eq){
-      genQRDataUrl(APP_URL+"?equipo="+eq.id,function(url){
-        qrUrls[eq.id]=url;
-        pending--;
-        if(pending===0) abrirVentana();
-      });
+    // Mostrar pantalla de carga mientras generamos los QR
+    w.document.write(
+      '<!DOCTYPE html><html><head><meta charset="UTF-8">'+
+      '<style>body{font-family:Arial,sans-serif;display:flex;align-items:center;'+
+      'justify-content:center;height:100vh;margin:0;background:#f9f9f9;color:#333;}'+
+      '.msg{text-align:center;}.spin{font-size:32px;animation:s 1s linear infinite;}'+
+      '@keyframes s{to{transform:rotate(360deg);}}</style></head>'+
+      '<body><div class="msg"><div class="spin">⚙️</div>'+
+      '<p style="margin-top:16px;font-size:14px;">Generando códigos QR...</p></div></body></html>'
+    );
+    w.document.close();
+
+    // Cargar QRCode.js en la ventana hija para generar QRs ahí mismo
+    var estilos=[
+      "@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;700;800&display=swap');",
+      "*{box-sizing:border-box;margin:0;padding:0;}",
+      "html,body{font-family:'Sora',Arial,sans-serif;background:#fff;}",
+      "@page{size:letter portrait;margin:6mm;}",
+      ".hoja{display:grid;grid-template-columns:repeat(4,47mm);gap:3mm;padding:2mm;width:200mm;margin:0 auto;}",
+      ".et{width:47mm;height:90mm;border:1px dashed #bbb;border-radius:3mm;overflow:hidden;display:flex;flex-direction:column;background:#fff;page-break-inside:avoid;}",
+      ".eh{background:#111;padding:2mm 2.5mm;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;height:9mm;}",
+      ".brand{color:#fff;font-size:8pt;font-weight:800;}",
+      ".eid{color:#00e87a;font-size:6.5pt;font-family:monospace;font-weight:700;}",
+      ".qrwrap{display:flex;justify-content:center;align-items:center;height:37mm;flex-shrink:0;}",
+      ".info{padding:1mm 2mm;flex:1;overflow:hidden;}",
+      ".ename{font-size:6.5pt;font-weight:800;color:#111;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}",
+      ".eserie{font-size:5.5pt;color:#444;font-family:monospace;margin-top:0.5mm;}",
+      ".ecat{font-size:5pt;color:#555;background:#f0f0f0;padding:0.4mm 1.5mm;border-radius:4mm;display:inline-block;margin-top:0.5mm;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
+      ".eger{font-size:5pt;color:#9966ff;font-weight:700;margin-top:0.5mm;}",
+      ".ebase{font-size:5pt;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:0.3mm;}",
+      ".ef{background:#f5f5f5;border-top:1px solid #ddd;padding:0;flex-shrink:0;height:8mm;display:flex;align-items:center;justify-content:center;}",
+      ".scan{font-size:5.5pt;color:#444;text-transform:uppercase;letter-spacing:0.5pt;font-weight:700;}",
+      "@media print{.et{border-color:#ccc;}}"
+    ].join("\n");
+
+    var etiquetasData=equiposSel.map(function(eq){
+      var base=[(eq.ciudad_base||""),(eq.estado_base||"")].filter(Boolean).join(", ");
+      var sitio=eq.sitio_base||"";
+      return {
+        id:eq.id,
+        nombre:eq.nombre,
+        serie:eq.serie||"—",
+        categoria:eq.categoria||"",
+        gerencia:eq.gerencia||"",
+        base:base+(sitio?" · "+sitio:""),
+        url:APP_URL+"?equipo="+eq.id
+      };
     });
 
-    function abrirVentana(){
-      // Calcular filas necesarias
-      var cols=4;
-      var rows=Math.ceil(equiposSel.length/cols);
-
-      var estilos=[
-        "@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;700;800&display=swap');",
-        "*{box-sizing:border-box;margin:0;padding:0;}",
-        "html,body{width:216mm;font-family:'Sora',Arial,sans-serif;background:#fff;}",
-        "@page{size:letter portrait;margin:6mm;}",
-        ".hoja{",
-        "  display:grid;",
-        "  grid-template-columns:repeat(4,47mm);",
-        "  grid-template-rows:repeat("+rows+",90mm);",
-        "  gap:3mm;",
-        "  padding:2mm;",
-        "  width:200mm;",
-        "  margin:0 auto;",
-        "}",
-        ".et{width:47mm;height:90mm;border:1px dashed #bbb;border-radius:3mm;overflow:hidden;",
-        "  display:flex;flex-direction:column;background:#fff;page-break-inside:avoid;}",
-        ".eh{background:#111;padding:2mm 2.5mm;display:flex;align-items:center;",
-        "  justify-content:space-between;flex-shrink:0;height:9mm;}",
-        ".brand{color:#fff;font-size:8pt;font-weight:800;font-family:'Sora',Arial,sans-serif;}",
-        ".eid{color:#00e87a;font-size:6.5pt;font-family:monospace;font-weight:700;}",
-        ".qrwrap{display:flex;justify-content:center;align-items:center;padding:2mm 1mm 1mm;height:37mm;flex-shrink:0;}",
-        ".qrwrap img{width:33mm;height:33mm;display:block;}",
-        ".info{padding:1mm 2mm;flex:1;overflow:hidden;}",
-        ".ename{font-size:6.5pt;font-weight:800;color:#111;line-height:1.2;",
-        "  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}",
-        ".eserie{font-size:5.5pt;color:#444;font-family:monospace;margin-top:0.5mm;}",
-        ".ecat{font-size:5pt;color:#555;background:#f0f0f0;padding:0.4mm 1.5mm;",
-        "  border-radius:4mm;display:inline-block;margin-top:0.5mm;max-width:100%;",
-        "  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
-        ".eger{font-size:5pt;color:#9966ff;font-weight:700;margin-top:0.5mm;}",
-        ".ebase{font-size:5pt;color:#888;overflow:hidden;text-overflow:ellipsis;",
-        "  white-space:nowrap;margin-top:0.3mm;}",
-        ".ef{background:#f5f5f5;border-top:1px solid #ddd;padding:1.5mm 2mm;",
-        "  flex-shrink:0;text-align:center;height:8mm;display:flex;align-items:center;justify-content:center;}",
-        ".scan{font-size:5.5pt;color:#444;text-transform:uppercase;letter-spacing:0.5pt;font-weight:700;}",
-        "@media print{",
-        "  html,body{width:216mm;}",
-        "  .et{border-color:#ccc;}",
-        "}"
-      ].join("\n");
-
-      var etiquetas=equiposSel.map(function(eq){
-        var qrImg=qrUrls[eq.id]?'<img src="'+qrUrls[eq.id]+'" alt="QR"/>':'';
-        var base=[(eq.ciudad_base||""),(eq.estado_base||"")].filter(Boolean).join(", ");
-        var sitio=eq.sitio_base||"";
-        return '<div class="et">'+
-          '<div class="eh">'+
-            '<span class="brand">Lumo</span>'+
-            '<span class="eid">'+eq.id+'</span>'+
-          '</div>'+
-          '<div class="qrwrap">'+qrImg+'</div>'+
-          '<div class="info">'+
-            '<div class="ename">'+eq.nombre+'</div>'+
-            '<div class="eserie">S/N: '+(eq.serie||"—")+'</div>'+
-            (eq.categoria?'<div class="ecat">'+eq.categoria+'</div>':'')+
-            (eq.gerencia?'<div class="eger">'+eq.gerencia+'</div>':'')+
-            (base?'<div class="ebase">'+base+(sitio?' · '+sitio:'')+'</div>':'')+
-          '</div>'+
-          '<div class="ef"><span class="scan">Escanea para registrar</span></div>'+
-        '</div>';
-      }).join("");
-
-      var w=window.open("","_blank");
-      if(!w)return;
+    // Escribir HTML final con script que genera QRs en la ventana hija
+    setTimeout(function(){
+      if(!w||w.closed) return;
+      w.document.open();
       w.document.write(
         '<!DOCTYPE html><html><head><meta charset="UTF-8">'+
         '<title>Etiquetas Lumo</title>'+
-        '<style>'+estilos+'</style></head>'+
-        '<body><div class="hoja">'+etiquetas+'</div>'+
-        '<script>window.onload=function(){window.print();}<\/script>'+
+        '<style>'+estilos+'</style>'+
+        '<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>'+
+        '</head><body>'+
+        '<div class="hoja" id="hoja">'+
+        etiquetasData.map(function(eq){
+          return '<div class="et">'+
+            '<div class="eh">'+
+              '<span class="brand">Lumo</span>'+
+              '<span class="eid">'+eq.id+'</span>'+
+            '</div>'+
+            '<div class="qrwrap" id="qr-'+eq.id+'"></div>'+
+            '<div class="info">'+
+              '<div class="ename">'+eq.nombre+'</div>'+
+              '<div class="eserie">S/N: '+eq.serie+'</div>'+
+              (eq.categoria?'<div class="ecat">'+eq.categoria+'</div>':'')+
+              (eq.gerencia?'<div class="eger">'+eq.gerencia+'</div>':'')+
+              (eq.base?'<div class="ebase">'+eq.base+'</div>':'')+
+            '</div>'+
+            '<div class="ef"><span class="scan">Escanea para registrar</span></div>'+
+          '</div>';
+        }).join("")+
+        '</div>'+
+        '<script>'+
+        'var datos='+JSON.stringify(etiquetasData)+';'+
+        'function gen(i){'+
+        '  if(i>=datos.length){setTimeout(function(){window.print();},400);return;}'+
+        '  var d=document.getElementById("qr-"+datos[i].id);'+
+        '  if(!d){gen(i+1);return;}'+
+        '  new QRCode(d,{text:datos[i].url,width:125,height:125,'+
+        '    colorDark:"#111",colorLight:"#fff",correctLevel:QRCode.CorrectLevel.H});'+
+        '  setTimeout(function(){gen(i+1);},80);'+
+        '}'+
+        'window.onload=function(){gen(0);};'+
+        '<\/script>'+
         '</body></html>'
       );
       w.document.close();
-    }
+    },100);
   }
 
   function exportarCSV(){

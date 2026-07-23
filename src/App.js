@@ -2214,6 +2214,74 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
     }catch(ex){alert("Error: "+ex.message);}
   }
 
+  function imprimirHojaEtiquetas(){
+    // Genera página carta con 20 etiquetas (4 col x 5 filas) 38x90mm
+    var equipos=eqsFiltrados.length>0?eqsFiltrados:listaEqs;
+    var APP_URL="https://equipotrack-app.vercel.app";
+
+    var estilos=[
+      "@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;700;800&display=swap');",
+      "*{box-sizing:border-box;margin:0;padding:0;}",
+      "body{font-family:'Sora',Arial,sans-serif;background:#fff;padding:8mm;}",
+      "@page{size:letter;margin:8mm;}",
+      ".hoja{display:grid;grid-template-columns:repeat(4,38mm);grid-template-rows:repeat(5,90mm);gap:4mm;justify-content:center;}",
+      ".et{width:38mm;height:90mm;border:1.5px solid #222;border-radius:3mm;overflow:hidden;display:flex;flex-direction:column;background:#fff;page-break-inside:avoid;}",
+      ".eh{background:#111;padding:2mm 2.5mm;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}",
+      ".brand{color:#fff;font-size:7pt;font-weight:800;}",
+      ".eid{color:#00e87a;font-size:6pt;font-family:monospace;font-weight:700;}",
+      ".qrwrap{display:flex;justify-content:center;align-items:center;padding:2mm 1.5mm 1mm;flex-shrink:0;}",
+      ".qrwrap img{width:30mm;height:30mm;display:block;}",
+      ".info{padding:1mm 2mm;flex:1;display:flex;flex-direction:column;gap:0.5mm;}",
+      ".ename{font-size:6.5pt;font-weight:800;color:#111;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}",
+      ".eserie{font-size:5.5pt;color:#333;font-family:monospace;font-weight:600;}",
+      ".ecat{font-size:5pt;color:#555;background:#f5f5f5;padding:0.5mm 2mm;border-radius:5mm;display:inline-block;margin-top:0.5mm;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
+      ".eger{font-size:5pt;color:#9966ff;font-weight:700;}",
+      ".ebase{font-size:5pt;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
+      ".ef{background:#f0f0f0;border-top:1px solid #ddd;padding:1.5mm 2mm;flex-shrink:0;text-align:center;}",
+      ".scan{font-size:5.5pt;color:#444;text-transform:uppercase;letter-spacing:0.5pt;font-weight:700;}",
+      "@media print{body{padding:0;}.et{border-color:#aaa;}}"
+    ].join("");
+
+    var items=equipos.slice(0,20); // máximo 20 por hoja carta
+    var etiquetas=items.map(function(eq){
+      var url=APP_URL+"?equipo="+eq.id;
+      // QR via API de Google Charts (no requiere JS)
+      var qrSrc="https://chart.googleapis.com/chart?chs=160x160&cht=qr&chl="+encodeURIComponent(url)+"&choe=UTF-8&chld=H|1";
+      var base=[(eq.ciudad_base||""),(eq.estado_base||"")].filter(Boolean).join(", ");
+      var sitio=eq.sitio_base||"";
+      return '<div class="et">'+
+        '<div class="eh">'+
+          '<span class="brand">Lumo</span>'+
+          '<span class="eid">'+eq.id+'</span>'+
+        '</div>'+
+        '<div class="qrwrap"><img src="'+qrSrc+'" alt="QR"/></div>'+
+        '<div class="info">'+
+          '<div class="ename">'+eq.nombre+'</div>'+
+          '<div class="eserie">S/N: '+(eq.serie||"—")+'</div>'+
+          (eq.categoria?'<div class="ecat">'+eq.categoria+'</div>':'')+
+          (eq.gerencia?'<div class="eger">'+eq.gerencia+'</div>':'')+
+          (base?'<div class="ebase">'+base+(sitio?' · '+sitio:'')+'</div>':'')+
+        '</div>'+
+        '<div class="ef"><span class="scan">Escanea para registrar</span></div>'+
+      '</div>';
+    }).join("");
+
+    var html='<!DOCTYPE html><html><head><meta charset="UTF-8">'+
+      '<title>Etiquetas Lumo — Hoja '+new Date().toLocaleDateString('es-MX')+'</title>'+
+      '<style>'+estilos+'</style></head>'+
+      '<body>'+
+      '<div class="hoja">'+etiquetas+'</div>'+
+      '</body></html>';
+
+    var w=window.open("","_blank");
+    if(!w) return;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    // Esperar que carguen los QR antes de imprimir
+    setTimeout(function(){w.print();},1800);
+  }
+
   function exportarCSV(){
     var headers=["ID","Nombre","Serie","Categoria","Gerencia","Estado Base","Ciudad Base","Sitio Base","Administrador","Estatus"];
     var rows=listaEqs.map(function(eq){
@@ -2626,13 +2694,22 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                   </button>
                 );})}
               </div>
-              {listaEqs.length>0&&<button onClick={exportarCSV}
-                style={{width:"100%",padding:"10px",background:"transparent",
-                  border:"1px solid "+C.green+"44",borderRadius:"10px",
-                  color:C.green,cursor:"pointer",fontSize:"12px",
-                  fontWeight:"700",fontFamily:"inherit",marginBottom:"4px"}}>
-                📊 Exportar CSV de auditoría ({listaEqs.length} equipos)
-              </button>}
+              {listaEqs.length>0&&<div style={{display:"flex",gap:"8px"}}>
+                <button onClick={exportarCSV}
+                  style={{flex:1,padding:"10px",background:"transparent",
+                    border:"1px solid "+C.green+"44",borderRadius:"10px",
+                    color:C.green,cursor:"pointer",fontSize:"12px",
+                    fontWeight:"700",fontFamily:"inherit"}}>
+                  📊 Exportar CSV ({listaEqs.length})
+                </button>
+                <button onClick={imprimirHojaEtiquetas}
+                  style={{flex:1,padding:"10px",background:"transparent",
+                    border:"1px solid #9966ff44",borderRadius:"10px",
+                    color:"#9966ff",cursor:"pointer",fontSize:"12px",
+                    fontWeight:"700",fontFamily:"inherit"}}>
+                  🖨️ Hoja QR ({Math.min(eqsFiltrados.length||listaEqs.length,20)})
+                </button>
+              </div>}
               {eqsFiltrados.length===0&&<p style={{textAlign:"center",color:C.muted,padding:"20px",fontSize:"13px"}}>
                 {busqAdmin||soloMios?"Sin resultados para este filtro":"Sin equipos registrados"}
               </p>}
@@ -3571,7 +3648,7 @@ export default function App(){
       const [eqsR,regsR,histR,prfsR]=await Promise.allSettled([
         supa("equipos",{token,params:{order:"created_at.asc",activo:"eq.true"}}),
         supa("registros",{token,params:{order:"fecha_retiro.desc"}}),
-        supa("historial",{token,params:{order:"fecha_devolucion.desc",limit:"200"}}),
+        supa("historial",{token,params:{order:"fecha_devolucion.desc",limit:"200",select:"*"}}),
         supa("perfiles",{token,params:{order:"nombre.asc",select:"*"}}),
       ]);
 
@@ -3579,6 +3656,8 @@ export default function App(){
       var eqList=eqsR.status==="fulfilled"?(eqsR.value||[]):[];
       var regs=regsR.status==="fulfilled"?(regsR.value||[]):[];
       var hist=histR.status==="fulfilled"?(histR.value||[]):[];
+      // Debug temporal — verificar que comentario llega
+      if(hist.length>0) console.log("Historial[0]:",JSON.stringify(hist[0]));
       var prfs=prfsR.status==="fulfilled"?(prfsR.value||[]):[];
 
       // Si todos fallaron y es el primer intento, reintentar una vez silenciosamente

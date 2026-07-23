@@ -2214,72 +2214,139 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
     }catch(ex){alert("Error: "+ex.message);}
   }
 
+  // Selección de equipos para hoja QR
+  const [selEtiquetas,setSelEtiquetas]=useState({}); // {id: true}
+  const selCount=Object.keys(selEtiquetas).filter(function(k){return selEtiquetas[k];}).length;
+
+  function toggleSelEtiqueta(id){
+    setSelEtiquetas(function(prev){
+      var n=Object.assign({},prev);
+      n[id]=!n[id];
+      return n;
+    });
+  }
+  function selTodos(){
+    var todos={};
+    eqsFiltrados.slice(0,20).forEach(function(eq){todos[eq.id]=true;});
+    setSelEtiquetas(todos);
+  }
+  function deselTodos(){setSelEtiquetas({});}
+
   function imprimirHojaEtiquetas(){
-    // Genera página carta con 20 etiquetas (4 col x 5 filas) 38x90mm
-    var equipos=eqsFiltrados.length>0?eqsFiltrados:listaEqs;
     var APP_URL="https://equipotrack-app.vercel.app";
+    var equiposSel=selCount>0
+      ?eqsFiltrados.filter(function(eq){return selEtiquetas[eq.id];})
+      :eqsFiltrados.slice(0,20);
 
-    var estilos=[
-      "@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;700;800&display=swap');",
-      "*{box-sizing:border-box;margin:0;padding:0;}",
-      "body{font-family:'Sora',Arial,sans-serif;background:#fff;padding:8mm;}",
-      "@page{size:letter;margin:8mm;}",
-      ".hoja{display:grid;grid-template-columns:repeat(4,38mm);grid-template-rows:repeat(5,90mm);gap:4mm;justify-content:center;}",
-      ".et{width:38mm;height:90mm;border:1.5px solid #222;border-radius:3mm;overflow:hidden;display:flex;flex-direction:column;background:#fff;page-break-inside:avoid;}",
-      ".eh{background:#111;padding:2mm 2.5mm;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}",
-      ".brand{color:#fff;font-size:7pt;font-weight:800;}",
-      ".eid{color:#00e87a;font-size:6pt;font-family:monospace;font-weight:700;}",
-      ".qrwrap{display:flex;justify-content:center;align-items:center;padding:2mm 1.5mm 1mm;flex-shrink:0;}",
-      ".qrwrap img{width:30mm;height:30mm;display:block;}",
-      ".info{padding:1mm 2mm;flex:1;display:flex;flex-direction:column;gap:0.5mm;}",
-      ".ename{font-size:6.5pt;font-weight:800;color:#111;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}",
-      ".eserie{font-size:5.5pt;color:#333;font-family:monospace;font-weight:600;}",
-      ".ecat{font-size:5pt;color:#555;background:#f5f5f5;padding:0.5mm 2mm;border-radius:5mm;display:inline-block;margin-top:0.5mm;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
-      ".eger{font-size:5pt;color:#9966ff;font-weight:700;}",
-      ".ebase{font-size:5pt;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
-      ".ef{background:#f0f0f0;border-top:1px solid #ddd;padding:1.5mm 2mm;flex-shrink:0;text-align:center;}",
-      ".scan{font-size:5.5pt;color:#444;text-transform:uppercase;letter-spacing:0.5pt;font-weight:700;}",
-      "@media print{body{padding:0;}.et{border-color:#aaa;}}"
-    ].join("");
+    if(equiposSel.length===0){alert("Selecciona al menos un equipo");return;}
 
-    var items=equipos.slice(0,20); // máximo 20 por hoja carta
-    var etiquetas=items.map(function(eq){
-      var url=APP_URL+"?equipo="+eq.id;
-      // QR via API de Google Charts (no requiere JS)
-      var qrSrc="https://chart.googleapis.com/chart?chs=160x160&cht=qr&chl="+encodeURIComponent(url)+"&choe=UTF-8&chld=H|1";
-      var base=[(eq.ciudad_base||""),(eq.estado_base||"")].filter(Boolean).join(", ");
-      var sitio=eq.sitio_base||"";
-      return '<div class="et">'+
-        '<div class="eh">'+
-          '<span class="brand">Lumo</span>'+
-          '<span class="eid">'+eq.id+'</span>'+
-        '</div>'+
-        '<div class="qrwrap"><img src="'+qrSrc+'" alt="QR"/></div>'+
-        '<div class="info">'+
-          '<div class="ename">'+eq.nombre+'</div>'+
-          '<div class="eserie">S/N: '+(eq.serie||"—")+'</div>'+
-          (eq.categoria?'<div class="ecat">'+eq.categoria+'</div>':'')+
-          (eq.gerencia?'<div class="eger">'+eq.gerencia+'</div>':'')+
-          (base?'<div class="ebase">'+base+(sitio?' · '+sitio:'')+'</div>':'')+
-        '</div>'+
-        '<div class="ef"><span class="scan">Escanea para registrar</span></div>'+
-      '</div>';
-    }).join("");
+    // Generar QRs con canvas usando la librería que ya está en la app
+    function genQRDataUrl(text,cb){
+      var div=document.createElement("div");
+      document.body.appendChild(div);
+      var qr=new window.QRCode(div,{
+        text:text,width:160,height:160,
+        colorDark:"#111111",colorLight:"#ffffff",
+        correctLevel:window.QRCode&&window.QRCode.CorrectLevel?window.QRCode.CorrectLevel.H:1
+      });
+      setTimeout(function(){
+        var canvas=div.querySelector("canvas");
+        var url=canvas?canvas.toDataURL("image/png"):"";
+        document.body.removeChild(div);
+        cb(url);
+      },300);
+    }
 
-    var html='<!DOCTYPE html><html><head><meta charset="UTF-8">'+
-      '<title>Etiquetas Lumo — Hoja '+new Date().toLocaleDateString('es-MX')+'</title>'+
-      '<style>'+estilos+'</style></head>'+
-      '<body>'+
-      '<div class="hoja">'+etiquetas+'</div>'+
-      '</body></html>';
+    // Generar todos los QRs primero, luego abrir la ventana
+    var qrUrls={};
+    var pending=equiposSel.length;
+    equiposSel.forEach(function(eq){
+      genQRDataUrl(APP_URL+"?equipo="+eq.id,function(url){
+        qrUrls[eq.id]=url;
+        pending--;
+        if(pending===0) abrirVentana();
+      });
+    });
 
-    var w=window.open("","_blank");
-    if(!w) return;
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
-    // Esperar que carguen los QR antes de imprimir
-    setTimeout(function(){w.print();},1800);
+    function abrirVentana(){
+      // Calcular filas necesarias
+      var cols=4;
+      var rows=Math.ceil(equiposSel.length/cols);
+
+      var estilos=[
+        "@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;700;800&display=swap');",
+        "*{box-sizing:border-box;margin:0;padding:0;}",
+        "html,body{width:216mm;font-family:'Sora',Arial,sans-serif;background:#fff;}",
+        "@page{size:letter portrait;margin:6mm;}",
+        ".hoja{",
+        "  display:grid;",
+        "  grid-template-columns:repeat(4,47mm);",
+        "  grid-template-rows:repeat("+rows+",90mm);",
+        "  gap:3mm;",
+        "  padding:2mm;",
+        "  width:200mm;",
+        "  margin:0 auto;",
+        "}",
+        ".et{width:47mm;height:90mm;border:1px dashed #bbb;border-radius:3mm;overflow:hidden;",
+        "  display:flex;flex-direction:column;background:#fff;page-break-inside:avoid;}",
+        ".eh{background:#111;padding:2mm 2.5mm;display:flex;align-items:center;",
+        "  justify-content:space-between;flex-shrink:0;height:9mm;}",
+        ".brand{color:#fff;font-size:8pt;font-weight:800;font-family:'Sora',Arial,sans-serif;}",
+        ".eid{color:#00e87a;font-size:6.5pt;font-family:monospace;font-weight:700;}",
+        ".qrwrap{display:flex;justify-content:center;align-items:center;padding:2mm 1mm 1mm;height:37mm;flex-shrink:0;}",
+        ".qrwrap img{width:33mm;height:33mm;display:block;}",
+        ".info{padding:1mm 2mm;flex:1;overflow:hidden;}",
+        ".ename{font-size:6.5pt;font-weight:800;color:#111;line-height:1.2;",
+        "  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}",
+        ".eserie{font-size:5.5pt;color:#444;font-family:monospace;margin-top:0.5mm;}",
+        ".ecat{font-size:5pt;color:#555;background:#f0f0f0;padding:0.4mm 1.5mm;",
+        "  border-radius:4mm;display:inline-block;margin-top:0.5mm;max-width:100%;",
+        "  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
+        ".eger{font-size:5pt;color:#9966ff;font-weight:700;margin-top:0.5mm;}",
+        ".ebase{font-size:5pt;color:#888;overflow:hidden;text-overflow:ellipsis;",
+        "  white-space:nowrap;margin-top:0.3mm;}",
+        ".ef{background:#f5f5f5;border-top:1px solid #ddd;padding:1.5mm 2mm;",
+        "  flex-shrink:0;text-align:center;height:8mm;display:flex;align-items:center;justify-content:center;}",
+        ".scan{font-size:5.5pt;color:#444;text-transform:uppercase;letter-spacing:0.5pt;font-weight:700;}",
+        "@media print{",
+        "  html,body{width:216mm;}",
+        "  .et{border-color:#ccc;}",
+        "}"
+      ].join("\n");
+
+      var etiquetas=equiposSel.map(function(eq){
+        var qrImg=qrUrls[eq.id]?'<img src="'+qrUrls[eq.id]+'" alt="QR"/>':'';
+        var base=[(eq.ciudad_base||""),(eq.estado_base||"")].filter(Boolean).join(", ");
+        var sitio=eq.sitio_base||"";
+        return '<div class="et">'+
+          '<div class="eh">'+
+            '<span class="brand">Lumo</span>'+
+            '<span class="eid">'+eq.id+'</span>'+
+          '</div>'+
+          '<div class="qrwrap">'+qrImg+'</div>'+
+          '<div class="info">'+
+            '<div class="ename">'+eq.nombre+'</div>'+
+            '<div class="eserie">S/N: '+(eq.serie||"—")+'</div>'+
+            (eq.categoria?'<div class="ecat">'+eq.categoria+'</div>':'')+
+            (eq.gerencia?'<div class="eger">'+eq.gerencia+'</div>':'')+
+            (base?'<div class="ebase">'+base+(sitio?' · '+sitio:'')+'</div>':'')+
+          '</div>'+
+          '<div class="ef"><span class="scan">Escanea para registrar</span></div>'+
+        '</div>';
+      }).join("");
+
+      var w=window.open("","_blank");
+      if(!w)return;
+      w.document.write(
+        '<!DOCTYPE html><html><head><meta charset="UTF-8">'+
+        '<title>Etiquetas Lumo</title>'+
+        '<style>'+estilos+'</style></head>'+
+        '<body><div class="hoja">'+etiquetas+'</div>'+
+        '<script>window.onload=function(){window.print();}<\/script>'+
+        '</body></html>'
+      );
+      w.document.close();
+    }
   }
 
   function exportarCSV(){
@@ -2700,15 +2767,32 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                     border:"1px solid "+C.green+"44",borderRadius:"10px",
                     color:C.green,cursor:"pointer",fontSize:"12px",
                     fontWeight:"700",fontFamily:"inherit"}}>
-                  📊 Exportar CSV ({listaEqs.length})
+                  📊 CSV ({listaEqs.length})
                 </button>
                 <button onClick={imprimirHojaEtiquetas}
+                  disabled={eqsFiltrados.length===0}
                   style={{flex:1,padding:"10px",background:"transparent",
-                    border:"1px solid #9966ff44",borderRadius:"10px",
-                    color:"#9966ff",cursor:"pointer",fontSize:"12px",
-                    fontWeight:"700",fontFamily:"inherit"}}>
-                  🖨️ Hoja QR ({Math.min(eqsFiltrados.length||listaEqs.length,20)})
+                    border:"1px solid #9966ff"+(eqsFiltrados.length===0?"22":"44"),borderRadius:"10px",
+                    color:eqsFiltrados.length===0?"#333":"#9966ff",
+                    cursor:eqsFiltrados.length===0?"not-allowed":"pointer",
+                    fontSize:"12px",fontWeight:"700",fontFamily:"inherit"}}>
+                  🖨️ {selCount>0?"Imprimir ("+selCount+")":"Hoja QR"}
                 </button>
+              </div>}
+              {/* Controles de selección para hoja QR */}
+              {eqsFiltrados.length>0&&<div style={{display:"flex",gap:"6px",alignItems:"center"}}>
+                <button onClick={selTodos}
+                  style={{flex:1,padding:"6px",background:"transparent",fontSize:"11px",
+                    border:"1px solid #333",borderRadius:"8px",color:C.muted,
+                    cursor:"pointer",fontFamily:"inherit"}}>
+                  ☑ Seleccionar 20
+                </button>
+                {selCount>0&&<button onClick={deselTodos}
+                  style={{flex:1,padding:"6px",background:"transparent",fontSize:"11px",
+                    border:"1px solid #333",borderRadius:"8px",color:C.muted,
+                    cursor:"pointer",fontFamily:"inherit"}}>
+                  ✕ Quitar selección ({selCount})
+                </button>}
               </div>}
               {eqsFiltrados.length===0&&<p style={{textAlign:"center",color:C.muted,padding:"20px",fontSize:"13px"}}>
                 {busqAdmin||soloMios?"Sin resultados para este filtro":"Sin equipos registrados"}
@@ -2723,8 +2807,19 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                 var inactivo=!eq.activo;
                 return(
                   <div key={eq.id} style={{background:"#12121f",
-                    border:"1px solid "+(enRep?"#ff950044":inactivo?"#ff3b3b33":C.border),
-                    borderRadius:"12px",padding:"12px 14px"}}>
+                    border:"1px solid "+(selEtiquetas[eq.id]?"#9966ff":(enRep?"#ff950044":inactivo?"#ff3b3b33":C.border)),
+                    borderRadius:"12px",padding:"12px 14px",
+                    position:"relative"}}>
+                    {/* Checkbox selección QR */}
+                    <div onClick={function(){toggleSelEtiqueta(eq.id);}}
+                      style={{position:"absolute",top:"10px",right:"10px",
+                        width:"20px",height:"20px",borderRadius:"50%",
+                        border:"2px solid "+(selEtiquetas[eq.id]?"#9966ff":C.border),
+                        background:selEtiquetas[eq.id]?"#9966ff":"transparent",
+                        cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
+                        flexShrink:0,zIndex:1}}>
+                      {selEtiquetas[eq.id]&&<span style={{color:"#fff",fontSize:"11px",fontWeight:"800",lineHeight:1}}>✓</span>}
+                    </div>
                     <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:"8px"}}>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:"flex",alignItems:"center",gap:"6px",marginBottom:"4px",flexWrap:"wrap"}}>

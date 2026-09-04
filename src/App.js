@@ -1991,8 +1991,13 @@ function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
   const [comentario,setComentario]=useState("");
   const [loading,setLoading]=useState(false),[listo,setListo]=useState(false);
 
-  async function confirmar(){
-    if(!foto)return;setLoading(true);
+  // Detectar si quien devuelve es distinto de quien retiró
+  var esOtraPersona=registro.ingeniero&&session.nombre&&
+    registro.ingeniero.trim().toLowerCase()!==session.nombre.trim().toLowerCase();
+  const [confirmarOtro,setConfirmarOtro]=useState(false);
+
+  async function procederConfirmar(){
+    setLoading(true);
     try{
       // 1. Subir foto de devolución a Storage
       var fotoUrl=foto;
@@ -2001,21 +2006,20 @@ function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
           fotoUrl=await subirFotoStorage(foto,token,equipo.id,"checkin");
       }catch(e){fotoUrl=foto;}
 
-      // 2. Insertar en historial
+      // 2. Insertar en historial — devuelto_por solo si es persona distinta
       await supa("historial",{method:"POST",token,body:{
         equipo_id:equipo.id,equipo_nombre:equipo.nombre,
         user_id:getUserId(session),
         ingeniero:registro.ingeniero,estado:registro.estado,ciudad:registro.ciudad,
         fecha_retiro:registro.fecha_retiro,
         foto_retiro:registro.foto_retiro,foto_devolucion:fotoUrl,
-        // Combinar comentario del checkout (registro) y del checkin (este modal)
         comentario:[registro.comentario,comentario].filter(Boolean).join(" | ")||null,
         dias:getDias(registro.fecha_retiro),tipo:registro.tipo,
         guia_paqueteria:registro.guia_paqueteria,
+        devuelto_por:esOtraPersona?session.nombre:null,
       }});
 
       // 3. Borrar registro activo
-      // Intentar primero con el token del usuario actual
       var delRes=await fetch(
         SUPA_URL+"/rest/v1/registros?equipo_id=eq."+equipo.id,
         {method:"DELETE",headers:{
@@ -2037,11 +2041,55 @@ function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
     finally{setLoading(false);}
   }
 
+  function confirmar(){
+    if(!foto)return;
+    // Si es otra persona y aún no confirmó el aviso, mostrar el popup primero
+    if(esOtraPersona&&!confirmarOtro){
+      setConfirmarOtro(true);
+      return;
+    }
+    procederConfirmar();
+  }
+
   if(listo)return(
     <div style={{position:"fixed",inset:0,zIndex:900,background:"rgba(0,0,0,0.92)",
       display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:"12px"}}>
       <div style={{fontSize:"70px"}}>✅</div>
       <p style={{color:C.green,fontSize:"20px",fontWeight:"800"}}>¡Equipo devuelto!</p>
+    </div>
+  );
+
+  // Popup de confirmación cuando otra persona devuelve el equipo
+  if(confirmarOtro)return(
+    <div style={{position:"fixed",inset:0,zIndex:20000,background:"rgba(0,0,0,0.85)",
+      display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}}>
+      <div style={{background:C.card,border:"1px solid "+C.orange+"66",borderRadius:"18px",
+        padding:"24px",maxWidth:"360px",width:"100%"}}>
+        <div style={{fontSize:"40px",textAlign:"center",marginBottom:"12px"}}>⚠️</div>
+        <h3 style={{color:C.orange,fontSize:"16px",fontWeight:"800",textAlign:"center",marginBottom:"10px"}}>
+          Equipo asignado a otra persona
+        </h3>
+        <p style={{color:"#ccc",fontSize:"13px",lineHeight:1.6,textAlign:"center",marginBottom:"20px"}}>
+          Este equipo está registrado a nombre de <strong style={{color:"#fff"}}>{registro.ingeniero}</strong>.
+          Estás a punto de registrar su devolución como <strong style={{color:"#fff"}}>{session.nombre}</strong>.
+          ¿Confirmas que quieres continuar?
+        </p>
+        <div style={{display:"flex",gap:"10px"}}>
+          <button onClick={()=>setConfirmarOtro(false)}
+            style={{flex:1,padding:"12px",background:"transparent",
+              border:"1px solid "+C.border,borderRadius:"10px",
+              color:C.muted,fontWeight:"700",fontSize:"13px",cursor:"pointer",fontFamily:"inherit"}}>
+            Cancelar
+          </button>
+          <button onClick={procederConfirmar} disabled={loading}
+            style={{flex:1,padding:"12px",background:C.orange,
+              border:"none",borderRadius:"10px",
+              color:"#1a0e00",fontWeight:"800",fontSize:"13px",
+              cursor:loading?"wait":"pointer",fontFamily:"inherit"}}>
+            {loading?"Guardando…":"Sí, confirmar"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 
@@ -2074,6 +2122,12 @@ function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
           {equipo.serie&&<Row label="S/N" value={equipo.serie} last/>}
           {!equipo.serie&&<Row label="Retiro" value={fmt(registro.fecha_retiro)} last/>}
         </div>
+        {esOtraPersona&&<div style={{marginBottom:"14px",background:"#1a0e00",border:"1px solid "+C.orange+"44",
+          borderRadius:"10px",padding:"8px 12px"}}>
+          <p style={{color:C.orange,fontSize:"11px",fontWeight:"700",margin:0,lineHeight:1.5}}>
+            ⚠️ Este equipo no está a tu nombre — al confirmar se te pedirá verificarlo.
+          </p>
+        </div>}
         {equipo.notas&&<div style={{marginBottom:"14px",background:"#1a1200",border:"1px solid "+C.orange+"44",
           borderRadius:"10px",padding:"8px 12px"}}>
           <p style={{color:C.orange,fontSize:"10px",fontWeight:"700",marginBottom:"3px",letterSpacing:"0.08em"}}>
@@ -4274,7 +4328,8 @@ export default function App(){
                     <Row label="Ciudad" value={`${h.ciudad}, ${h.estado}`}/>
                     {h.guia_paqueteria&&<Row label="Guía" value={h.guia_paqueteria}/>}
                     <Row label="Retiro" value={fmt(h.fecha_retiro)}/>
-                    <Row label="Devolución" value={fmt(h.fecha_devolucion)} last={!h.comentario}/>
+                    <Row label="Devolución" value={fmt(h.fecha_devolucion)} last={!h.comentario&&!h.devuelto_por}/>
+                    {h.devuelto_por&&<Row label="Devuelto por" value={h.devuelto_por} last={!h.comentario}/>}
                     {h.comentario&&<div style={{marginTop:"8px",padding:"8px 10px",
                       background:"#0d0d1a",border:"1px solid #2a2a4a",
                       borderRadius:"8px",borderLeft:"3px solid "+C.blue}}>

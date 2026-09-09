@@ -1055,6 +1055,8 @@ function CambiarContrasenaPrimerLogin({session, onComplete}){
     {ok:/[0-9]/.test(pass),label:"1 número"},
   ];
 
+  const [listo,setListo]=useState(false);
+
   async function guardar(e){
     e.preventDefault();
     if(!nombreReal&&!nombreInput.trim()){setErr("Por favor ingresa tu nombre completo.");return;}
@@ -1095,10 +1097,26 @@ function CambiarContrasenaPrimerLogin({session, onComplete}){
           });
         }catch(pe){}
       }
-      onComplete();
+      setListo(true);
+      setTimeout(function(){onComplete();},2200);
     }catch(ex){setErr(ex.message);}
     finally{setLoading(false);}
   }
+
+  if(listo)return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
+      justifyContent:"center",padding:"20px",fontFamily:"'Sora',sans-serif"}}>
+      <div style={{textAlign:"center"}}>
+        <div style={{fontSize:"56px",marginBottom:"14px"}}>✅</div>
+        <p style={{color:C.green,fontSize:"18px",fontWeight:"800",marginBottom:"6px"}}>
+          Contraseña actualizada
+        </p>
+        <p style={{color:C.muted,fontSize:"13px"}}>
+          Vuelve a iniciar sesión con tu nueva contraseña…
+        </p>
+      </div>
+    </div>
+  );
 
   return(
     <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",
@@ -3964,11 +3982,10 @@ export default function App(){
   if(session.debeContraseña)return <CambiarContrasenaPrimerLogin
     session={session}
     onComplete={function(){
-      // Marcar como completado y continuar al dashboard
-      var s=Object.assign({},session,{debeContraseña:false});
-      sessionRef.current=s;
-      setSession(s);
-      cargar(s.token);
+      // Forzar logout y volver al login para autenticar limpio con la nueva contraseña
+      try{localStorage.removeItem("lumo_session");}catch(e){}
+      sessionRef.current=null;
+      setSession(null);
     }}/>;
   if(session.necesitaNombre)return <RegistroNombre sessionTemp={session}
     token={sessionRef.current?sessionRef.current.token:session.token}

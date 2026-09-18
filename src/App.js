@@ -1392,6 +1392,7 @@ function ResetPassword({onVolver}){
         widgetId=window.hcaptcha.render(captchaRef.current,{
           sitekey:"c8541066-98c2-474a-8d3e-0f0c4748f016",
           theme:"dark",
+          hl:"es",
           callback:function(token){setCaptchaToken(token);},
           "expired-callback":function(){setCaptchaToken(null);},
           "error-callback":function(){setCaptchaToken(null);}
@@ -1506,6 +1507,7 @@ function Login({onLogin}){
         widgetId=window.hcaptcha.render(captchaRef.current,{
           sitekey:"c8541066-98c2-474a-8d3e-0f0c4748f016",
           theme:"dark",
+          hl:"es",
           callback:function(token){setCaptchaToken(token);},
           "expired-callback":function(){setCaptchaToken(null);},
           "error-callback":function(){setCaptchaToken(null);}
@@ -1520,7 +1522,7 @@ function Login({onLogin}){
       // Cargar script por primera vez
       var s=document.createElement("script");
       s.id="hcaptcha-script";
-      s.src="https://js.hcaptcha.com/1/api.js?render=explicit&onload=onHCaptchaLoad";
+      s.src="https://js.hcaptcha.com/1/api.js?render=explicit&onload=onHCaptchaLoad&hl=es";
       s.async=true; s.defer=true;
       window.onHCaptchaLoad=function(){renderWidget();};
       document.head.appendChild(s);
@@ -1561,6 +1563,7 @@ function Login({onLogin}){
         window.hcaptcha.render(captchaRef.current,{
           sitekey:"c8541066-98c2-474a-8d3e-0f0c4748f016",
           theme:"dark",
+          hl:"es",
           callback:function(token){setCaptchaToken(token);},
           "expired-callback":function(){setCaptchaToken(null);},
           "error-callback":function(){setCaptchaToken(null);}
@@ -2410,10 +2413,10 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
         eq.nombre,
         eq.serie,
         eq.categoria,
+        eq.gerencia||"Sin asignar",
         eq.estado_base,
         eq.ciudad_base,
         eq.sitio_base,
-        eq.gerencia||"Sin asignar",
         eq.admin_email||"Sin asignar",
         eq.activo?(eq.estatus==="reparacion"?"En reparación":"Activo"):"Eliminado"
       ].map(function(v){return '"'+(v||"").replace(/"/g,'""')+'"';}).join(",");

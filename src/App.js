@@ -2256,8 +2256,11 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
   const [csvResult,setCsvResult]=useState(null); // {ok, errores, total}
   const [editEq,setEditEq]=useState(null); // equipo en edición
 
+  // Cargar categorías una sola vez al montar — necesarias para import CSV sin importar el tab activo
+  useEffect(()=>{ cargarCats(); },[]);
+
   useEffect(()=>{
-    if(tab==="categorias")cargarCats();
+    if(tab==="categorias")cargarCats(); // refrescar por si hubo cambios
     if(tab==="ingenieros"){ cargarPerfiles(); }
     if(tab==="equipos"){cargarEquipos();}
     // usuarios no necesita carga — usa formulario

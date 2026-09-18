@@ -2406,8 +2406,14 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
     w.document.close();
   }
   function exportarCSV(){
-    var headers=["ID","Nombre","Serie","Categoria","Gerencia","Estado Base","Ciudad Base","Sitio Base","Administrador","Estatus"];
+    var headers=["ID","Nombre","Serie","Categoria","Gerencia","Estado Base","Ciudad Base","Sitio Base","Administrador","Admin Email","Estatus"];
+    // Mapa rápido email -> nombre para no buscar en un loop O(n²)
+    var mapaAdmins={};
+    perfilesAdmin.forEach(function(p){if(p.email)mapaAdmins[p.email.toLowerCase()]=p.nombre;});
     var rows=listaEqs.map(function(eq){
+      var adminNombre=eq.admin_email
+        ?(mapaAdmins[eq.admin_email.toLowerCase()]||"")
+        :"";
       return [
         eq.id,
         eq.nombre,
@@ -2417,6 +2423,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
         eq.estado_base,
         eq.ciudad_base,
         eq.sitio_base,
+        adminNombre||"Sin asignar",
         eq.admin_email||"Sin asignar",
         eq.activo?(eq.estatus==="reparacion"?"En reparación":"Activo"):"Eliminado"
       ].map(function(v){return '"'+(v||"").replace(/"/g,'""')+'"';}).join(",");
@@ -3745,12 +3752,18 @@ export default function App(){
     var lista=filtroGerencia
       ?equipos.filter(function(e){return (e.gerencia||"")===filtroGerencia;})
       :equipos;
-    var headers=["ID","Nombre","Serie","Categoria","Gerencia","Estado Base","Ciudad Base","Sitio Base","Administrador","Estatus"];
+    var headers=["ID","Nombre","Serie","Categoria","Gerencia","Estado Base","Ciudad Base","Sitio Base","Administrador","Admin Email","Estatus"];
+    var mapaAdmins={};
+    perfiles.forEach(function(p){if(p.email)mapaAdmins[p.email.toLowerCase()]=p.nombre;});
     var rows=lista.map(function(eq){
+      var adminNombre=eq.admin_email
+        ?(mapaAdmins[eq.admin_email.toLowerCase()]||"")
+        :"";
       return [
         eq.id, eq.nombre, eq.serie, eq.categoria,
         eq.gerencia||"Sin asignar",
         eq.estado_base, eq.ciudad_base, eq.sitio_base,
+        adminNombre||"Sin asignar",
         eq.admin_email||"Sin asignar",
         eq.activo?(eq.estatus==="reparacion"?"En reparacion":"Activo"):"Eliminado"
       ].map(function(v){return '"'+(String(v||"")).replace(/"/g,'""')+'"';}).join(",");

@@ -21,8 +21,10 @@ button{cursor:pointer;font-weight:700}button.pri{background:var(--g);color:#001a
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px}
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
 .kpi b{display:block;font-size:26px;font-weight:800;margin-top:4px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
-@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-bottom:16px}
+.grid>*,.panel{min-width:0}
+html,body{overflow-x:hidden}
+@media(max-width:760px){.grid{grid-template-columns:minmax(0,1fr)}th,td{padding:7px 5px}table{font-size:11.5px}}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
 .panel h2{font-size:13px;margin-bottom:10px}
 .row{display:flex;align-items:center;gap:8px;margin:7px 0;font-size:12px}
@@ -81,7 +83,7 @@ const KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6
 const SITEKEY="c8541066-98c2-474a-8d3e-0f0c4748f016";
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-let token=null,data=[],ing=[],cap="",sortK="usos",sortD=-1;
+let shared=false,token=null,data=[],ing=[],cap="",sortK="usos",sortD=-1;
 const COLS=[["equipo_id","ID"],["nombre","Equipo"],["gerencia","Gerencia"],["admin_email","Administrador"],["usos","Usos"],["usos_30d","30 días"],["ultimo_uso","Último uso"],["dias_desde_ultimo_uso","Días sin uso"],["dias_en_uso","Días en uso"],["en_uso_ahora","Estado"]];
 
 window.onHC=function(){hcaptcha.render("hc",{sitekey:SITEKEY,theme:"dark",callback:t=>cap=t,"expired-callback":()=>cap=""})};
@@ -165,10 +167,10 @@ function csv(){
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["﻿"+L.join("\r\n")],{type:"text/csv;charset=utf-8"}));
   a.download="lumo-uso-equipos.csv";a.click();
 }
-function start(t,email,rol,shared){
+function start(t,email,rol,shared_){
   token=t;$("who").textContent=email+" · "+rol;
   $("login").classList.add("hide");$("app").classList.remove("hide");
-  if(shared){$("out").textContent="Volver a la app";$("out").onclick=()=>location.href="/"}
+  if(shared_){shared=true;$("out").textContent="Volver a la app"}
   return load();
 }
 // Reutiliza la sesion de la app (mismo dominio): evita volver a iniciar sesion
@@ -183,7 +185,7 @@ function start(t,email,rol,shared){
 })();
 $("go").onclick=login;$("pw").onkeydown=e=>{if(e.key==="Enter")login()};
 ["fg","fa","fc"].forEach(i=>$(i).onchange=render);$("q").oninput=render;
-$("csv").onclick=csv;$("out").onclick=()=>location.reload();
+$("csv").onclick=csv;$("out").onclick=()=>{shared?location.href="/":location.reload()};
 </script>
 </body>
 </html>

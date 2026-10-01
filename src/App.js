@@ -1059,8 +1059,8 @@ function CambiarContrasenaPrimerLogin({session, onComplete}){
 
   async function guardar(e){
     e.preventDefault();
-    if(!nombreReal&&!nombreInput.trim()){setErr("Por favor ingresa tu nombre completo.");return;}
-    if(!nombreReal&&!nombreInput.trim().includes(" ")){setErr("Ingresa tu nombre y apellido.");return;}
+    if(!nombreInput.trim()){setErr("Por favor ingresa tu nombre completo.");return;}
+    if(!nombreInput.trim().includes(" ")){setErr("Ingresa tu nombre y apellido.");return;}
     var vErr=validarPassword(pass);
     if(vErr){setErr(vErr);return;}
     if(pass!==pass2){setErr("Las contraseñas no coinciden");return;}
@@ -1077,13 +1077,13 @@ function CambiarContrasenaPrimerLogin({session, onComplete}){
           password:pass,
           data:{
             debe_cambiar_password:false,
-            nombre:nombreInput.trim()||session.nombre
+            nombre:nombreInput.trim()
           }
         }),
       });
       if(!res.ok){const d=await res.json();throw new Error(d.error_description||d.msg||"Error");}
       // Actualizar nombre en perfiles si cambió
-      if(!nombreReal&&nombreInput.trim()){
+      if(nombreInput.trim()!==(session.nombre||"")){
         try{
           await fetch(SUPA_URL+"/rest/v1/perfiles?email=eq."+encodeURIComponent(session.email),{
             method:"PATCH",
@@ -1156,8 +1156,8 @@ function CambiarContrasenaPrimerLogin({session, onComplete}){
           <p style={{color:"#555",fontSize:"11px"}}>{session.email}</p>
         </div>
         <form onSubmit={guardar} style={{display:"flex",flexDirection:"column",gap:"12px"}}>
-          {/* Nombre — solo si no tiene nombre real */}
-          {!nombreReal&&<div>
+          {/* Nombre — precargado si ya existe, editable siempre */}
+          {<div>
             <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",
               display:"block",marginBottom:"6px"}}>TU NOMBRE COMPLETO</label>
             <input type="text" value={nombreInput}
@@ -1165,7 +1165,7 @@ function CambiarContrasenaPrimerLogin({session, onComplete}){
               placeholder="Nombre y apellidos"
               style={inp} required/>
             <p style={{color:"#444",fontSize:"10px",marginTop:"4px"}}>
-              Así aparecerás en todos los registros del sistema
+              {nombreReal?"Verifica que tu nombre sea correcto. ":""}Así aparecerás en todos los registros del sistema
             </p>
           </div>}
           <div>
@@ -1707,7 +1707,12 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador · v0.28.0
+          ¿Sin acceso? Contacta al administrador · v0.30.0
+        </p>
+        <p style={{textAlign:"center",marginTop:"8px"}}>
+          <a href="/dashboard.html" style={{color:C.muted,fontSize:"12px",textDecoration:"underline"}}>
+            Dashboard de uso (admins y gerentes)
+          </a>
         </p>
       </div>
     </div>
@@ -4079,6 +4084,15 @@ export default function App(){
                 ⚙️
               </button>
             )}
+            {(isAdmin||isGer)&&(
+              <button onClick={function(){window.location.href="/dashboard.html";}}
+                title="Dashboard de uso"
+                style={{background:"#0a1a10",border:`1px solid ${C.green}44`,borderRadius:"10px",
+                  padding:"8px 12px",cursor:"pointer",color:C.green,
+                  fontFamily:"'Sora',sans-serif",fontSize:"12px",fontWeight:"700"}}>
+                📊
+              </button>
+            )}
             <button onClick={()=>setShowMapa(true)}
               style={{display:"flex",alignItems:"center",gap:"5px",
                 background:enUso>0?"#12121f":C.card,border:`1px solid ${C.border}`,
@@ -4679,7 +4693,7 @@ export default function App(){
 
             <p style={{textAlign:"center",fontSize:"11px",color:"#333",
               marginTop:"20px",fontStyle:"italic",fontFamily:"'Sora',sans-serif"}}>
-              Cada activo en su lugar ✦ Lumo v0.27.0
+              Cada activo en su lugar ✦ Lumo v0.30.0
             </p>
           </div>
         </div>

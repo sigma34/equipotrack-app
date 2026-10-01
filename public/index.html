@@ -2,12 +2,21 @@
 <html lang="es">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#07070f" />
-    <meta name="description" content="EquipoTrack - Control de instrumentos de medición" />
-    <title>EquipoTrack</title>
+    <meta name="color-scheme" content="dark" />
+    <meta name="description" content="Lumo - Control de instrumentos de medición" />
+    <title>Lumo</title>
+    <style>
+      /* Fondo oscuro y sin márgenes desde el primer instante, en TODAS las pantallas
+         (login, activación, recuperar contraseña...). Evita el marco blanco. */
+      html, body { margin: 0; padding: 0; background: #07070f; }
+      body { min-height: 100vh; min-height: 100dvh; }
+      #root { min-height: 100vh; min-height: 100dvh; background: #07070f; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
   </body>
 </html>
+

@@ -35,7 +35,7 @@ html,body{overflow-x:hidden}
 th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
 th{color:var(--mu);cursor:pointer;font-weight:600}
 .tag{padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
-.on{background:#ff950022;color:var(--o)}.off{background:#00e87a22;color:var(--g)}.never{background:#ff5c6c22;color:var(--r)}
+.on{background:#ff950022;color:var(--o)}.off{background:#00e87a22;color:var(--g)}.never{background:#ff5c6c22;color:var(--r)}.rep{background:#9966ff22;color:var(--p)}
 .hide{display:none!important}
 </style>
 </head>
@@ -105,13 +105,23 @@ async function login(){
   $("login").classList.add("hide");$("app").classList.remove("hide");
   load();
 }
+async function getAll(view){
+  let rows=[],from=0,st=200;
+  for(;;){
+    const r=await fetch(URL_+"/rest/v1/"+view+"?select=*",{headers:{apikey:KEY,Authorization:"Bearer "+token,Range:from+"-"+(from+999),"Range-Unit":"items"}});
+    if(!r.ok)return{ok:false,status:r.status,rows};
+    const b=await r.json();rows=rows.concat(b);
+    if(b.length<1000)return{ok:true,status:200,rows};
+    from+=1000;
+  }
+}
 async function load(){
-  const r=await fetch(URL_+"/rest/v1/v_uso_equipos?select=*&limit=2000",{headers:{apikey:KEY,Authorization:"Bearer "+token}});
+  const r=await getAll("v_uso_equipos");
   if(r.status===401||r.status===403){token=null;$("app").classList.add("hide");$("login").classList.remove("hide");return}
   if(!r.ok){alert("No se pudieron cargar los datos ("+r.status+")");return}
-  data=await r.json();
-  const r2=await fetch(URL_+"/rest/v1/v_uso_ingenieros?select=*&limit=5000",{headers:{apikey:KEY,Authorization:"Bearer "+token}});
-  ing=r2.ok?await r2.json():[];
+  data=r.rows;
+  const r2=await getAll("v_uso_ingenieros");
+  ing=r2.ok?r2.rows:[];
   fill("fg","gerencia");fill("fa","admin_email");fill("fc","categoria");
   render();
 }
@@ -130,31 +140,38 @@ function bars(el,rows,key,color){
 }
 function render(){
   const d=filtered();
-  const usados=d.filter(x=>x.usos>0),nunca=d.filter(x=>x.usos===0);
+  const usados=d.filter(x=>x.usos>0),nunca=d.filter(x=>x.usos===0&&!rep(x)),enRep=d.filter(rep).length;
   const tot=d.reduce((s,x)=>s+x.usos,0),ahora=d.filter(x=>x.en_uso_ahora).length;
   const prom=usados.length?Math.round(usados.reduce((s,x)=>s+x.dias_desde_ultimo_uso,0)/usados.length):0;
   const k=(l,v,c)=>`<div class="kpi"><span class="mu">${l}</span><b style="color:${c}">${v}</b></div>`;
   $("kpis").innerHTML=k("Equipos",d.length,"var(--tx)")+k("Usos totales",tot,"var(--g)")+k("Usos últimos 30 días",d.reduce((s,x)=>s+x.usos_30d,0),"var(--b)")+
-    k("En uso ahora",ahora,"var(--o)")+k("Días sin uso (promedio)",prom,"var(--p)")+k("Nunca usados",nunca.length,"var(--r)");
+    k("En uso ahora",ahora,"var(--o)")+k("En reparación",enRep,"var(--p)")+k("Días sin uso (promedio)",prom,"var(--p)")+k("Nunca usados",nunca.length,"var(--r)");
   bars("top",[...d].sort((a,b)=>b.usos-a.usos).slice(0,10),"usos","var(--g)");
   bars("idle",usados.sort((a,b)=>b.dias_desde_ultimo_uso-a.dias_desde_ultimo_uso).slice(0,10),"dias_desde_ultimo_uso","var(--o)");
-  renderCat(d);renderIng();
+  renderCat(d);renderIng(d);
   $("th").innerHTML=COLS.map(c=>`<th data-k="${c[0]}">${c[1]}${sortK===c[0]?(sortD>0?" ▲":" ▼"):""}</th>`).join("");
   document.querySelectorAll("#th th").forEach(t=>t.onclick=()=>{const k=t.dataset.k;sortD=sortK===k?-sortD:-1;sortK=k;render()});
   const rows=[...d].sort((a,b)=>{const x=a[sortK],y=b[sortK];if(x==null)return 1;if(y==null)return-1;return(x>y?1:x<y?-1:0)*sortD});
   $("cnt").textContent="("+rows.length+")";
   $("tb").innerHTML=rows.map(x=>`<tr><td>${esc(x.equipo_id)}</td><td>${esc(x.nombre)}</td><td>${esc(x.gerencia||"—")}</td><td>${esc(x.admin_email||"—")}</td>
    <td>${x.usos}</td><td>${x.usos_30d}</td><td>${fd(x.ultimo_uso)}</td><td>${x.dias_desde_ultimo_uso==null?"—":x.dias_desde_ultimo_uso}</td><td>${x.dias_en_uso}</td>
-   <td><span class="tag ${x.usos===0?"never":x.en_uso_ahora?"on":"off"}">${x.usos===0?"Nunca usado":x.en_uso_ahora?"En uso":"Disponible"}</span></td></tr>`).join("");
+   <td><span class="tag ${est(x)[0]}">${est(x)[1]}</span></td></tr>`).join("");
 }
+function est(x){
+  if(x.en_uso_ahora)return["on","En uso"];
+  if(x.estatus==="reparacion")return["rep","En reparación"];
+  if(x.usos===0)return["never","Nunca usado"];
+  return["off","Disponible"];
+}
+const rep=x=>x.estatus==="reparacion";
 function renderCat(d){
   const m={};d.forEach(x=>{const k=x.categoria||"Sin categoría",o=m[k]||(m[k]={n:0,u:0,u30:0,nun:0,ds:0,dn:0});
-    o.n++;o.u+=x.usos;o.u30+=x.usos_30d;if(x.usos===0)o.nun++;else{o.ds+=x.dias_desde_ultimo_uso;o.dn++}});
+    o.n++;o.u+=x.usos;o.u30+=x.usos_30d;if(x.usos===0&&!rep(x))o.nun++;if(x.usos>0){o.ds+=x.dias_desde_ultimo_uso;o.dn++}});
   $("tcat").innerHTML=Object.entries(m).sort((a,b)=>b[1].u-a[1].u).map(([k,o])=>`<tr><td>${esc(k)}</td><td>${o.n}</td><td>${o.u}</td><td>${o.u30}</td><td>${o.dn?Math.round(o.ds/o.dn):"—"}</td><td>${o.nun}</td></tr>`).join("")||'<tr><td class="mu">Sin datos</td></tr>';
 }
-function renderIng(){
-  const g=$("fg").value,a=$("fa").value,c=$("fc").value,m={};
-  ing.filter(x=>(!g||x.gerencia===g)&&(!a||x.admin_email===a)&&(!c||x.categoria===c)).forEach(x=>{
+function renderIng(d){
+  const ids=new Set(d.map(x=>x.equipo_id)),m={};
+  ing.filter(x=>x.equipo_id===undefined||ids.has(x.equipo_id)).forEach(x=>{
     const o=m[x.ingeniero]||(m[x.ingeniero]={u:0,u30:0,eq:0,d:0,ult:null,ah:0});
     o.u+=x.usos;o.u30+=x.usos_30d;o.eq+=x.equipos;o.d+=Number(x.dias_en_uso);o.ah+=x.en_uso_ahora;if(x.ultimo_uso&&(!o.ult||x.ultimo_uso>o.ult))o.ult=x.ultimo_uso});
   const rows=Object.entries(m).sort((a,b)=>b[1].u-a[1].u);

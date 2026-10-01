@@ -16,7 +16,8 @@ h1{font-size:20px;font-weight:800}h1 span{color:var(--g)}
 button,select,input{font-family:inherit;font-size:13px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--tx);padding:9px 12px}
 button{cursor:pointer;font-weight:700}button.pri{background:var(--g);color:#001a0d;border:0}
 #login{max-width:380px;margin:12vh auto;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:12px}
-#login h1{text-align:center}#err{color:var(--r);font-size:12px;min-height:16px}
+#login h1{text-align:center}.back{text-align:center;color:var(--mu);font-size:12px;text-decoration:underline;padding:4px}.back:hover{color:var(--g)}
+#err{color:var(--r);font-size:12px;min-height:16px}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.filters>*{flex:1;min-width:140px}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px}
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
@@ -48,6 +49,7 @@ th{color:var(--mu);cursor:pointer;font-weight:600}
   <div id="hc" style="display:flex;justify-content:center"></div>
   <div id="err"></div>
   <button class="pri" id="go">Entrar</button>
+  <a href="/" class="back">&larr; Ir al login de la app</a>
 </div>
 
 <div class="wrap hide" id="app">
@@ -68,7 +70,7 @@ th{color:var(--mu);cursor:pointer;font-weight:600}
   </div>
   <div class="grid">
     <div class="panel"><h2>Por categoría</h2><div class="tw"><table><thead><tr><th>Categoría</th><th>Equipos</th><th>Usos</th><th>30 días</th><th>Sin uso prom.</th><th>Nunca usados</th></tr></thead><tbody id="tcat"></tbody></table></div></div>
-    <div class="panel"><h2>Por ingeniero <span class="mu" id="cing"></span></h2><div class="tw" style="max-height:360px;overflow-y:auto"><table><thead><tr><th>Ingeniero</th><th>Usos</th><th>30 días</th><th>Equipos</th><th>Días en uso</th><th>Último uso</th><th>Ahora</th></tr></thead><tbody id="ting"></tbody></table></div></div>
+    <div class="panel"><h2>Por ingeniero <span class="mu" id="cing"></span></h2><p class="mu" style="margin:-6px 0 8px;font-size:11px">La gerencia filtra por la del ingeniero; el resto de filtros, por equipo.</p><div class="tw" style="max-height:360px;overflow-y:auto"><table><thead><tr><th>Ingeniero</th><th>Usos</th><th>30 días</th><th>Equipos</th><th>Días en uso</th><th>Último uso</th><th>Ahora</th></tr></thead><tbody id="ting"></tbody></table></div></div>
   </div>
   <div class="panel">
     <h2>Detalle por equipo <span class="mu" id="cnt"></span></h2>
@@ -127,8 +129,8 @@ async function load(){
 }
 function fill(id,k){const el=$(id),f=el.options[0].outerHTML;
   el.innerHTML=f+[...new Set(data.map(x=>x[k]).filter(Boolean))].sort().map(v=>`<option>${esc(v)}</option>`).join("")}
-function filtered(){
-  const g=$("fg").value,a=$("fa").value,c=$("fc").value,q=$("q").value.toLowerCase().trim();
+function filtered(skipG){
+  const g=skipG?"":$("fg").value,a=$("fa").value,c=$("fc").value,q=$("q").value.toLowerCase().trim();
   return data.filter(x=>(!g||x.gerencia===g)&&(!a||x.admin_email===a)&&(!c||x.categoria===c)&&
     (!q||(x.nombre+" "+x.serie+" "+x.equipo_id).toLowerCase().includes(q)));
 }
@@ -169,9 +171,10 @@ function renderCat(d){
     o.n++;o.u+=x.usos;o.u30+=x.usos_30d;if(x.usos===0&&!rep(x))o.nun++;if(x.usos>0){o.ds+=x.dias_desde_ultimo_uso;o.dn++}});
   $("tcat").innerHTML=Object.entries(m).sort((a,b)=>b[1].u-a[1].u).map(([k,o])=>`<tr><td>${esc(k)}</td><td>${o.n}</td><td>${o.u}</td><td>${o.u30}</td><td>${o.dn?Math.round(o.ds/o.dn):"—"}</td><td>${o.nun}</td></tr>`).join("")||'<tr><td class="mu">Sin datos</td></tr>';
 }
-function renderIng(d){
-  const ids=new Set(d.map(x=>x.equipo_id)),m={};
-  ing.filter(x=>x.equipo_id===undefined||ids.has(x.equipo_id)).forEach(x=>{
+function renderIng(){
+  // Equipos que cumplen los filtros (SIN la gerencia: esa se aplica a la gerencia del ingeniero)
+  const ids=new Set(filtered(true).map(x=>x.equipo_id)),g=$("fg").value,m={};
+  ing.filter(x=>(x.equipo_id===undefined||ids.has(x.equipo_id))&&(!g||(x.gerencia_ingeniero||x.gerencia)===g)).forEach(x=>{
     const o=m[x.ingeniero]||(m[x.ingeniero]={u:0,u30:0,eq:0,d:0,ult:null,ah:0});
     o.u+=x.usos;o.u30+=x.usos_30d;o.eq+=x.equipos;o.d+=Number(x.dias_en_uso);o.ah+=x.en_uso_ahora;if(x.ultimo_uso&&(!o.ult||x.ultimo_uso>o.ult))o.ult=x.ultimo_uso});
   const rows=Object.entries(m).sort((a,b)=>b[1].u-a[1].u);

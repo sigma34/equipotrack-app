@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lumo - Dashboard de uso</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#07070f;--card:#12121e;--line:#23233a;--tx:#eef0f7;--mu:#8a8fa8;--g:#00e87a;--b:#4a9eff;--p:#9966ff;--o:#ff9500;--r:#ff5c6c}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Sora',system-ui,sans-serif;background:var(--bg);color:var(--tx);min-height:100vh}
+.wrap{max-width:1180px;margin:0 auto;padding:16px}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+h1{font-size:20px;font-weight:800}h1 span{color:var(--g)}
+.mu{color:var(--mu);font-size:12px}
+button,select,input{font-family:inherit;font-size:13px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--tx);padding:9px 12px}
+button{cursor:pointer;font-weight:700}button.pri{background:var(--g);color:#001a0d;border:0}
+#login{max-width:380px;margin:12vh auto;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:12px}
+#login h1{text-align:center}#err{color:var(--r);font-size:12px;min-height:16px}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.filters>*{flex:1;min-width:140px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.kpi b{display:block;font-size:26px;font-weight:800;margin-top:4px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.panel h2{font-size:13px;margin-bottom:10px}
+.row{display:flex;align-items:center;gap:8px;margin:7px 0;font-size:12px}
+.row .n{flex:0 0 42%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar{flex:1;height:8px;background:var(--line);border-radius:6px;overflow:hidden}.bar i{display:block;height:100%;background:var(--g)}
+.row .v{flex:0 0 auto;min-width:34px;text-align:right;color:var(--mu)}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--mu);cursor:pointer;font-weight:600}
+.tag{padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+.on{background:#ff950022;color:var(--o)}.off{background:#00e87a22;color:var(--g)}.never{background:#ff5c6c22;color:var(--r)}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<div id="login">
+  <h1>Lu<span>mo</span> · Dashboard</h1>
+  <p class="mu" style="text-align:center">Acceso para administradores y gerentes</p>
+  <input id="em" type="email" placeholder="Correo" autocomplete="username">
+  <input id="pw" type="password" placeholder="Contraseña" autocomplete="current-password">
+  <div id="hc" style="display:flex;justify-content:center"></div>
+  <div id="err"></div>
+  <button class="pri" id="go">Entrar</button>
+</div>
+
+<div class="wrap hide" id="app">
+  <header>
+    <div><h1>Lu<span>mo</span> · Uso de equipos</h1><div class="mu" id="who"></div></div>
+    <div style="display:flex;gap:8px"><button id="csv">Descargar CSV</button><button id="out">Salir</button></div>
+  </header>
+  <div class="filters">
+    <select id="fg"><option value="">Todas las gerencias</option></select>
+    <select id="fa"><option value="">Todos los administradores</option></select>
+    <select id="fc"><option value="">Todas las categorías</option></select>
+    <input id="q" placeholder="Buscar equipo o serie">
+  </div>
+  <div class="cards" id="kpis"></div>
+  <div class="grid">
+    <div class="panel"><h2>Más usados</h2><div id="top"></div></div>
+    <div class="panel"><h2>Más tiempo sin uso (solo equipos ya usados)</h2><div id="idle"></div></div>
+  </div>
+  <div class="grid">
+    <div class="panel"><h2>Por categoría</h2><div class="tw"><table><thead><tr><th>Categoría</th><th>Equipos</th><th>Usos</th><th>30 días</th><th>Sin uso prom.</th><th>Nunca usados</th></tr></thead><tbody id="tcat"></tbody></table></div></div>
+    <div class="panel"><h2>Por ingeniero <span class="mu" id="cing"></span></h2><div class="tw" style="max-height:360px;overflow-y:auto"><table><thead><tr><th>Ingeniero</th><th>Usos</th><th>30 días</th><th>Equipos</th><th>Días en uso</th><th>Último uso</th><th>Ahora</th></tr></thead><tbody id="ting"></tbody></table></div></div>
+  </div>
+  <div class="panel">
+    <h2>Detalle por equipo <span class="mu" id="cnt"></span></h2>
+    <div class="tw"><table><thead><tr id="th"></tr></thead><tbody id="tb"></tbody></table></div>
+  </div>
+  <p class="mu" style="margin-top:12px">Datos en vivo. Cada persona ve solo lo que sus permisos en Lumo le permiten.</p>
+</div>
+
+<script>
+const URL_="https://tawgfibmeymxjgwkgnsc.supabase.co";
+const KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRhd2dmaWJtZXlteGpnd2tnbnNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MzIzODcsImV4cCI6MjA5NTMwODM4N30.iWVX276PbFNt8rC2ZGO58Kc8nOuEjVcahhMh7vzZk3Q";
+const SITEKEY="c8541066-98c2-474a-8d3e-0f0c4748f016";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let token=null,data=[],ing=[],cap="",sortK="usos",sortD=-1;
+const COLS=[["equipo_id","ID"],["nombre","Equipo"],["gerencia","Gerencia"],["admin_email","Administrador"],["usos","Usos"],["usos_30d","30 días"],["ultimo_uso","Último uso"],["dias_desde_ultimo_uso","Días sin uso"],["dias_en_uso","Días en uso"],["en_uso_ahora","Estado"]];
+
+window.onHC=function(){hcaptcha.render("hc",{sitekey:SITEKEY,theme:"dark",callback:t=>cap=t,"expired-callback":()=>cap=""})};
+const s=document.createElement("script");s.src="https://js.hcaptcha.com/1/api.js?render=explicit&onload=onHC&hl=es";s.async=true;document.head.appendChild(s);
+
+function jwt(t){try{return JSON.parse(atob(t.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")))}catch(e){return{}}}
+
+async function login(){
+  $("err").textContent="";
+  if(!cap){$("err").textContent="Completa el captcha";return}
+  const r=await fetch(URL_+"/auth/v1/token?grant_type=password",{method:"POST",headers:{apikey:KEY,"Content-Type":"application/json"},
+    body:JSON.stringify({email:$("em").value.trim(),password:$("pw").value,gotrue_meta_security:{captcha_token:cap}})});
+  const d=await r.json();
+  if(!r.ok){$("err").textContent="Correo o contraseña incorrectos";try{hcaptcha.reset()}catch(e){}cap="";return}
+  const rol=(jwt(d.access_token).app_metadata||{}).rol;
+  if(!["admin","super_admin","gerente"].includes(rol)){$("err").textContent="Tu rol no tiene acceso a este dashboard";return}
+  token=d.access_token;
+  $("who").textContent=d.user.email+" · "+rol;
+  $("login").classList.add("hide");$("app").classList.remove("hide");
+  load();
+}
+async function load(){
+  const r=await fetch(URL_+"/rest/v1/v_uso_equipos?select=*&limit=2000",{headers:{apikey:KEY,Authorization:"Bearer "+token}});
+  if(r.status===401||r.status===403){token=null;$("app").classList.add("hide");$("login").classList.remove("hide");return}
+  if(!r.ok){alert("No se pudieron cargar los datos ("+r.status+")");return}
+  data=await r.json();
+  const r2=await fetch(URL_+"/rest/v1/v_uso_ingenieros?select=*&limit=5000",{headers:{apikey:KEY,Authorization:"Bearer "+token}});
+  ing=r2.ok?await r2.json():[];
+  fill("fg","gerencia");fill("fa","admin_email");fill("fc","categoria");
+  render();
+}
+function fill(id,k){const el=$(id),f=el.options[0].outerHTML;
+  el.innerHTML=f+[...new Set(data.map(x=>x[k]).filter(Boolean))].sort().map(v=>`<option>${esc(v)}</option>`).join("")}
+function filtered(){
+  const g=$("fg").value,a=$("fa").value,c=$("fc").value,q=$("q").value.toLowerCase().trim();
+  return data.filter(x=>(!g||x.gerencia===g)&&(!a||x.admin_email===a)&&(!c||x.categoria===c)&&
+    (!q||(x.nombre+" "+x.serie+" "+x.equipo_id).toLowerCase().includes(q)));
+}
+const fd=v=>v?new Date(v).toLocaleDateString("es-MX",{day:"2-digit",month:"short",year:"numeric"}):"Nunca";
+function bars(el,rows,key,color){
+  const mx=Math.max(1,...rows.map(r=>r[key]||0));
+  $(el).innerHTML=rows.map(r=>`<div class="row"><div class="n" title="${esc(r.nombre)}">${esc(r.equipo_id)} ${esc(r.nombre)}</div>
+  <div class="bar"><i style="width:${(r[key]||0)/mx*100}%;background:${color}"></i></div><div class="v">${r[key]==null?"—":r[key]}</div></div>`).join("")||'<div class="mu">Sin datos</div>';
+}
+function render(){
+  const d=filtered();
+  const usados=d.filter(x=>x.usos>0),nunca=d.filter(x=>x.usos===0);
+  const tot=d.reduce((s,x)=>s+x.usos,0),ahora=d.filter(x=>x.en_uso_ahora).length;
+  const prom=usados.length?Math.round(usados.reduce((s,x)=>s+x.dias_desde_ultimo_uso,0)/usados.length):0;
+  const k=(l,v,c)=>`<div class="kpi"><span class="mu">${l}</span><b style="color:${c}">${v}</b></div>`;
+  $("kpis").innerHTML=k("Equipos",d.length,"var(--tx)")+k("Usos totales",tot,"var(--g)")+k("Usos últimos 30 días",d.reduce((s,x)=>s+x.usos_30d,0),"var(--b)")+
+    k("En uso ahora",ahora,"var(--o)")+k("Días sin uso (promedio)",prom,"var(--p)")+k("Nunca usados",nunca.length,"var(--r)");
+  bars("top",[...d].sort((a,b)=>b.usos-a.usos).slice(0,10),"usos","var(--g)");
+  bars("idle",usados.sort((a,b)=>b.dias_desde_ultimo_uso-a.dias_desde_ultimo_uso).slice(0,10),"dias_desde_ultimo_uso","var(--o)");
+  renderCat(d);renderIng();
+  $("th").innerHTML=COLS.map(c=>`<th data-k="${c[0]}">${c[1]}${sortK===c[0]?(sortD>0?" ▲":" ▼"):""}</th>`).join("");
+  document.querySelectorAll("#th th").forEach(t=>t.onclick=()=>{const k=t.dataset.k;sortD=sortK===k?-sortD:-1;sortK=k;render()});
+  const rows=[...d].sort((a,b)=>{const x=a[sortK],y=b[sortK];if(x==null)return 1;if(y==null)return-1;return(x>y?1:x<y?-1:0)*sortD});
+  $("cnt").textContent="("+rows.length+")";
+  $("tb").innerHTML=rows.map(x=>`<tr><td>${esc(x.equipo_id)}</td><td>${esc(x.nombre)}</td><td>${esc(x.gerencia||"—")}</td><td>${esc(x.admin_email||"—")}</td>
+   <td>${x.usos}</td><td>${x.usos_30d}</td><td>${fd(x.ultimo_uso)}</td><td>${x.dias_desde_ultimo_uso==null?"—":x.dias_desde_ultimo_uso}</td><td>${x.dias_en_uso}</td>
+   <td><span class="tag ${x.usos===0?"never":x.en_uso_ahora?"on":"off"}">${x.usos===0?"Nunca usado":x.en_uso_ahora?"En uso":"Disponible"}</span></td></tr>`).join("");
+}
+function renderCat(d){
+  const m={};d.forEach(x=>{const k=x.categoria||"Sin categoría",o=m[k]||(m[k]={n:0,u:0,u30:0,nun:0,ds:0,dn:0});
+    o.n++;o.u+=x.usos;o.u30+=x.usos_30d;if(x.usos===0)o.nun++;else{o.ds+=x.dias_desde_ultimo_uso;o.dn++}});
+  $("tcat").innerHTML=Object.entries(m).sort((a,b)=>b[1].u-a[1].u).map(([k,o])=>`<tr><td>${esc(k)}</td><td>${o.n}</td><td>${o.u}</td><td>${o.u30}</td><td>${o.dn?Math.round(o.ds/o.dn):"—"}</td><td>${o.nun}</td></tr>`).join("")||'<tr><td class="mu">Sin datos</td></tr>';
+}
+function renderIng(){
+  const g=$("fg").value,a=$("fa").value,c=$("fc").value,m={};
+  ing.filter(x=>(!g||x.gerencia===g)&&(!a||x.admin_email===a)&&(!c||x.categoria===c)).forEach(x=>{
+    const o=m[x.ingeniero]||(m[x.ingeniero]={u:0,u30:0,eq:0,d:0,ult:null,ah:0});
+    o.u+=x.usos;o.u30+=x.usos_30d;o.eq+=x.equipos;o.d+=Number(x.dias_en_uso);o.ah+=x.en_uso_ahora;if(x.ultimo_uso&&(!o.ult||x.ultimo_uso>o.ult))o.ult=x.ultimo_uso});
+  const rows=Object.entries(m).sort((a,b)=>b[1].u-a[1].u);
+  $("cing").textContent="("+rows.length+")";
+  $("ting").innerHTML=rows.map(([k,o])=>`<tr><td>${esc(k)}</td><td>${o.u}</td><td>${o.u30}</td><td>${o.eq}</td><td>${Math.round(o.d*10)/10}</td><td>${fd(o.ult)}</td><td>${o.ah?'<span class="tag on">'+o.ah+'</span>':"—"}</td></tr>`).join("")||'<tr><td class="mu">Sin datos</td></tr>';
+}
+function csv(){
+  const rows=filtered(),h=COLS.map(c=>c[1]);
+  const L=[h.join(",")].concat(rows.map(x=>COLS.map(c=>'"'+String(x[c[0]]==null?"":x[c[0]]).replace(/"/g,'""')+'"').join(",")));
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["﻿"+L.join("\r\n")],{type:"text/csv;charset=utf-8"}));
+  a.download="lumo-uso-equipos.csv";a.click();
+}
+function start(t,email,rol,shared){
+  token=t;$("who").textContent=email+" · "+rol;
+  $("login").classList.add("hide");$("app").classList.remove("hide");
+  if(shared){$("out").textContent="Volver a la app";$("out").onclick=()=>location.href="/"}
+  return load();
+}
+// Reutiliza la sesion de la app (mismo dominio): evita volver a iniciar sesion
+(async function(){
+  try{
+    const s=JSON.parse(localStorage.getItem("lumo_session")||"null");if(!s||!s.token)return;
+    const p=jwt(s.token),rol=(p.app_metadata||{}).rol;
+    if(p.exp&&Date.now()/1000>p.exp)return;
+    if(!["admin","super_admin","gerente"].includes(rol))return;
+    const ok=await start(s.token,p.email||"sesion activa",rol,true);
+  }catch(e){}
+})();
+$("go").onclick=login;$("pw").onkeydown=e=>{if(e.key==="Enter")login()};
+["fg","fa","fc"].forEach(i=>$(i).onchange=render);$("q").oninput=render;
+$("csv").onclick=csv;$("out").onclick=()=>location.reload();
+</script>
+</body>
+</html>

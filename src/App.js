@@ -2238,6 +2238,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
   const [editPerfil,setEditPerfil]=useState(null);
   const [gerenciaPerfil,setGerenciaPerfil]=useState(""); // gerencia del usuario en edicion
   const [coordinadorPerfil,setCoordinadorPerfil]=useState(""); // coordinador del usuario en edicion
+  const [esCoordPerfil,setEsCoordPerfil]=useState(false); // marca: este usuario ES coordinador
 
   // Lista de equipos
   const [listaEqs,setListaEqs]=useState([]),[loadEqs,setLoadEqs]=useState(false);
@@ -2502,9 +2503,12 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
       await supa(`perfiles?id=eq.${perfil.id}`,{method:"PATCH",token,body:{
         nombre:nuevoNombre.trim(),
         gerencia:gerenciaPerfil||null,
-        coordinador:coordinadorPerfil.trim()||null,
+        // Los gerentes y el super admin no tienen coordinador
+        ...((perfil.rol==="ingeniero"||perfil.rol==="admin")?{coordinador:coordinadorPerfil.trim()||null}:{coordinador:null}),
+        // Solo el super admin decide quién es coordinador
+        ...(isSA?{es_coordinador:!!esCoordPerfil}:{}),
       }});
-      setEditPerfil(null);setNuevoNombre("");setGerenciaPerfil("");setCoordinadorPerfil("");cargarPerfiles();
+      setEditPerfil(null);setNuevoNombre("");setGerenciaPerfil("");setCoordinadorPerfil("");setEsCoordPerfil(false);cargarPerfiles();
     }catch(ex){alert("Error: "+ex.message);}
   }
 
@@ -3249,7 +3253,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                       style={{padding:"9px 14px",background:"linear-gradient(135deg,"+C.green+",#00c066)",
                         border:"none",borderRadius:"9px",color:"#001a0d",fontWeight:"800",
                         cursor:"pointer",fontFamily:"inherit"}}>✓</button>
-                    <button onClick={()=>{setEditPerfil(null);setNuevoNombre("");setGerenciaPerfil("");setCoordinadorPerfil("");}}
+                    <button onClick={()=>{setEditPerfil(null);setNuevoNombre("");setGerenciaPerfil("");setCoordinadorPerfil("");setEsCoordPerfil(false);}}
                       style={{padding:"9px 12px",background:"transparent",border:"1px solid "+C.border,
                         borderRadius:"9px",color:C.muted,cursor:"pointer",fontFamily:"inherit"}}>✕</button>
                   </div>
@@ -3268,18 +3272,34 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                       );})}
                     </div>
                   </div>
-                  <div>
-                    <p style={{fontSize:"10px",color:C.muted,marginBottom:"5px",letterSpacing:"0.08em"}}>COORDINADOR</p>
-                    <input value={coordinadorPerfil} onChange={e=>setCoordinadorPerfil(e.target.value)}
-                      list="lista-coordinadores"
-                      style={{...inp,width:"100%",padding:"9px 12px",fontSize:"13px"}}
-                      placeholder="Nombre del coordinador (elige o escribe)"/>
-                    <datalist id="lista-coordinadores">
-                      {Array.from(new Set(perfiles.map(function(x){return x.coordinador;}).filter(Boolean))).sort().map(function(c){
-                        return <option key={c} value={c}/>;
-                      })}
-                    </datalist>
-                  </div>
+                  {isSA&&<div>
+                    <p style={{fontSize:"10px",color:C.muted,marginBottom:"5px",letterSpacing:"0.08em"}}>¿ES COORDINADOR?</p>
+                    <button onClick={function(){setEsCoordPerfil(!esCoordPerfil);}}
+                      style={{width:"100%",padding:"8px",fontSize:"12px",fontWeight:"700",
+                        background:esCoordPerfil?"#001a2a":"transparent",
+                        border:"1px solid "+(esCoordPerfil?C.blue:C.border),
+                        borderRadius:"8px",color:esCoordPerfil?C.blue:C.muted,
+                        cursor:"pointer",fontFamily:"inherit"}}>
+                      {esCoordPerfil?"🧭 Sí, aparece en la lista de coordinadores":"No es coordinador"}
+                    </button>
+                  </div>}
+                  {(p.rol==="ingeniero"||p.rol==="admin")&&<div>
+                    <p style={{fontSize:"10px",color:C.muted,marginBottom:"5px",letterSpacing:"0.08em"}}>COORDINADOR DE ESTA PERSONA</p>
+                    <select value={coordinadorPerfil} onChange={e=>setCoordinadorPerfil(e.target.value)}
+                      style={{...inp,width:"100%",padding:"9px 12px",fontSize:"13px"}}>
+                      <option value="">Sin coordinador</option>
+                      {(function(){
+                        var nombres=perfiles.filter(function(x){return x.es_coordinador&&x.id!==p.id;}).map(function(x){return x.nombre;});
+                        // Si ya tenia uno que ya no esta marcado como coordinador, se conserva visible
+                        if(coordinadorPerfil&&nombres.indexOf(coordinadorPerfil)===-1)nombres.push(coordinadorPerfil);
+                        return nombres.sort().map(function(n){return <option key={n} value={n}>{n}</option>;});
+                      })()}
+                    </select>
+                    {perfiles.filter(function(x){return x.es_coordinador;}).length===0&&
+                      <p style={{fontSize:"10px",color:C.muted,marginTop:"4px"}}>
+                        Aun no hay coordinadores. El super admin los marca con "¿Es coordinador?".
+                      </p>}
+                  </div>}
                   {isSA&&<div style={{display:"flex",gap:"6px"}}>
                     {["ingeniero","gerente","admin","super_admin"].map(function(r){
                       return <button key={r} onClick={()=>cambiarRol(p,r)}
@@ -3306,12 +3326,16 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                       padding:"1px 7px",borderRadius:"20px",fontWeight:"700",display:"inline-block",marginTop:"3px"}}>
                       🏢 {p.gerencia}
                     </span>}
+                    {p.es_coordinador&&<span style={{fontSize:"10px",color:"#00d4ff",background:"#00d4ff22",
+                      padding:"1px 7px",borderRadius:"20px",fontWeight:"700",display:"inline-block",marginTop:"3px",marginLeft:"4px"}}>
+                      🧭 Coordinador
+                    </span>}
                     {p.coordinador&&<span style={{fontSize:"10px",color:C.blue,background:C.blue+"22",
                       padding:"1px 7px",borderRadius:"20px",fontWeight:"700",display:"inline-block",marginTop:"3px",marginLeft:"4px"}}>
                       👤 Coord: {p.coordinador}
                     </span>}
                   </div>
-                  {(isSA||(isAdmin&&(p.rol==="ingeniero"||p.rol==="gerente")))?<button onClick={function(){setEditPerfil(p.id);setNuevoNombre(p.nombre);setGerenciaPerfil(p.gerencia||"");setCoordinadorPerfil(p.coordinador||"");}}
+                  {(isSA||(isAdmin&&(p.rol==="ingeniero"||p.rol==="gerente")))?<button onClick={function(){setEditPerfil(p.id);setNuevoNombre(p.nombre);setGerenciaPerfil(p.gerencia||"");setCoordinadorPerfil(p.coordinador||"");setEsCoordPerfil(!!p.es_coordinador);}}
                     style={{background:"transparent",border:"1px solid "+C.border,borderRadius:"8px",
                       color:C.muted,padding:"4px 10px",cursor:"pointer",fontSize:"12px",fontFamily:"inherit"}}>
                     Editar

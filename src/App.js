@@ -2237,6 +2237,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
   const [perfiles,setPerfiles]=useState([]),[nuevoNombre,setNuevoNombre]=useState("");
   const [editPerfil,setEditPerfil]=useState(null);
   const [gerenciaPerfil,setGerenciaPerfil]=useState(""); // gerencia del usuario en edicion
+  const [coordinadorPerfil,setCoordinadorPerfil]=useState(""); // coordinador del usuario en edicion
 
   // Lista de equipos
   const [listaEqs,setListaEqs]=useState([]),[loadEqs,setLoadEqs]=useState(false);
@@ -2501,8 +2502,9 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
       await supa(`perfiles?id=eq.${perfil.id}`,{method:"PATCH",token,body:{
         nombre:nuevoNombre.trim(),
         gerencia:gerenciaPerfil||null,
+        coordinador:coordinadorPerfil.trim()||null,
       }});
-      setEditPerfil(null);setNuevoNombre("");setGerenciaPerfil("");cargarPerfiles();
+      setEditPerfil(null);setNuevoNombre("");setGerenciaPerfil("");setCoordinadorPerfil("");cargarPerfiles();
     }catch(ex){alert("Error: "+ex.message);}
   }
 
@@ -3247,7 +3249,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                       style={{padding:"9px 14px",background:"linear-gradient(135deg,"+C.green+",#00c066)",
                         border:"none",borderRadius:"9px",color:"#001a0d",fontWeight:"800",
                         cursor:"pointer",fontFamily:"inherit"}}>✓</button>
-                    <button onClick={()=>{setEditPerfil(null);setNuevoNombre("");setGerenciaPerfil("");}}
+                    <button onClick={()=>{setEditPerfil(null);setNuevoNombre("");setGerenciaPerfil("");setCoordinadorPerfil("");}}
                       style={{padding:"9px 12px",background:"transparent",border:"1px solid "+C.border,
                         borderRadius:"9px",color:C.muted,cursor:"pointer",fontFamily:"inherit"}}>✕</button>
                   </div>
@@ -3265,6 +3267,18 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                         </button>
                       );})}
                     </div>
+                  </div>
+                  <div>
+                    <p style={{fontSize:"10px",color:C.muted,marginBottom:"5px",letterSpacing:"0.08em"}}>COORDINADOR</p>
+                    <input value={coordinadorPerfil} onChange={e=>setCoordinadorPerfil(e.target.value)}
+                      list="lista-coordinadores"
+                      style={{...inp,width:"100%",padding:"9px 12px",fontSize:"13px"}}
+                      placeholder="Nombre del coordinador (elige o escribe)"/>
+                    <datalist id="lista-coordinadores">
+                      {Array.from(new Set(perfiles.map(function(x){return x.coordinador;}).filter(Boolean))).sort().map(function(c){
+                        return <option key={c} value={c}/>;
+                      })}
+                    </datalist>
                   </div>
                   {isSA&&<div style={{display:"flex",gap:"6px"}}>
                     {["ingeniero","gerente","admin","super_admin"].map(function(r){
@@ -3292,8 +3306,12 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                       padding:"1px 7px",borderRadius:"20px",fontWeight:"700",display:"inline-block",marginTop:"3px"}}>
                       🏢 {p.gerencia}
                     </span>}
+                    {p.coordinador&&<span style={{fontSize:"10px",color:C.blue,background:C.blue+"22",
+                      padding:"1px 7px",borderRadius:"20px",fontWeight:"700",display:"inline-block",marginTop:"3px",marginLeft:"4px"}}>
+                      👤 Coord: {p.coordinador}
+                    </span>}
                   </div>
-                  {(isSA||(isAdmin&&(p.rol==="ingeniero"||p.rol==="gerente")))?<button onClick={function(){setEditPerfil(p.id);setNuevoNombre(p.nombre);setGerenciaPerfil(p.gerencia||"");}}
+                  {(isSA||(isAdmin&&(p.rol==="ingeniero"||p.rol==="gerente")))?<button onClick={function(){setEditPerfil(p.id);setNuevoNombre(p.nombre);setGerenciaPerfil(p.gerencia||"");setCoordinadorPerfil(p.coordinador||"");}}
                     style={{background:"transparent",border:"1px solid "+C.border,borderRadius:"8px",
                       color:C.muted,padding:"4px 10px",cursor:"pointer",fontSize:"12px",fontFamily:"inherit"}}>
                     Editar
@@ -4693,7 +4711,7 @@ export default function App(){
 
             <p style={{textAlign:"center",fontSize:"11px",color:"#333",
               marginTop:"20px",fontStyle:"italic",fontFamily:"'Sora',sans-serif"}}>
-              Cada activo en su lugar ✦ Lumo v0.30.0
+              Cada activo en su lugar ✦ Lumo v0.27.0
             </p>
           </div>
         </div>

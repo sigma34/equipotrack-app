@@ -59,6 +59,7 @@ th{color:var(--mu);cursor:pointer;font-weight:600}
   </header>
   <div class="filters">
     <select id="fg"><option value="">Todas las gerencias</option></select>
+    <select id="fo"><option value="">Todos los coordinadores</option></select>
     <select id="fa"><option value="">Todos los administradores</option></select>
     <select id="fc"><option value="">Todas las categorías</option></select>
     <input id="q" placeholder="Buscar equipo o serie">
@@ -70,7 +71,7 @@ th{color:var(--mu);cursor:pointer;font-weight:600}
   </div>
   <div class="grid">
     <div class="panel"><h2>Por categoría</h2><div class="tw"><table><thead><tr><th>Categoría</th><th>Equipos</th><th>Usos</th><th>30 días</th><th>Sin uso prom.</th><th>Nunca usados</th></tr></thead><tbody id="tcat"></tbody></table></div></div>
-    <div class="panel"><h2>Por ingeniero <span class="mu" id="cing"></span></h2><p class="mu" style="margin:-6px 0 8px;font-size:11px">La gerencia filtra por la del ingeniero; el resto de filtros, por equipo.</p><div class="tw" style="max-height:360px;overflow-y:auto"><table><thead><tr><th>Ingeniero</th><th>Usos</th><th>30 días</th><th>Equipos</th><th>Días en uso</th><th>Último uso</th><th>Ahora</th></tr></thead><tbody id="ting"></tbody></table></div></div>
+    <div class="panel"><h2>Por ingeniero <span class="mu" id="cing"></span></h2><p class="mu" style="margin:-6px 0 8px;font-size:11px">La gerencia filtra por la del ingeniero; el resto de filtros, por equipo.</p><div class="tw" style="max-height:360px;overflow-y:auto"><table><thead><tr><th>Ingeniero</th><th>Coordinador</th><th>Usos</th><th>30 días</th><th>Equipos</th><th>Días en uso</th><th>Último uso</th><th>Ahora</th></tr></thead><tbody id="ting"></tbody></table></div></div>
   </div>
   <div class="panel">
     <h2>Detalle por equipo <span class="mu" id="cnt"></span></h2>
@@ -86,7 +87,7 @@ const SITEKEY="c8541066-98c2-474a-8d3e-0f0c4748f016";
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let shared=false,token=null,data=[],ing=[],cap="",sortK="usos",sortD=-1;
-const COLS=[["equipo_id","ID"],["nombre","Equipo"],["gerencia","Gerencia"],["admin_email","Administrador"],["usos","Usos"],["usos_30d","30 días"],["ultimo_uso","Último uso"],["dias_desde_ultimo_uso","Días sin uso"],["dias_en_uso","Días en uso"],["en_uso_ahora","Estado"]];
+const COLS=[["equipo_id","ID"],["nombre","Equipo"],["gerencia","Gerencia"],["coordinador","Coordinador"],["admin_email","Administrador"],["usos","Usos"],["usos_30d","30 días"],["ultimo_uso","Último uso"],["dias_desde_ultimo_uso","Días sin uso"],["dias_en_uso","Días en uso"],["en_uso_ahora","Estado"]];
 
 window.onHC=function(){hcaptcha.render("hc",{sitekey:SITEKEY,theme:"dark",callback:t=>cap=t,"expired-callback":()=>cap=""})};
 const s=document.createElement("script");s.src="https://js.hcaptcha.com/1/api.js?render=explicit&onload=onHC&hl=es";s.async=true;document.head.appendChild(s);
@@ -124,14 +125,14 @@ async function load(){
   data=r.rows;
   const r2=await getAll("v_uso_ingenieros");
   ing=r2.ok?r2.rows:[];
-  fill("fg","gerencia");fill("fa","admin_email");fill("fc","categoria");
+  fill("fg","gerencia");fill("fo","coordinador");fill("fa","admin_email");fill("fc","categoria");
   render();
 }
 function fill(id,k){const el=$(id),f=el.options[0].outerHTML;
   el.innerHTML=f+[...new Set(data.map(x=>x[k]).filter(Boolean))].sort().map(v=>`<option>${esc(v)}</option>`).join("")}
 function filtered(skipG){
-  const g=skipG?"":$("fg").value,a=$("fa").value,c=$("fc").value,q=$("q").value.toLowerCase().trim();
-  return data.filter(x=>(!g||x.gerencia===g)&&(!a||x.admin_email===a)&&(!c||x.categoria===c)&&
+  const g=skipG?"":$("fg").value,co=$("fo").value,a=$("fa").value,c=$("fc").value,q=$("q").value.toLowerCase().trim();
+  return data.filter(x=>(!g||x.gerencia===g)&&(!co||x.coordinador===co)&&(!a||x.admin_email===a)&&(!c||x.categoria===c)&&
     (!q||(x.nombre+" "+x.serie+" "+x.equipo_id).toLowerCase().includes(q)));
 }
 const fd=v=>v?new Date(v).toLocaleDateString("es-MX",{day:"2-digit",month:"short",year:"numeric"}):"Nunca";
@@ -155,7 +156,7 @@ function render(){
   document.querySelectorAll("#th th").forEach(t=>t.onclick=()=>{const k=t.dataset.k;sortD=sortK===k?-sortD:-1;sortK=k;render()});
   const rows=[...d].sort((a,b)=>{const x=a[sortK],y=b[sortK];if(x==null)return 1;if(y==null)return-1;return(x>y?1:x<y?-1:0)*sortD});
   $("cnt").textContent="("+rows.length+")";
-  $("tb").innerHTML=rows.map(x=>`<tr><td>${esc(x.equipo_id)}</td><td>${esc(x.nombre)}</td><td>${esc(x.gerencia||"—")}</td><td>${esc(x.admin_email||"—")}</td>
+  $("tb").innerHTML=rows.map(x=>`<tr><td>${esc(x.equipo_id)}</td><td>${esc(x.nombre)}</td><td>${esc(x.gerencia||"—")}</td><td>${esc(x.coordinador||"—")}</td><td>${esc(x.admin_email||"—")}</td>
    <td>${x.usos}</td><td>${x.usos_30d}</td><td>${fd(x.ultimo_uso)}</td><td>${x.dias_desde_ultimo_uso==null?"—":x.dias_desde_ultimo_uso}</td><td>${x.dias_en_uso}</td>
    <td><span class="tag ${est(x)[0]}">${est(x)[1]}</span></td></tr>`).join("");
 }
@@ -174,12 +175,12 @@ function renderCat(d){
 function renderIng(){
   // Equipos que cumplen los filtros (SIN la gerencia: esa se aplica a la gerencia del ingeniero)
   const ids=new Set(filtered(true).map(x=>x.equipo_id)),g=$("fg").value,m={};
-  ing.filter(x=>(x.equipo_id===undefined||ids.has(x.equipo_id))&&(!g||(x.gerencia_ingeniero||x.gerencia)===g)).forEach(x=>{
-    const o=m[x.ingeniero]||(m[x.ingeniero]={u:0,u30:0,eq:0,d:0,ult:null,ah:0});
+  ing.filter(x=>(x.equipo_id===undefined||ids.has(x.equipo_id))&&(!g||(x.gerencia_ingeniero||x.gerencia)===g)&&(!$("fo").value||x.coordinador===$("fo").value)).forEach(x=>{
+    const o=m[x.ingeniero]||(m[x.ingeniero]={co:x.coordinador||"",u:0,u30:0,eq:0,d:0,ult:null,ah:0});
     o.u+=x.usos;o.u30+=x.usos_30d;o.eq+=x.equipos;o.d+=Number(x.dias_en_uso);o.ah+=x.en_uso_ahora;if(x.ultimo_uso&&(!o.ult||x.ultimo_uso>o.ult))o.ult=x.ultimo_uso});
   const rows=Object.entries(m).sort((a,b)=>b[1].u-a[1].u);
   $("cing").textContent="("+rows.length+")";
-  $("ting").innerHTML=rows.map(([k,o])=>`<tr><td>${esc(k)}</td><td>${o.u}</td><td>${o.u30}</td><td>${o.eq}</td><td>${Math.round(o.d*10)/10}</td><td>${fd(o.ult)}</td><td>${o.ah?'<span class="tag on">'+o.ah+'</span>':"—"}</td></tr>`).join("")||'<tr><td class="mu">Sin datos</td></tr>';
+  $("ting").innerHTML=rows.map(([k,o])=>`<tr><td>${esc(k)}</td><td>${esc(o.co||"—")}</td><td>${o.u}</td><td>${o.u30}</td><td>${o.eq}</td><td>${Math.round(o.d*10)/10}</td><td>${fd(o.ult)}</td><td>${o.ah?'<span class="tag on">'+o.ah+'</span>':"—"}</td></tr>`).join("")||'<tr><td class="mu">Sin datos</td></tr>';
 }
 function csv(){
   const rows=filtered(),h=COLS.map(c=>c[1]);
@@ -204,7 +205,7 @@ function start(t,email,rol,shared_){
   }catch(e){}
 })();
 $("go").onclick=login;$("pw").onkeydown=e=>{if(e.key==="Enter")login()};
-["fg","fa","fc"].forEach(i=>$(i).onchange=render);$("q").oninput=render;
+["fg","fo","fa","fc"].forEach(i=>$(i).onchange=render);$("q").oninput=render;
 $("csv").onclick=csv;$("out").onclick=()=>{shared?location.href="/":location.reload()};
 </script>
 </body>

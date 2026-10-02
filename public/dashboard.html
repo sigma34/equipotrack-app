@@ -126,12 +126,15 @@ async function load(){
   const r2=await getAll("v_uso_ingenieros");
   ing=r2.ok?r2.rows:[];
   fill("fg","gerencia");fill("fo","coordinador");fill("fa","admin_email");fill("fc","categoria");
+  // Si quien entra es coordinador, abre mostrando SU equipo (se puede cambiar a "Todos")
+  const nm=String((jwt(token).user_metadata||{}).nombre||"").trim().toLowerCase();
+  if(nm){const op=[...$("fo").options].find(o=>o.value.toLowerCase()===nm);if(op)$("fo").value=op.value}
   render();
 }
 function fill(id,k){const el=$(id),f=el.options[0].outerHTML;
   el.innerHTML=f+[...new Set(data.map(x=>x[k]).filter(Boolean))].sort().map(v=>`<option>${esc(v)}</option>`).join("")}
-function filtered(skipG){
-  const g=skipG?"":$("fg").value,co=$("fo").value,a=$("fa").value,c=$("fc").value,q=$("q").value.toLowerCase().trim();
+function filtered(skipG,skipCo){
+  const g=skipG?"":$("fg").value,co=skipCo?"":$("fo").value,a=$("fa").value,c=$("fc").value,q=$("q").value.toLowerCase().trim();
   return data.filter(x=>(!g||x.gerencia===g)&&(!co||x.coordinador===co)&&(!a||x.admin_email===a)&&(!c||x.categoria===c)&&
     (!q||(x.nombre+" "+x.serie+" "+x.equipo_id).toLowerCase().includes(q)));
 }
@@ -174,7 +177,7 @@ function renderCat(d){
 }
 function renderIng(){
   // Equipos que cumplen los filtros (SIN la gerencia: esa se aplica a la gerencia del ingeniero)
-  const ids=new Set(filtered(true).map(x=>x.equipo_id)),g=$("fg").value,m={};
+  const ids=new Set(filtered(true,true).map(x=>x.equipo_id)),g=$("fg").value,m={};
   ing.filter(x=>(x.equipo_id===undefined||ids.has(x.equipo_id))&&(!g||(x.gerencia_ingeniero||x.gerencia)===g)&&(!$("fo").value||x.coordinador===$("fo").value)).forEach(x=>{
     const o=m[x.ingeniero]||(m[x.ingeniero]={co:x.coordinador||"",u:0,u30:0,eq:0,d:0,ult:null,ah:0});
     o.u+=x.usos;o.u30+=x.usos_30d;o.eq+=x.equipos;o.d+=Number(x.dias_en_uso);o.ah+=x.en_uso_ahora;if(x.ultimo_uso&&(!o.ult||x.ultimo_uso>o.ult))o.ult=x.ultimo_uso});

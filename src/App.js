@@ -1707,7 +1707,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador · v0.30.0
+          ¿Sin acceso? Contacta al administrador · v0.30.1
         </p>
         <p style={{textAlign:"center",marginTop:"8px"}}>
           <a href="/dashboard.html" style={{color:C.muted,fontSize:"12px",textDecoration:"underline"}}>
@@ -4735,7 +4735,7 @@ export default function App(){
 
             <p style={{textAlign:"center",fontSize:"11px",color:"#333",
               marginTop:"20px",fontStyle:"italic",fontFamily:"'Sora',sans-serif"}}>
-              Cada activo en su lugar ✦ Lumo v0.27.0
+              Cada activo en su lugar ✦ Lumo v0.30.1
             </p>
           </div>
         </div>

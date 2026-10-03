@@ -1707,7 +1707,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador · v0.30.1
+          ¿Sin acceso? Contacta al administrador · v0.31.0
         </p>
         <p style={{textAlign:"center",marginTop:"8px"}}>
           <a href="/dashboard.html" style={{color:C.muted,fontSize:"12px",textDecoration:"underline"}}>
@@ -2224,6 +2224,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
   // Equipo form
   const [nombre,setNombre]=useState(""),[serie,setSerie]=useState("");
   const [adminEq,setAdminEq]=useState(""); // admin responsable del equipo
+  const [coordEq,setCoordEq]=useState(""); // coordinador dueño del equipo
   const [notas,setNotas]=useState(""); // notas y accesorios del equipo
   const [gerenciaEq,setGerenciaEq]=useState(""); // gerencia del equipo
   const [cat,setCat]=useState(""),[estadoB,setEstadoB]=useState("");
@@ -2292,6 +2293,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
         ciudad_base:editEq.ciudad_base,
         sitio_base:editEq.sitio_base,
         admin_email:editEq.admin_email||null,
+        coordinador:editEq.coordinador||null,
         notas:editEq.notas||null,
         gerencia:editEq.gerencia||null,
       }});
@@ -2747,6 +2749,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
 
   async function crearEquipo(){
     if(!nombre||!serie||!cat||!estadoB||!ciudadB||!sitio){setErr("Todos los campos son requeridos");return;}
+    if(!coordEq){setErr("Selecciona el coordinador dueño del equipo");return;}
     setLoading(true);setErr("");
     try{
       const existentes=await supa("equipos",{token,params:{select:"id",order:"created_at.desc",limit:"1"}});
@@ -2755,11 +2758,11 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
         const num=parseInt(existentes[0].id.replace("EQ-",""))||0;next=num+1;
       }
       const id=`EQ-${String(next).padStart(3,"0")}`;
-      const eq={id,nombre,serie,categoria:cat,estado_base:estadoB,ciudad_base:ciudadB,sitio_base:sitio,activo:true,admin_email:adminEq||null,notas:notas.trim()||null,gerencia:gerenciaEq||null};
+      const eq={id,nombre,serie,categoria:cat,estado_base:estadoB,ciudad_base:ciudadB,sitio_base:sitio,activo:true,admin_email:adminEq||null,coordinador:coordEq||null,notas:notas.trim()||null,gerencia:gerenciaEq||null};
       await supa("equipos",{method:"POST",token,body:eq});
       setNuevoEq(eq);
       onEquipoCreado();
-      setNombre("");setSerie("");setCat("");setEstadoB("");setCiudadB("");setSitio("");
+      setNombre("");setSerie("");setCat("");setEstadoB("");setCiudadB("");setSitio("");setCoordEq("");
     }catch(ex){
       setErr(ex.message);
     }
@@ -2919,6 +2922,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                         </p>
                         {eq.admin_email&&<p style={{fontSize:"10px",color:C.blue,margin:"2px 0 0"}}>
                           👤 {eq.admin_email}
+                          {eq.coordinador&&<span style={{color:"#00d4ff",marginLeft:"8px"}}>🧭 {eq.coordinador}</span>}
                         </p>}
                       </div>
                     </div>
@@ -3189,6 +3193,17 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                   .map(function(p){return(
                     <option key={p.id} value={p.email}>{p.nombre} — {p.email}</option>
                   );})}
+              </select>
+            </div>
+            <div>
+              <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>
+                COORDINADOR DUEÑO DEL EQUIPO *
+              </label>
+              <select value={coordEq} onChange={e=>setCoordEq(e.target.value)}
+                style={{...inp,cursor:"pointer",color:coordEq?C.text:C.muted}}>
+                <option value="">Selecciona…</option>
+                {perfilesAdmin.filter(function(p){return p.es_coordinador;})
+                  .map(function(p){return(<option key={p.id} value={p.nombre}>{p.nombre}</option>);})}
               </select>
             </div>
             <button onClick={crearEquipo} disabled={loading} style={btnP(loading)}>
@@ -3549,6 +3564,18 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
               .map(function(p){return(
                 <option key={p.id} value={p.email}>{p.nombre} - {p.email}</option>
               );})}
+          </select>
+        </div>
+        <div>
+          <label style={{color:"#999",fontSize:"11px",letterSpacing:"0.08em",display:"block",marginBottom:"6px"}}>COORDINADOR DUEÑO DEL EQUIPO</label>
+          <select value={editEq.coordinador||""}
+            onChange={function(e){setEditEq(Object.assign({},editEq,{coordinador:e.target.value}));}}
+            style={{...inp,cursor:"pointer",color:editEq.coordinador?C.text:C.muted}}>
+            <option value="">Sin asignar (usa el del administrador)</option>
+            {editEq.coordinador&&!perfilesAdmin.some(function(p){return p.es_coordinador&&p.nombre===editEq.coordinador;})&&
+              <option value={editEq.coordinador}>{editEq.coordinador}</option>}
+            {perfilesAdmin.filter(function(p){return p.es_coordinador;})
+              .map(function(p){return(<option key={p.id} value={p.nombre}>{p.nombre}</option>);})}
           </select>
         </div>
         <button onClick={guardarEdicion} style={btnP(false)}>
@@ -4735,7 +4762,7 @@ export default function App(){
 
             <p style={{textAlign:"center",fontSize:"11px",color:"#333",
               marginTop:"20px",fontStyle:"italic",fontFamily:"'Sora',sans-serif"}}>
-              Cada activo en su lugar ✦ Lumo v0.30.1
+              Cada activo en su lugar ✦ Lumo v0.31.0
             </p>
           </div>
         </div>

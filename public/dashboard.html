@@ -38,6 +38,11 @@ th{color:var(--mu);cursor:pointer;font-weight:600}
 .tag{padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
 .on{background:#ff950022;color:var(--o)}.off{background:#00e87a22;color:var(--g)}.never{background:#ff5c6c22;color:var(--r)}.rep{background:#9966ff22;color:var(--p)}
 .hide{display:none!important}
+.seg{display:flex;gap:0;margin-bottom:10px}.seg button{flex:1;border-radius:0;font-size:13px;padding:10px 12px}
+.seg button:first-child{border-radius:10px 0 0 10px}.seg button:last-child{border-radius:0 10px 10px 0;border-left:0}
+.seg button.act{background:var(--g);color:#001a0d;border-color:var(--g)}
+.hint{margin:0 0 12px;line-height:1.5}.aviso{background:#ff950022;border:1px solid var(--o);color:var(--o);border-radius:10px;padding:10px 12px;font-size:12px;margin-bottom:12px}
+.pill{padding:1px 8px;border-radius:20px;font-size:10px;font-weight:700;background:#00e87a22;color:var(--g);margin-left:6px}
 </style>
 </head>
 <body>
@@ -57,6 +62,9 @@ th{color:var(--mu);cursor:pointer;font-weight:600}
     <div><h1>Lu<span>mo</span> · Uso de equipos</h1><div class="mu" id="who"></div></div>
     <div style="display:flex;gap:8px"><button id="csv">Descargar CSV</button><button id="out">Salir</button></div>
   </header>
+  <div class="seg"><button id="mg">Mi gente</button><button id="mq">Mis equipos</button></div>
+  <p class="mu hint" id="hint"></p>
+  <div class="aviso hide" id="aviso"></div>
   <div class="filters">
     <select id="fg"><option value="">Todas las gerencias</option></select>
     <select id="fo"><option value="">Todos los coordinadores</option></select>
@@ -66,12 +74,16 @@ th{color:var(--mu);cursor:pointer;font-weight:600}
   </div>
   <div class="cards" id="kpis"></div>
   <div class="grid">
-    <div class="panel"><h2>Más usados</h2><div id="top"></div></div>
-    <div class="panel"><h2>Más tiempo sin uso (solo equipos ya usados)</h2><div id="idle"></div></div>
+    <div class="panel"><h2 id="t1">Más usados</h2><div id="top"></div></div>
+    <div class="panel"><h2 id="t2">Más tiempo sin uso</h2><div id="idle"></div></div>
   </div>
   <div class="grid">
-    <div class="panel"><h2>Por categoría</h2><div class="tw"><table><thead><tr><th>Categoría</th><th>Equipos</th><th>Usos</th><th>30 días</th><th>Sin uso prom.</th><th>Nunca usados</th></tr></thead><tbody id="tcat"></tbody></table></div></div>
-    <div class="panel"><h2>Por ingeniero <span class="mu" id="cing"></span></h2><p class="mu" style="margin:-6px 0 8px;font-size:11px">La gerencia filtra por la del ingeniero; el resto de filtros, por equipo.</p><div class="tw" style="max-height:360px;overflow-y:auto"><table><thead><tr><th>Ingeniero</th><th>Coordinador</th><th>Usos</th><th>30 días</th><th>Equipos</th><th>Días en uso</th><th>Último uso</th><th>Ahora</th></tr></thead><tbody id="ting"></tbody></table></div></div>
+    <div class="panel"><h2 id="t3">Entre coordinaciones</h2><div class="tw"><table><thead><tr><th>Coordinación</th><th>Usos</th><th>%</th></tr></thead><tbody id="tx"></tbody></table></div></div>
+    <div class="panel"><h2>Por categoría</h2><div class="tw"><table><thead><tr id="thc"></tr></thead><tbody id="tcat"></tbody></table></div></div>
+  </div>
+  <div class="panel" style="margin-bottom:16px">
+    <h2 id="t4">Por ingeniero <span class="mu" id="cing"></span></h2>
+    <div class="tw" style="max-height:380px;overflow-y:auto"><table><thead><tr><th>Ingeniero</th><th>Coordinador</th><th>Usos</th><th>30 días</th><th>Equipos</th><th>Días en uso</th><th>Último uso</th><th>Ahora</th></tr></thead><tbody id="ting"></tbody></table></div>
   </div>
   <div class="panel">
     <h2>Detalle por equipo <span class="mu" id="cnt"></span></h2>
@@ -86,8 +98,9 @@ const KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6
 const SITEKEY="c8541066-98c2-474a-8d3e-0f0c4748f016";
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-let shared=false,token=null,data=[],ing=[],cap="",sortK="usos",sortD=-1;
-const COLS=[["equipo_id","ID"],["nombre","Equipo"],["gerencia","Gerencia"],["coordinador","Coordinador"],["admin_email","Administrador"],["usos","Usos"],["usos_30d","30 días"],["ultimo_uso","Último uso"],["dias_desde_ultimo_uso","Días sin uso"],["dias_en_uso","Días en uso"],["en_uso_ahora","Estado"]];
+// modo: "gente" = usos de MIS ingenieros sobre cualquier equipo; "equipos" = usos de MIS equipos por cualquier ingeniero
+let shared=false,token=null,data=[],ing=[],cap="",sortK="usos",sortD=-1,modo="gente",eqMap=new Map(),me=null;
+const COLS=[["equipo_id","ID"],["nombre","Equipo"],["gerencia","Gerencia"],["coordinador","Coordinador"],["admin_nombre","Administrador"],["usos","Usos"],["usos_30d","30 días"],["ultimo_uso","Último uso"],["dias_desde_ultimo_uso","Días sin uso"],["dias_en_uso","Días en uso"],["en_uso_ahora","Estado"]];
 
 window.onHC=function(){hcaptcha.render("hc",{sitekey:SITEKEY,theme:"dark",callback:t=>cap=t,"expired-callback":()=>cap=""})};
 const s=document.createElement("script");s.src="https://js.hcaptcha.com/1/api.js?render=explicit&onload=onHC&hl=es";s.async=true;document.head.appendChild(s);
@@ -103,13 +116,10 @@ async function login(){
   if(!r.ok){$("err").textContent="Correo o contraseña incorrectos";try{hcaptcha.reset()}catch(e){}cap="";return}
   const rol=(jwt(d.access_token).app_metadata||{}).rol;
   if(!["admin","super_admin","gerente"].includes(rol)){$("err").textContent="Tu rol no tiene acceso a este dashboard";return}
-  token=d.access_token;
-  $("who").textContent=d.user.email+" · "+rol;
-  $("login").classList.add("hide");$("app").classList.remove("hide");
-  load();
+  start(d.access_token,d.user.email,rol,false);
 }
 async function getAll(view){
-  let rows=[],from=0,st=200;
+  let rows=[],from=0;
   for(;;){
     const r=await fetch(URL_+"/rest/v1/"+view+"?select=*",{headers:{apikey:KEY,Authorization:"Bearer "+token,Range:from+"-"+(from+999),"Range-Unit":"items"}});
     if(!r.ok)return{ok:false,status:r.status,rows};
@@ -125,71 +135,144 @@ async function load(){
   data=r.rows;
   const r2=await getAll("v_uso_ingenieros");
   ing=r2.ok?r2.rows:[];
-  fill("fg","gerencia");fill("fo","coordinador");fill("fa","admin_email");fill("fc","categoria");
-  // Si quien entra es coordinador, abre mostrando SU equipo (se puede cambiar a "Todos")
-  const nm=String((jwt(token).user_metadata||{}).nombre||"").trim().toLowerCase();
-  if(nm){const op=[...$("fo").options].find(o=>o.value.toLowerCase()===nm);if(op)$("fo").value=op.value}
+  // Mi propio perfil: define con qué vista abre el dashboard
+  me=null;
+  try{
+    const em=(jwt(token).email||"").toLowerCase();
+    const r3=await fetch(URL_+"/rest/v1/perfiles?select=nombre,es_coordinador,gerencia&email=ilike."+encodeURIComponent(em),{headers:{apikey:KEY,Authorization:"Bearer "+token}});
+    if(r3.ok){const a=await r3.json();me=a[0]||null}
+  }catch(e){}
+  boot((jwt(token).app_metadata||{}).rol,(jwt(token).email||"").toLowerCase());
+}
+function opts(id,vals){const el=$(id),f=el.options[0].outerHTML;
+  el.innerHTML=f+[...new Set(vals.filter(Boolean))].sort().map(v=>`<option>${esc(v)}</option>`).join("")}
+function setSel(id,v){const el=$(id);if([...el.options].some(o=>o.value===v))el.value=v}
+// Llena filtros y elige la vista inicial
+function boot(rol,email){
+  data.forEach(x=>{if(!x.admin_nombre)x.admin_nombre=x.admin_email||""});
+  eqMap=new Map(data.map(x=>[x.equipo_id,x]));
+  opts("fg",data.map(x=>x.gerencia).concat(ing.map(x=>x.gerencia_ingeniero)));
+  opts("fo",data.map(x=>x.coordinador).concat(ing.map(x=>x.coordinador),ing.map(x=>x.coordinador_equipo),[me&&me.es_coordinador?me.nombre:null]));
+  {const el=$("fa"),f0=el.options[0].outerHTML,m=new Map();
+  data.forEach(x=>{if(x.admin_email)m.set(x.admin_email,x.admin_nombre||x.admin_email)});
+  el.innerHTML=f0+[...m].sort((a,b)=>a[1].localeCompare(b[1])).map(([v,n])=>`<option value="${esc(v)}">${esc(n)}</option>`).join("")}
+  opts("fc",data.map(x=>x.categoria));
+  // Prioridad: si la persona ES coordinador (aunque sea admin) abre en "Mi gente" con su nombre.
+  // Admin que no es coordinador: "Mis equipos" filtrado a sus equipos. Gerente: su gerencia.
+  if(me&&me.es_coordinador){modo="gente";setSel("fo",me.nombre)}
+  else{
+    modo="equipos";
+    if(rol==="admin")setSel("fa",email);
+    else if(rol==="gerente"&&me&&me.gerencia)setSel("fg",me.gerencia);
+  }
+  const falta=(data.length&&!("coordinador" in data[0]))||(ing.length&&!("coordinador_equipo" in ing[0]));
+  $("aviso").classList.toggle("hide",!falta);
+  if(falta)$("aviso").textContent="Falta correr la versión nueva de lumo-dashboard-uso.sql en Supabase: sin ella, los filtros de coordinador y los cruces entre coordinaciones salen incompletos.";
+  setModo(modo);
+}
+function setModo(m){
+  modo=m;
+  $("mg").classList.toggle("act",m==="gente");$("mq").classList.toggle("act",m==="equipos");
+  $("hint").textContent=m==="gente"
+    ?"Mi gente: el filtro de coordinador es el del INGENIERO. Se ven los usos de esos ingenieros sobre cualquier equipo, sean o no de su coordinación."
+    :"Mis equipos: el filtro de coordinador es el del ADMINISTRADOR del equipo (o el propio administrador si es coordinador). Se ven todos los usos de esos equipos, también de ingenieros de otras coordinaciones.";
   render();
 }
-function fill(id,k){const el=$(id),f=el.options[0].outerHTML;
-  el.innerHTML=f+[...new Set(data.map(x=>x[k]).filter(Boolean))].sort().map(v=>`<option>${esc(v)}</option>`).join("")}
-function filtered(skipG,skipCo){
-  const g=skipG?"":$("fg").value,co=skipCo?"":$("fo").value,a=$("fa").value,c=$("fc").value,q=$("q").value.toLowerCase().trim();
-  return data.filter(x=>(!g||x.gerencia===g)&&(!co||x.coordinador===co)&&(!a||x.admin_email===a)&&(!c||x.categoria===c)&&
-    (!q||(x.nombre+" "+x.serie+" "+x.equipo_id).toLowerCase().includes(q)));
+function F(){return{g:$("fg").value,co:$("fo").value,a:$("fa").value,c:$("fc").value,q:$("q").value.toLowerCase().trim()}}
+// Filtros que siempre aplican al EQUIPO: administrador, categoría y buscador
+function eqOK(x,f){return(!f.a||x.admin_email===f.a)&&(!f.c||x.categoria===f.c)&&(!f.q||(x.nombre+" "+x.serie+" "+x.equipo_id).toLowerCase().includes(f.q))}
+// Movimientos ingeniero-equipo que cumplen los filtros, según la vista
+function ingRows(f){
+  const ok=new Set(data.filter(x=>eqOK(x,f)).map(x=>x.equipo_id));
+  return ing.filter(x=>ok.has(x.equipo_id)&&(modo==="gente"
+    ?((!f.co||x.coordinador===f.co)&&(!f.g||(x.gerencia_ingeniero||x.gerencia)===f.g))
+    :((!f.co||x.coordinador_equipo===f.co)&&(!f.g||x.gerencia===f.g))));
+}
+// Equipos que se muestran: en "Mis equipos" los de mi flota; en "Mi gente" los que usa mi gente (con SUS usos)
+function eqRows(f,ir){
+  if(modo==="equipos")return data.filter(x=>eqOK(x,f)&&(!f.g||x.gerencia===f.g)&&(!f.co||x.coordinador===f.co));
+  const m=new Map();
+  ir.forEach(x=>{let o=m.get(x.equipo_id);if(!o){o={u:0,u30:0,ult:null,d:0,ah:0};m.set(x.equipo_id,o)}
+    o.u+=x.usos;o.u30+=x.usos_30d;o.d+=Number(x.dias_en_uso);o.ah+=x.en_uso_ahora;if(x.ultimo_uso&&(!o.ult||x.ultimo_uso>o.ult))o.ult=x.ultimo_uso});
+  return[...m].map(([id,o])=>Object.assign({},eqMap.get(id),{usos:o.u,usos_30d:o.u30,ultimo_uso:o.ult,
+    dias_desde_ultimo_uso:o.ult?Math.floor((Date.now()-new Date(o.ult))/864e5):null,dias_en_uso:Math.round(o.d*10)/10,en_uso_ahora:o.ah>0}));
+}
+function engAgg(ir){
+  const m={};
+  ir.forEach(x=>{const o=m[x.ingeniero]||(m[x.ingeniero]={co:x.coordinador||"",u:0,u30:0,eq:0,d:0,ult:null,ah:0});
+    o.u+=x.usos;o.u30+=x.usos_30d;o.eq+=x.equipos;o.d+=Number(x.dias_en_uso);o.ah+=x.en_uso_ahora;if(x.ultimo_uso&&(!o.ult||x.ultimo_uso>o.ult))o.ult=x.ultimo_uso});
+  return Object.entries(m).sort((a,b)=>b[1].u-a[1].u);
 }
 const fd=v=>v?new Date(v).toLocaleDateString("es-MX",{day:"2-digit",month:"short",year:"numeric"}):"Nunca";
-function bars(el,rows,key,color){
-  const mx=Math.max(1,...rows.map(r=>r[key]||0));
-  $(el).innerHTML=rows.map(r=>`<div class="row"><div class="n" title="${esc(r.nombre)}">${esc(r.equipo_id)} ${esc(r.nombre)}</div>
-  <div class="bar"><i style="width:${(r[key]||0)/mx*100}%;background:${color}"></i></div><div class="v">${r[key]==null?"—":r[key]}</div></div>`).join("")||'<div class="mu">Sin datos</div>';
+function bars(el,items,color){
+  const mx=Math.max(1,...items.map(r=>r.v||0));
+  $(el).innerHTML=items.map(r=>`<div class="row"><div class="n" title="${esc(r.t)}">${esc(r.l)}</div>
+  <div class="bar"><i style="width:${(r.v||0)/mx*100}%;background:${color}"></i></div><div class="v">${r.v==null?"—":r.v}</div></div>`).join("")||'<div class="mu">Sin datos</div>';
 }
-function render(){
-  const d=filtered();
-  const usados=d.filter(x=>x.usos>0),nunca=d.filter(x=>x.usos===0&&!rep(x)),enRep=d.filter(rep).length;
-  const tot=d.reduce((s,x)=>s+x.usos,0),ahora=d.filter(x=>x.en_uso_ahora).length;
-  const prom=usados.length?Math.round(usados.reduce((s,x)=>s+x.dias_desde_ultimo_uso,0)/usados.length):0;
-  const k=(l,v,c)=>`<div class="kpi"><span class="mu">${l}</span><b style="color:${c}">${v}</b></div>`;
-  $("kpis").innerHTML=k("Equipos",d.length,"var(--tx)")+k("Usos totales",tot,"var(--g)")+k("Usos últimos 30 días",d.reduce((s,x)=>s+x.usos_30d,0),"var(--b)")+
-    k("En uso ahora",ahora,"var(--o)")+k("En reparación",enRep,"var(--p)")+k("Días sin uso (promedio)",prom,"var(--p)")+k("Nunca usados",nunca.length,"var(--r)");
-  bars("top",[...d].sort((a,b)=>b.usos-a.usos).slice(0,10),"usos","var(--g)");
-  bars("idle",usados.sort((a,b)=>b.dias_desde_ultimo_uso-a.dias_desde_ultimo_uso).slice(0,10),"dias_desde_ultimo_uso","var(--o)");
-  renderCat(d);renderIng(d);
-  $("th").innerHTML=COLS.map(c=>`<th data-k="${c[0]}">${c[1]}${sortK===c[0]?(sortD>0?" ▲":" ▼"):""}</th>`).join("");
-  document.querySelectorAll("#th th").forEach(t=>t.onclick=()=>{const k=t.dataset.k;sortD=sortK===k?-sortD:-1;sortK=k;render()});
-  const rows=[...d].sort((a,b)=>{const x=a[sortK],y=b[sortK];if(x==null)return 1;if(y==null)return-1;return(x>y?1:x<y?-1:0)*sortD});
-  $("cnt").textContent="("+rows.length+")";
-  $("tb").innerHTML=rows.map(x=>`<tr><td>${esc(x.equipo_id)}</td><td>${esc(x.nombre)}</td><td>${esc(x.gerencia||"—")}</td><td>${esc(x.coordinador||"—")}</td><td>${esc(x.admin_email||"—")}</td>
-   <td>${x.usos}</td><td>${x.usos_30d}</td><td>${fd(x.ultimo_uso)}</td><td>${x.dias_desde_ultimo_uso==null?"—":x.dias_desde_ultimo_uso}</td><td>${x.dias_en_uso}</td>
-   <td><span class="tag ${est(x)[0]}">${est(x)[1]}</span></td></tr>`).join("");
-}
+const rep=x=>x.estatus==="reparacion";
 function est(x){
   if(x.en_uso_ahora)return["on","En uso"];
-  if(x.estatus==="reparacion")return["rep","En reparación"];
+  if(rep(x))return["rep","En reparación"];
   if(x.usos===0)return["never","Nunca usado"];
   return["off","Disponible"];
 }
-const rep=x=>x.estatus==="reparacion";
+function render(){
+  if(!data.length&&!ing.length&&!$("kpis"))return;
+  const f=F(),ir=ingRows(f),d=eqRows(f,ir),G=modo==="gente";
+  const k=(l,v,c)=>`<div class="kpi"><span class="mu">${l}</span><b style="color:${c}">${v}</b></div>`;
+  const sum=(a,key)=>a.reduce((s,x)=>s+Number(x[key]||0),0);
+  const tot=sum(ir,"usos"),ajena=ir.filter(x=>(x.coordinador||"")!==(x.coordinador_equipo||"")).reduce((s,x)=>s+x.usos,0);
+  const pct=tot?Math.round(ajena/tot*100)+"%":"—";
+  const usados=d.filter(x=>x.usos>0);
+  if(G){
+    const eng=engAgg(ir);
+    $("kpis").innerHTML=k("Ingenieros con uso",eng.length,"var(--tx)")+k("Usos totales",tot,"var(--g)")+k("Usos últimos 30 días",sum(ir,"usos_30d"),"var(--b)")+
+      k("Equipos en su poder ahora",sum(ir,"en_uso_ahora"),"var(--o)")+k("Días promedio por uso",tot?(sum(ir,"dias_en_uso")/tot).toFixed(1):"—","var(--p)")+
+      k("Equipos distintos usados",d.length,"var(--tx)")+k("Uso de equipos de OTRAS coordinaciones",pct,"var(--r)");
+    $("t1").textContent="Equipos que más usa mi gente";$("t2").textContent="Ingenieros que más usan";
+    bars("top",[...d].sort((a,b)=>b.usos-a.usos).slice(0,10).map(x=>({l:x.equipo_id+" "+x.nombre,t:x.nombre,v:x.usos})),"var(--g)");
+    bars("idle",eng.slice(0,10).map(([n,o])=>({l:n,t:n,v:o.u})),"var(--b)");
+    $("t3").textContent="De quién son los equipos que usa mi gente";$("t4").firstChild.textContent="Mi gente · por ingeniero ";
+  }else{
+    const nunca=d.filter(x=>x.usos===0&&!rep(x)).length,prom=usados.length?Math.round(usados.reduce((s,x)=>s+x.dias_desde_ultimo_uso,0)/usados.length):0;
+    $("kpis").innerHTML=k("Equipos",d.length,"var(--tx)")+k("Usos totales",sum(d,"usos"),"var(--g)")+k("Usos últimos 30 días",sum(d,"usos_30d"),"var(--b)")+
+      k("En uso ahora",d.filter(x=>x.en_uso_ahora).length,"var(--o)")+k("En reparación",d.filter(rep).length,"var(--p)")+
+      k("Días sin uso (promedio)",prom,"var(--p)")+k("Nunca usados",nunca,"var(--r)")+k("Uso de mi flota por OTRAS coordinaciones",pct,"var(--r)");
+    $("t1").textContent="Equipos más usados";$("t2").textContent="Más tiempo sin uso (solo equipos ya usados)";
+    bars("top",[...d].sort((a,b)=>b.usos-a.usos).slice(0,10).map(x=>({l:x.equipo_id+" "+x.nombre,t:x.nombre,v:x.usos})),"var(--g)");
+    bars("idle",[...usados].sort((a,b)=>b.dias_desde_ultimo_uso-a.dias_desde_ultimo_uso).slice(0,10).map(x=>({l:x.equipo_id+" "+x.nombre,t:x.nombre,v:x.dias_desde_ultimo_uso})),"var(--o)");
+    $("t3").textContent="Quién usa mi flota (coordinador del ingeniero)";$("t4").firstChild.textContent="Quién usa estos equipos · por ingeniero ";
+  }
+  renderX(ir,f);renderCat(d);
+  const eng=engAgg(ir);
+  $("cing").textContent="("+eng.length+")";
+  $("ting").innerHTML=eng.map(([n,o])=>`<tr><td>${esc(n)}</td><td>${esc(o.co||"—")}</td><td>${o.u}</td><td>${o.u30}</td><td>${o.eq}</td><td>${Math.round(o.d*10)/10}</td><td>${fd(o.ult)}</td><td>${o.ah?'<span class="tag on">'+o.ah+'</span>':"—"}</td></tr>`).join("")||'<tr><td class="mu">Sin datos</td></tr>';
+  $("th").innerHTML=COLS.map(c=>`<th data-k="${c[0]}">${c[1]}${sortK===c[0]?(sortD>0?" ▲":" ▼"):""}</th>`).join("");
+  document.querySelectorAll("#th th").forEach(t=>t.onclick=()=>{const kk=t.dataset.k;sortD=sortK===kk?-sortD:-1;sortK=kk;render()});
+  const rows=[...d].sort((a,b)=>{const x=a[sortK],y=b[sortK];if(x==null)return 1;if(y==null)return-1;return(x>y?1:x<y?-1:0)*sortD});
+  $("cnt").textContent="("+rows.length+")";
+  $("tb").innerHTML=rows.map(x=>`<tr><td>${esc(x.equipo_id)}</td><td>${esc(x.nombre)}</td><td>${esc(x.gerencia||"—")}</td><td>${esc(x.coordinador||"—")}</td><td>${esc(x.admin_nombre||x.admin_email||"—")}</td>
+   <td>${x.usos}</td><td>${x.usos_30d}</td><td>${fd(x.ultimo_uso)}</td><td>${x.dias_desde_ultimo_uso==null?"—":x.dias_desde_ultimo_uso}</td><td>${x.dias_en_uso}</td>
+   <td><span class="tag ${est(x)[0]}">${est(x)[1]}</span></td></tr>`).join("");
+}
+// Cruce entre coordinaciones: en "Mi gente", de quién son los equipos; en "Mis equipos", de quién son los ingenieros que los usan
+function renderX(ir,f){
+  const m={};let tot=0;
+  ir.forEach(x=>{const k=(modo==="gente"?x.coordinador_equipo:x.coordinador)||"Sin coordinador";m[k]=(m[k]||0)+x.usos;tot+=x.usos});
+  $("tx").innerHTML=Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<tr><td>${esc(k)}${f.co&&k===f.co?'<span class="pill">Propia</span>':""}</td><td>${v}</td><td>${tot?Math.round(v/tot*100):0}%</td></tr>`).join("")||'<tr><td class="mu">Sin datos</td></tr>';
+}
 function renderCat(d){
+  const G=modo==="gente";
+  $("thc").innerHTML=G?"<th>Categoría</th><th>Equipos usados</th><th>Usos</th><th>30 días</th>":"<th>Categoría</th><th>Equipos</th><th>Usos</th><th>30 días</th><th>Sin uso prom.</th><th>Nunca usados</th>";
   const m={};d.forEach(x=>{const k=x.categoria||"Sin categoría",o=m[k]||(m[k]={n:0,u:0,u30:0,nun:0,ds:0,dn:0});
     o.n++;o.u+=x.usos;o.u30+=x.usos_30d;if(x.usos===0&&!rep(x))o.nun++;if(x.usos>0){o.ds+=x.dias_desde_ultimo_uso;o.dn++}});
-  $("tcat").innerHTML=Object.entries(m).sort((a,b)=>b[1].u-a[1].u).map(([k,o])=>`<tr><td>${esc(k)}</td><td>${o.n}</td><td>${o.u}</td><td>${o.u30}</td><td>${o.dn?Math.round(o.ds/o.dn):"—"}</td><td>${o.nun}</td></tr>`).join("")||'<tr><td class="mu">Sin datos</td></tr>';
-}
-function renderIng(){
-  // Equipos que cumplen los filtros (SIN la gerencia: esa se aplica a la gerencia del ingeniero)
-  const ids=new Set(filtered(true,true).map(x=>x.equipo_id)),g=$("fg").value,m={};
-  ing.filter(x=>(x.equipo_id===undefined||ids.has(x.equipo_id))&&(!g||(x.gerencia_ingeniero||x.gerencia)===g)&&(!$("fo").value||x.coordinador===$("fo").value)).forEach(x=>{
-    const o=m[x.ingeniero]||(m[x.ingeniero]={co:x.coordinador||"",u:0,u30:0,eq:0,d:0,ult:null,ah:0});
-    o.u+=x.usos;o.u30+=x.usos_30d;o.eq+=x.equipos;o.d+=Number(x.dias_en_uso);o.ah+=x.en_uso_ahora;if(x.ultimo_uso&&(!o.ult||x.ultimo_uso>o.ult))o.ult=x.ultimo_uso});
-  const rows=Object.entries(m).sort((a,b)=>b[1].u-a[1].u);
-  $("cing").textContent="("+rows.length+")";
-  $("ting").innerHTML=rows.map(([k,o])=>`<tr><td>${esc(k)}</td><td>${esc(o.co||"—")}</td><td>${o.u}</td><td>${o.u30}</td><td>${o.eq}</td><td>${Math.round(o.d*10)/10}</td><td>${fd(o.ult)}</td><td>${o.ah?'<span class="tag on">'+o.ah+'</span>':"—"}</td></tr>`).join("")||'<tr><td class="mu">Sin datos</td></tr>';
+  $("tcat").innerHTML=Object.entries(m).sort((a,b)=>b[1].u-a[1].u).map(([k,o])=>`<tr><td>${esc(k)}</td><td>${o.n}</td><td>${o.u}</td><td>${o.u30}</td>${G?"":`<td>${o.dn?Math.round(o.ds/o.dn):"—"}</td><td>${o.nun}</td>`}</tr>`).join("")||'<tr><td class="mu">Sin datos</td></tr>';
 }
 function csv(){
-  const rows=filtered(),h=COLS.map(c=>c[1]);
+  const f=F(),rows=eqRows(f,ingRows(f)),h=COLS.map(c=>c[1]);
   const L=[h.join(",")].concat(rows.map(x=>COLS.map(c=>'"'+String(x[c[0]]==null?"":x[c[0]]).replace(/"/g,'""')+'"').join(",")));
-  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["﻿"+L.join("\r\n")],{type:"text/csv;charset=utf-8"}));
-  a.download="lumo-uso-equipos.csv";a.click();
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["\ufeff"+L.join("\r\n")],{type:"text/csv;charset=utf-8"}));
+  a.download="lumo-uso-"+(modo==="gente"?"mi-gente":"mis-equipos")+".csv";a.click();
 }
 function start(t,email,rol,shared_){
   token=t;$("who").textContent=email+" · "+rol;
@@ -204,11 +287,12 @@ function start(t,email,rol,shared_){
     const p=jwt(s.token),rol=(p.app_metadata||{}).rol;
     if(p.exp&&Date.now()/1000>p.exp)return;
     if(!["admin","super_admin","gerente"].includes(rol))return;
-    const ok=await start(s.token,p.email||"sesion activa",rol,true);
+    await start(s.token,p.email||"sesion activa",rol,true);
   }catch(e){}
 })();
 $("go").onclick=login;$("pw").onkeydown=e=>{if(e.key==="Enter")login()};
 ["fg","fo","fa","fc"].forEach(i=>$(i).onchange=render);$("q").oninput=render;
+$("mg").onclick=()=>setModo("gente");$("mq").onclick=()=>setModo("equipos");
 $("csv").onclick=csv;$("out").onclick=()=>{shared?location.href="/":location.reload()};
 </script>
 </body>

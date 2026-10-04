@@ -1775,7 +1775,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador · v0.33.0
+          ¿Sin acceso? Contacta al administrador · v0.33.2
         </p>
         <p style={{textAlign:"center",marginTop:"8px"}}>
           <a href="/dashboard.html" style={{color:C.muted,fontSize:"12px",textDecoration:"underline"}}>
@@ -3738,11 +3738,18 @@ function MapaModal({registros,equipos:equiposTodos,coordDefault,onCerrar}){ // f
   const mapRef=useRef(),mapInst=useRef();
   // Filtro por coordinador: "" = todo el país | nombre | "__sin" = sin coordinador
   const [coordSel,setCoordSel]=useState(coordDefault||"");
-  const equipos=equiposTodos.filter(function(eq){
+  const [catSel,setCatSel]=useState(""); // filtro por categoría ("" = todas)
+  const porCoord=equiposTodos.filter(function(eq){
     if(!coordSel)return true;
     if(coordSel==="__sin")return !(eq.coordinador||"").trim();
     return eq.coordinador===coordSel;
   });
+  const equipos=porCoord.filter(function(eq){return !catSel||(eq.categoria||"Sin categoría")===catSel;});
+  const catLista=(function(){
+    var m={};
+    porCoord.forEach(function(eq){var c=eq.categoria||"Sin categoría";m[c]=(m[c]||0)+1;});
+    return Object.keys(m).sort().map(function(c){return {n:c,c:m[c]};});
+  })();
   const coordLista=(function(){
     var m={};
     equiposTodos.forEach(function(eq){if((eq.coordinador||"").trim())m[eq.coordinador]=true;});
@@ -3750,6 +3757,12 @@ function MapaModal({registros,equipos:equiposTodos,coordDefault,onCerrar}){ // f
     return Object.keys(m).sort();
   })();
   useEffect(()=>{
+    if(!document.getElementById("lf-popup-css")){
+      const st=document.createElement("style");
+      st.id="lf-popup-css";
+      st.textContent=".leaflet-popup-scrolled{overflow-y:auto !important;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain}.leaflet-popup-content{touch-action:pan-y}";
+      document.head.appendChild(st);
+    }
     if(!document.getElementById("lf-css")){
       const l=document.createElement("link");
       l.id="lf-css";l.rel="stylesheet";
@@ -3759,6 +3772,17 @@ function MapaModal({registros,equipos:equiposTodos,coordDefault,onCerrar}){ // f
     function init(){
       if(mapInst.current||!mapRef.current)return;
       const L=window.L;
+      // Popups largos: altura máxima con scroll interno (casi la mitad de la pantalla)
+      // Agrupa los equipos de un popup por categoría: "Categoría (n)" y debajo cada equipo
+      const popupGrupos=function(arr,fmt){
+        var porCat={};
+        arr.forEach(function(x){var c=((x.eq?x.eq.categoria:x.categoria)||"Sin categoría");(porCat[c]=porCat[c]||[]).push(x);});
+        return Object.keys(porCat).sort().map(function(c){
+          return '<div style="margin:6px 0 3px;padding:2px 6px;background:#e8eefc;border-radius:4px;font-weight:700;font-size:12px;color:#223">'+c+' ('+porCat[c].length+')</div>'+
+            porCat[c].map(fmt).join("<hr style='margin:4px 0'>");
+        }).join("");
+      };
+      const POPUP_OPC={maxHeight:Math.max(160,Math.round(window.innerHeight*0.42)),maxWidth:300,autoPanPadding:[10,60]};
       mapInst.current=L.map(mapRef.current,{zoomControl:true}).setView([23.5,-102],5);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
         {attribution:"© OpenStreetMap",maxZoom:18}).addTo(mapInst.current);
@@ -3783,11 +3807,11 @@ function MapaModal({registros,equipos:equiposTodos,coordDefault,onCerrar}){ // f
             html:'<div style="background:'+C.green+';color:#001a0d;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3)">'+(totalDisp>1?totalDisp:'✓')+'</div>',
             iconSize:[28,28],iconAnchor:[14,14]});
           var popupDisp='<div style="font-size:13px;font-family:sans-serif;min-width:180px"><b style="color:#00aa55">✅ Disponibles en '+estado+'</b><hr style="margin:5px 0">';
-          popupDisp+=grupo.disponibles.map(function(eq){
+          popupDisp+=popupGrupos(grupo.disponibles,function(eq){
             return '<b>'+eq.nombre+'</b><br><small>'+eq.sitio_base+' · '+eq.ciudad_base+'</small>'+(eq.coordinador?'<br><small>🧭 '+eq.coordinador+'</small>':'');
-          }).join("<hr style='margin:4px 0'>");
+          });
           popupDisp+='</div>';
-          L.marker([coords[0]-0.05,coords[1]],{icon:iconDisp}).addTo(mapInst.current).bindPopup(popupDisp);
+          L.marker([coords[0]-0.05,coords[1]],{icon:iconDisp}).addTo(mapInst.current).bindPopup(popupDisp,POPUP_OPC);
         }
 
         // Pin gris para equipos en reparación
@@ -3796,11 +3820,11 @@ function MapaModal({registros,equipos:equiposTodos,coordDefault,onCerrar}){ // f
             html:'<div style="background:#555;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3)">🔧</div>',
             iconSize:[28,28],iconAnchor:[14,14]});
           var popupRep='<div style="font-size:13px;font-family:sans-serif;min-width:180px"><b style="color:#ff9500">🔧 En reparación en '+estado+'</b><hr style="margin:5px 0">';
-          popupRep+=grupo.reparacion.map(function(eq){
+          popupRep+=popupGrupos(grupo.reparacion,function(eq){
             return '<b>'+eq.nombre+'</b><br><small>'+eq.sitio_base+'</small>'+(eq.coordinador?'<br><small>🧭 '+eq.coordinador+'</small>':'');
-          }).join("<hr style='margin:4px 0'>");
+          });
           popupRep+='</div>';
-          L.marker([coords[0]+0.05,coords[1]],{icon:iconRep}).addTo(mapInst.current).bindPopup(popupRep);
+          L.marker([coords[0]+0.05,coords[1]],{icon:iconRep}).addTo(mapInst.current).bindPopup(popupRep,POPUP_OPC);
         }
       });
 
@@ -3822,11 +3846,11 @@ function MapaModal({registros,equipos:equiposTodos,coordDefault,onCerrar}){ // f
         const icon=L.divIcon({className:"",
           html:'<div style="background:'+color+';color:#fff;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;border:3px solid #fff;box-shadow:0 2px 12px rgba(0,0,0,0.4)">'+items.length+'</div>',
           iconSize:[34,34],iconAnchor:[17,17]});
-        const popup=items.map(function(x){
+        const popup=popupGrupos(items,function(x){
           return '<b>'+x.eq.nombre+'</b>'+(x.eq.coordinador?'<br>🧭 '+x.eq.coordinador:'')+'<br>👤 '+x.reg.ingeniero+'<br>📍 '+x.reg.ciudad+'<br>⏱ '+getDias(x.reg.fecha_retiro)+(x.reg.tipo==="paqueteria"?"<br>📦 En tránsito":"");
-        }).join("<hr style='margin:5px 0'>");
+        });
         L.marker(coords,{icon}).addTo(mapInst.current)
-          .bindPopup('<div style="font-size:13px;font-family:sans-serif;min-width:180px"><b style="color:'+C.orange+'">📍 '+estado+'</b><hr style="margin:5px 0">'+popup+'</div>');
+          .bindPopup('<div style="font-size:13px;font-family:sans-serif;min-width:180px"><b style="color:'+C.orange+'">📍 '+estado+'</b><hr style="margin:5px 0">'+popup+'</div>',POPUP_OPC);
       });
     }
     if(window.L){init();}
@@ -3836,7 +3860,7 @@ function MapaModal({registros,equipos:equiposTodos,coordDefault,onCerrar}){ // f
       s.onload=init;document.head.appendChild(s);
     }
     return function(){if(mapInst.current){mapInst.current.remove();}mapInst.current=null;};
-  },[coordSel]);
+  },[coordSel,catSel]);
 
   const enUso=equipos.filter(function(e){return registros[e.id];}).length;
   const enRep=equipos.filter(function(e){return e.estatus==="reparacion"&&!registros[e.id];}).length;
@@ -3848,7 +3872,7 @@ function MapaModal({registros,equipos:equiposTodos,coordDefault,onCerrar}){ // f
         <div>
           <h2 style={{margin:0,fontSize:"17px",fontWeight:"800",color:C.text}}>🗺 Mapa de equipos</h2>
           <p style={{color:C.muted,fontSize:"11px",margin:"2px 0 0",fontFamily:"'JetBrains Mono',monospace"}}>
-            {enUso} en campo · {disponibles} disponibles{coordSel?" · "+equipos.length+" de "+equiposTodos.length+" equipos del país":""}
+            {enUso} en campo · {disponibles} disponibles{(coordSel||catSel)?" · "+equipos.length+" de "+equiposTodos.length+" equipos del país":""}
           </p>
         </div>
         <button onClick={onCerrar} style={{background:"#12121f",border:`1px solid ${C.border}`,
@@ -3857,15 +3881,21 @@ function MapaModal({registros,equipos:equiposTodos,coordDefault,onCerrar}){ // f
         </button>
       </div>
       <div style={{padding:"0 20px 10px"}}>
-        <select value={coordSel} onChange={function(e){setCoordSel(e.target.value);}}
+        <select value={coordSel} onChange={function(e){setCoordSel(e.target.value);setCatSel("");}}
           style={{width:"100%",padding:"9px 12px",background:"#12121f",borderRadius:"10px",cursor:"pointer",
             border:"1px solid "+(coordSel?"#00d4ff66":C.border),color:coordSel?"#00d4ff":C.text,fontFamily:"inherit"}}>
-          <option value="">🌎 Todo el país · todos los coordinadores ({equiposTodos.length})</option>
+          <option value="">🌎 Todo el país ({equiposTodos.length})</option>
           {coordLista.map(function(n){
             var c=equiposTodos.filter(function(eq){return eq.coordinador===n;}).length;
             return <option key={n} value={n}>🧭 {n} ({c})</option>;
           })}
           <option value="__sin">⚠️ Sin coordinador ({equiposTodos.filter(function(eq){return !(eq.coordinador||"").trim();}).length})</option>
+        </select>
+        <select value={catSel} onChange={function(e){setCatSel(e.target.value);}}
+          style={{width:"100%",padding:"9px 12px",background:"#12121f",borderRadius:"10px",cursor:"pointer",marginTop:"8px",
+            border:"1px solid "+(catSel?"#9966ff88":C.border),color:catSel?"#b794ff":C.text,fontFamily:"inherit"}}>
+          <option value="">🏷 Todas las categorías ({porCoord.length})</option>
+          {catLista.map(function(x){return <option key={x.n} value={x.n}>{x.n} ({x.c})</option>;})}
         </select>
       </div>
       <div style={{display:"flex",gap:"10px",padding:"0 20px 10px",flexWrap:"wrap"}}>
@@ -4929,7 +4959,7 @@ export default function App(){
 
             <p style={{textAlign:"center",fontSize:"11px",color:"#333",
               marginTop:"20px",fontStyle:"italic",fontFamily:"'Sora',sans-serif"}}>
-              Cada activo en su lugar ✦ Lumo v0.33.0
+              Cada activo en su lugar ✦ Lumo v0.33.2
             </p>
           </div>
         </div>

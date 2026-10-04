@@ -1707,7 +1707,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador · v0.31.0
+          ¿Sin acceso? Contacta al administrador · v0.32.1
         </p>
         <p style={{textAlign:"center",marginTop:"8px"}}>
           <a href="/dashboard.html" style={{color:C.muted,fontSize:"12px",textDecoration:"underline"}}>
@@ -2246,6 +2246,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
   const [subTab,setSubTab]=useState("lista"); // lista | nuevo | importar
   const [busqAdmin,setBusqAdmin]=useState("");
   const [soloMios,setSoloMios]=useState(false);
+  const [filtroCoord,setFiltroCoord]=useState(""); // ""=todos | nombre | "__sin"=sin coordinador
 
   // Filtrado de equipos en AdminPanel — useMemo para no recalcular en cada render
   const eqsFiltrados=React.useMemo(function(){
@@ -2257,9 +2258,10 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
         String(eq.serie||"").toLowerCase().includes(busqAdmin.toLowerCase())||
         eq.id.toLowerCase().includes(busqAdmin.toLowerCase());
       var mm=!soloMios||(eq.admin_email||"").toLowerCase()===myEmail;
-      return mb&&mm;
+      var mc=!filtroCoord||(filtroCoord==="__sin"?!(eq.coordinador||"").trim():eq.coordinador===filtroCoord);
+      return mb&&mm&&mc;
     });
-  },[listaEqs,busqAdmin,soloMios,token]);
+  },[listaEqs,busqAdmin,soloMios,filtroCoord,token]);
   // Estados para importación CSV
   const [csvRows,setCsvRows]=useState([]); // filas parseadas del CSV
   const [csvError,setCsvError]=useState("");
@@ -2317,6 +2319,11 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
     eqsFiltrados.slice(0,12).forEach(function(eq){todos[eq.id]=true;});
     setSelEtiquetas(todos);
   }
+  function selTodosFiltrados(){
+    var todos={};
+    eqsFiltrados.forEach(function(eq){todos[eq.id]=true;});
+    setSelEtiquetas(todos);
+  }
   function deselTodos(){setSelEtiquetas({});}
 
   function imprimirHojaEtiquetas(){
@@ -2366,7 +2373,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
       };
     });
 
-    var etiquetasHtml=etiquetasData.map(function(eq){
+    var etiquetasHtmlArr=etiquetasData.map(function(eq){
       var divId="q"+eq.id.replace("-","");
       return '<div class="et">'+
         '<div class="eh"><span class="brand">Lumo</span><span class="eid">'+eq.id+'</span></div>'+
@@ -2380,8 +2387,16 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
         '</div>'+
         '<div class="ef"><span class="scan">Escanea para registrar</span></div>'+
       '</div>';
-    }).join("");
+    });
 
+    // Hojas de 12 etiquetas (4x3); cada una en su propia página al imprimir
+    var etiquetasPaginas="";
+    (function(){
+      var items=etiquetasHtmlArr;
+      for(var k=0;k<items.length;k+=12){
+        etiquetasPaginas+='<div class="hoja" style="'+(k+12<items.length?'page-break-after:always;break-after:page;':'')+'">'+items.slice(k,k+12).join("")+'</div>';
+      }
+    })();
     var scriptData=JSON.stringify(etiquetasData);
     var script=
       'var D='+scriptData+';'+
@@ -2408,18 +2423,18 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
       '<style>'+estilos+'<\/style>'+
       '<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>'+
       '</head><body>'+
-      '<div class="hoja">'+etiquetasHtml+'</div>'+
+      etiquetasPaginas+
       '<script>'+script+'<\/script>'+
       '</body></html>'
     );
     w.document.close();
   }
   function exportarCSV(){
-    var headers=["ID","Nombre","Serie","Categoria","Gerencia","Estado Base","Ciudad Base","Sitio Base","Administrador","Admin Email","Estatus"];
+    var headers=["ID","Nombre","Serie","Categoria","Gerencia","Estado Base","Ciudad Base","Sitio Base","Administrador","Admin Email","Coordinador","Estatus"];
     // Mapa rápido email -> nombre para no buscar en un loop O(n²)
     var mapaAdmins={};
     perfilesAdmin.forEach(function(p){if(p.email)mapaAdmins[p.email.toLowerCase()]=p.nombre;});
-    var rows=listaEqs.map(function(eq){
+    var rows=(filtroCoord?eqsFiltrados:listaEqs).map(function(eq){
       var adminNombre=eq.admin_email
         ?(mapaAdmins[eq.admin_email.toLowerCase()]||"")
         :"";
@@ -2434,6 +2449,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
         eq.sitio_base,
         adminNombre||"Sin asignar",
         eq.admin_email||"Sin asignar",
+        eq.coordinador||"Sin asignar",
         eq.activo?(eq.estatus==="reparacion"?"En reparación":"Activo"):"Eliminado"
       ].map(function(v){return '"'+(v||"").replace(/"/g,'""')+'"';}).join(",");
     });
@@ -2441,7 +2457,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
     var blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
     var url=URL.createObjectURL(blob);
     var a=document.createElement("a");
-    a.href=url;a.download="equipos_auditoria_"+new Date().toISOString().slice(0,10)+".csv";
+    a.href=url;a.download="equipos_auditoria_"+(filtroCoord&&filtroCoord!=="__sin"?filtroCoord.replace(/\s+/g,"_")+"_":"")+new Date().toISOString().slice(0,10)+".csv";
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
@@ -2455,6 +2471,17 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
       await supa("equipos?id=eq."+eq.id,{method:"PATCH",token,body:{estatus:nuevoEstatus}});
       cargarEquipos();onEquipoCreado();
     }catch(ex){alert("Error: "+ex.message);}
+  }
+
+  async function cambiarCoordinador(eq,valor){
+    var nuevo=valor||null, anterior=eq.coordinador||null;
+    setListaEqs(function(l){return l.map(function(x){return x.id===eq.id?Object.assign({},x,{coordinador:nuevo}):x;});});
+    try{
+      await supa("equipos?id=eq."+eq.id,{method:"PATCH",token,body:{coordinador:nuevo}});
+    }catch(ex){
+      setListaEqs(function(l){return l.map(function(x){return x.id===eq.id?Object.assign({},x,{coordinador:anterior}):x;});});
+      alert("Error: "+ex.message);
+    }
   }
 
   async function eliminarEquipo(eq){
@@ -2821,6 +2848,24 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
           {/* Sub-tab: Lista */}
           {subTab==="lista"&&(loadEqs?<Spin/>:
             <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
+              {/* Filtro por coordinador (arriba de todo): sirve para ver, exportar e imprimir por coordinación */}
+              <select value={filtroCoord}
+                onChange={function(e){setFiltroCoord(e.target.value);setSelEtiquetas({});}}
+                style={{...inp,fontSize:"13px",marginBottom:"0",cursor:"pointer",
+                  color:filtroCoord?"#00d4ff":C.text,
+                  border:"1px solid "+(filtroCoord?"#00d4ff66":C.border)}}>
+                <option value="">🧭 Todos los coordinadores ({listaEqs.length})</option>
+                {(function(){
+                  var nombres={};
+                  perfilesAdmin.forEach(function(p){if(p.es_coordinador&&p.nombre)nombres[p.nombre]=true;});
+                  listaEqs.forEach(function(eq){if((eq.coordinador||"").trim())nombres[eq.coordinador]=true;});
+                  return Object.keys(nombres).sort().map(function(n){
+                    var c=listaEqs.filter(function(eq){return eq.coordinador===n;}).length;
+                    return <option key={n} value={n}>{n} ({c})</option>;
+                  });
+                })()}
+                <option value="__sin">⚠️ Sin coordinador ({listaEqs.filter(function(eq){return !(eq.coordinador||"").trim();}).length})</option>
+              </select>
               {/* Buscador */}
               <input value={busqAdmin} onChange={e=>setBusqAdmin(e.target.value)}
                 placeholder="🔍 Buscar por nombre, serie o código..."
@@ -2844,7 +2889,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                     border:"1px solid "+C.green+"44",borderRadius:"10px",
                     color:C.green,cursor:"pointer",fontSize:"12px",
                     fontWeight:"700",fontFamily:"inherit"}}>
-                  📊 CSV ({listaEqs.length})
+                  📊 CSV ({filtroCoord?eqsFiltrados.length:listaEqs.length})
                 </button>
                 <button onClick={imprimirHojaEtiquetas}
                   disabled={eqsFiltrados.length===0}
@@ -2864,6 +2909,12 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                     cursor:"pointer",fontFamily:"inherit"}}>
                   ☑ Seleccionar 12
                 </button>
+                {eqsFiltrados.length>12&&<button onClick={selTodosFiltrados}
+                  style={{flex:1,padding:"6px",background:"transparent",fontSize:"11px",
+                    border:"1px solid #9966ff55",borderRadius:"8px",color:"#9966ff",
+                    cursor:"pointer",fontFamily:"inherit"}}>
+                  ☑ Todos ({eqsFiltrados.length})
+                </button>}
                 {selCount>0&&<button onClick={deselTodos}
                   style={{flex:1,padding:"6px",background:"transparent",fontSize:"11px",
                     border:"1px solid #333",borderRadius:"8px",color:C.muted,
@@ -2872,12 +2923,12 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                 </button>}
               </div>}
               {eqsFiltrados.length===0&&<p style={{textAlign:"center",color:C.muted,padding:"20px",fontSize:"13px"}}>
-                {busqAdmin||soloMios?"Sin resultados para este filtro":"Sin equipos registrados"}
+                {busqAdmin||soloMios||filtroCoord?"Sin resultados para este filtro":"Sin equipos registrados"}
               </p>}
-              {eqsFiltrados.length>0&&(busqAdmin||soloMios)&&
+              {eqsFiltrados.length>0&&(busqAdmin||soloMios||filtroCoord)&&
                 <p style={{fontSize:"11px",color:C.muted,textAlign:"right",paddingRight:"4px",marginBottom:"4px"}}>
                   {eqsFiltrados.length} equipo{eqsFiltrados.length!==1?"s":""}
-                  {soloMios?" · asignados a ti":""}{busqAdmin?" · \""+busqAdmin+"\"":""}
+                  {soloMios?" · asignados a ti":""}{filtroCoord?" · "+(filtroCoord==="__sin"?"sin coordinador":filtroCoord):""}{busqAdmin?" · \""+busqAdmin+"\"":""}
                 </p>}
               {eqsFiltrados.map(function(eq){
                 var enRep=eq.estatus==="reparacion";
@@ -2900,8 +2951,8 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                     <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:"8px"}}>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:"flex",alignItems:"center",gap:"6px",marginBottom:"4px",flexWrap:"wrap"}}>
-                          <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",color:C.muted,
-                            background:"#0a0a18",padding:"2px 6px",borderRadius:"4px"}}>{eq.id}</span>
+                          <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"14px",fontWeight:"700",color:C.text,
+                            background:"#0a0a18",padding:"3px 9px",borderRadius:"6px",letterSpacing:"0.02em"}}>{eq.id}</span>
                           {enRep&&<span style={{fontSize:"10px",color:C.orange,background:C.orangeDk,
                             padding:"2px 8px",borderRadius:"20px",fontWeight:"700"}}>🔧 Reparación</span>}
                           {inactivo&&<span style={{fontSize:"10px",color:C.red,background:"#1a0000",
@@ -2909,8 +2960,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                           {!enRep&&!inactivo&&<span style={{fontSize:"10px",color:C.green,background:C.greenDk,
                             padding:"2px 8px",borderRadius:"20px",fontWeight:"700"}}>✓ Activo</span>}
                         </div>
-                        <p style={{fontSize:"13px",fontWeight:"700",color:C.text,margin:"0 0 1px",
-                          overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{eq.nombre}</p>
+                        <p style={{fontSize:"15px",fontWeight:"800",color:C.text,margin:"0 0 3px",lineHeight:1.3}}>{eq.nombre}</p>
                         <p style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",
                           color:"#556",margin:"0 0 2px",letterSpacing:"0.02em"}}>
                           S/N: {eq.serie||"—"}
@@ -2922,8 +2972,22 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                         </p>
                         {eq.admin_email&&<p style={{fontSize:"10px",color:C.blue,margin:"2px 0 0"}}>
                           👤 {eq.admin_email}
-                          {eq.coordinador&&<span style={{color:"#00d4ff",marginLeft:"8px"}}>🧭 {eq.coordinador}</span>}
                         </p>}
+                        {eq.activo&&<div style={{display:"flex",alignItems:"center",gap:"6px",marginTop:"6px"}}>
+                          <span style={{fontSize:"11px",color:"#00d4ff",flexShrink:0}}>🧭 Coordinador</span>
+                          <select value={eq.coordinador||""}
+                            onChange={function(e){cambiarCoordinador(eq,e.target.value);}}
+                            style={{flex:1,minWidth:0,padding:"5px 8px",background:"#0a0a18",
+                              border:"1px solid "+(eq.coordinador?"#00d4ff44":C.orange+"66"),
+                              borderRadius:"8px",color:eq.coordinador?C.text:C.orange,
+ cursor:"pointer"}}>
+                            <option value="">Sin asignar</option>
+                            {eq.coordinador&&!perfilesAdmin.some(function(p){return p.es_coordinador&&p.nombre===eq.coordinador;})&&
+                              <option value={eq.coordinador}>{eq.coordinador}</option>}
+                            {perfilesAdmin.filter(function(p){return p.es_coordinador;})
+                              .map(function(p){return(<option key={p.id} value={p.nombre}>{p.nombre}</option>);})}
+                          </select>
+                        </div>}
                       </div>
                     </div>
                     {eq.activo&&<div style={{display:"flex",gap:"6px",marginTop:"10px",
@@ -4089,6 +4153,8 @@ export default function App(){
       @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
       *{box-sizing:border-box;margin:0;padding:0}
       html,body{background:${C.bg};-webkit-text-size-adjust:100%;text-size-adjust:100%}
+      body{font-family:'Sora',system-ui,sans-serif}
+      button,input,select,textarea{font-family:inherit}
       input,select,textarea{font-size:16px !important}
       ::-webkit-scrollbar{width:4px}
       ::-webkit-scrollbar-thumb{background:${C.border};border-radius:4px}
@@ -4137,8 +4203,10 @@ export default function App(){
               </svg>
             </div>        <div>
               <h1 style={{fontSize:"17px",fontWeight:"800",lineHeight:1}}>Lumo</h1>
-              <p style={{fontSize:"10px",color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>
-                {session.nombre}
+              <p style={{fontSize:"12px",color:C.muted,fontWeight:"600",marginTop:"3px"}}>
+                {(function(){var n=(session.nombre||"").trim().split(/\s+/)[0]||"";
+                  if(!n||n.indexOf("@")>=0)return "¡Hola!";
+                  return "¡Hola "+n.charAt(0).toUpperCase()+n.slice(1).toLowerCase()+"!";})()}
                 {isAdmin&&<span style={{color:C.blue,marginLeft:"6px"}}>{isSA?"· SUPER ADMIN":"· ADMIN"}</span>}
                 {isGer&&<span style={{color:"#9966ff",marginLeft:"6px"}}>· GERENTE</span>}
               </p>
@@ -4762,7 +4830,7 @@ export default function App(){
 
             <p style={{textAlign:"center",fontSize:"11px",color:"#333",
               marginTop:"20px",fontStyle:"italic",fontFamily:"'Sora',sans-serif"}}>
-              Cada activo en su lugar ✦ Lumo v0.31.0
+              Cada activo en su lugar ✦ Lumo v0.32.1
             </p>
           </div>
         </div>

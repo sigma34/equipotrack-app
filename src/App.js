@@ -376,7 +376,7 @@ function Badge({reg,enRep}){
 }
 
 function Toast({msg,ok}){
-  return <div style={{position:"fixed",top:"16px",left:"50%",transform:"translateX(-50%)",
+  return <div style={{position:"fixed",top:"calc(16px + env(safe-area-inset-top))",left:"50%",transform:"translateX(-50%)",
     background:ok?C.greenDk:"#1a0000",border:`1px solid ${ok?C.green:C.red}`,
     borderRadius:"40px",padding:"11px 22px",color:ok?C.green:C.red,
     fontSize:"13px",fontWeight:"700",zIndex:9999,whiteSpace:"nowrap",
@@ -458,7 +458,7 @@ function CamaraModal({titulo,onCaptura,onCerrar}){
     }
   }
   return(
-    <div style={{position:"fixed",top:"6vh",left:0,right:0,zIndex:20000,width:"100%",boxSizing:"border-box"}}>
+    <div style={{position:"fixed",top:"max(6vh, calc(env(safe-area-inset-top) + 10px))",left:0,right:0,zIndex:20000,width:"100%",boxSizing:"border-box"}}>
       <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"20px",
         padding:"20px",width:"100%",maxWidth:"500px",margin:"0 auto",
         maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
@@ -1707,7 +1707,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador · v0.32.1
+          ¿Sin acceso? Contacta al administrador · v0.32.2
         </p>
         <p style={{textAlign:"center",marginTop:"8px"}}>
           <a href="/dashboard.html" style={{color:C.muted,fontSize:"12px",textDecoration:"underline"}}>
@@ -1772,7 +1772,7 @@ function ModalCheckout({equipo,token,session,perfiles,onConfirmar,onCerrar}){
   return(<>
     {showCam&&<CamaraModal titulo="Foto de RETIRO" onCaptura={img=>{setFoto(img);setShowCam(false);}} onCerrar={()=>setShowCam(false)}/>}
     <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.6)"}} onClick={onCerrar}/>
-    <div style={{position:"fixed",top:"6vh",left:"0",right:"0",zIndex:10000,width:"100%",boxSizing:"border-box",
+    <div style={{position:"fixed",top:"max(6vh, calc(env(safe-area-inset-top) + 10px))",left:"0",right:"0",zIndex:10000,width:"100%",boxSizing:"border-box",
       background:C.card,border:`1px solid ${C.border}`,
       borderRadius:"22px",
       padding:"24px 20px",
@@ -1941,7 +1941,7 @@ function ModalRecepcion({equipo,registro,token,session,onConfirmar,onCerrar}){
   return(<>
     {showCam&&<CamaraModal titulo="Foto de RECEPCIÓN" onCaptura={img=>{setFoto(img);setShowCam(false);}} onCerrar={()=>setShowCam(false)}/>}
     <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.6)"}} onClick={onCerrar}/>
-    <div style={{position:"fixed",top:"6vh",left:"0",right:"0",zIndex:10000,width:"100%",boxSizing:"border-box",
+    <div style={{position:"fixed",top:"max(6vh, calc(env(safe-area-inset-top) + 10px))",left:"0",right:"0",zIndex:10000,width:"100%",boxSizing:"border-box",
       background:C.card,border:`1px solid ${C.border}`,
       borderRadius:"22px",
       padding:"24px 20px",
@@ -2122,7 +2122,7 @@ function ModalCheckin({equipo,registro,token,session,onConfirmar,onCerrar}){
   return(<>
     {showCam&&<CamaraModal titulo="Foto de DEVOLUCIÓN" onCaptura={img=>{setFoto(img);setShowCam(false);}} onCerrar={()=>setShowCam(false)}/>}
     <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.6)"}} onClick={onCerrar}/>
-    <div style={{position:"fixed",top:"6vh",left:"0",right:"0",zIndex:10000,width:"100%",boxSizing:"border-box",
+    <div style={{position:"fixed",top:"max(6vh, calc(env(safe-area-inset-top) + 10px))",left:"0",right:"0",zIndex:10000,width:"100%",boxSizing:"border-box",
       background:C.card,border:`1px solid ${C.border}`,
       borderRadius:"22px",
       padding:"24px 20px",
@@ -2799,7 +2799,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
   return(<>
     <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:9999,background:"rgba(0,0,0,0.6)"}} onClick={onClose}/>
     {nuevoEq&&<QRLabel equipo={nuevoEq} onCerrar={()=>setNuevoEq(null)}/>}
-    <div style={{position:"fixed",top:"6vh",left:0,right:0,zIndex:10000,
+    <div style={{position:"fixed",top:"max(6vh, calc(env(safe-area-inset-top) + 10px))",left:0,right:0,zIndex:10000,
       width:"100%",boxSizing:"border-box",
       background:C.card,border:`1px solid ${C.border}`,
       borderRadius:"22px",
@@ -3554,7 +3554,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
     </div>
 
     {editEq&&<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:19999,background:"rgba(0,0,0,0.6)"}} onClick={function(){setEditEq(null);}}/>}
-    {editEq&&<div style={{position:"fixed",top:"6vh",left:0,right:0,zIndex:20000,
+    {editEq&&<div style={{position:"fixed",top:"max(6vh, calc(env(safe-area-inset-top) + 10px))",left:0,right:0,zIndex:20000,
       width:"100%",boxSizing:"border-box",
       background:C.card,border:"1px solid "+C.border,
       borderRadius:"22px",
@@ -3762,7 +3762,7 @@ function MapaModal({registros,equipos,onCerrar}){ // font heredado de App via So
   const disponibles=equipos.length-enUso-enRep;
   return(
     <div style={{position:"fixed",inset:0,zIndex:15000,background:C.bg,display:"flex",flexDirection:"column"}}>
-      <div style={{padding:"18px 20px 10px",display:"flex",justifyContent:"space-between",alignItems:"center",
+      <div style={{padding:"calc(18px + env(safe-area-inset-top)) 20px 10px",display:"flex",justifyContent:"space-between",alignItems:"center",
         background:`linear-gradient(180deg,${C.card},transparent)`}}>
         <div>
           <h2 style={{margin:0,fontSize:"17px",fontWeight:"800",color:C.text}}>🗺 Mapa de equipos</h2>
@@ -4175,7 +4175,7 @@ export default function App(){
       {toast&&<Toast {...toast}/>}
 
       {/* Header */}
-      <div style={{padding:"16px 16px 0",
+      <div style={{padding:"calc(16px + env(safe-area-inset-top)) 16px 0",
         background:C.card,
         position:"sticky",top:0,zIndex:100,
         borderBottom:`1px solid ${C.border}`}}>
@@ -4603,7 +4603,7 @@ export default function App(){
     {showGuia&&<>
       <div style={{position:"fixed",inset:0,zIndex:19998,background:"rgba(0,0,0,0.7)"}}
         onClick={function(){setShowGuia(false);}}/>
-      <div style={{position:"fixed",top:"6vh",left:0,right:0,zIndex:19999,
+      <div style={{position:"fixed",top:"max(6vh, calc(env(safe-area-inset-top) + 10px))",left:0,right:0,zIndex:19999,
         width:"100%",boxSizing:"border-box",fontFamily:"'Sora',sans-serif"}}>
         <div style={{background:C.card,border:"1px solid "+C.border,borderRadius:"22px",
           padding:"0",maxWidth:"600px",margin:"0 auto",
@@ -4830,7 +4830,7 @@ export default function App(){
 
             <p style={{textAlign:"center",fontSize:"11px",color:"#333",
               marginTop:"20px",fontStyle:"italic",fontFamily:"'Sora',sans-serif"}}>
-              Cada activo en su lugar ✦ Lumo v0.32.1
+              Cada activo en su lugar ✦ Lumo v0.32.2
             </p>
           </div>
         </div>

@@ -22,6 +22,74 @@ async function supa(path, opts = {}) {
   return text ? JSON.parse(text) : null;
 }
 
+// ─── NOTIFICACIONES PUSH ─────────────────────────────
+// Clave PÚBLICA VAPID (la privada va solo en los secretos de Supabase). Generar con: npx web-push generate-vapid-keys
+const VAPID_PUBLIC_KEY="PEGA_AQUI_TU_CLAVE_PUBLICA_VAPID";
+function b64ToU8(b){
+  var p="=".repeat((4-b.length%4)%4);
+  var r=atob((b+p).replace(/-/g,"+").replace(/_/g,"/"));
+  var u=new Uint8Array(r.length);
+  for(var i=0;i<r.length;i++)u[i]=r.charCodeAt(i);
+  return u;
+}
+function PushAvisos({token}){
+  var soporta=typeof window!=="undefined"&&"serviceWorker" in navigator&&"PushManager" in window&&"Notification" in window;
+  var esIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  var instalada=(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||window.navigator.standalone===true;
+  const [estado,setEstado]=useState("cargando"); // cargando|off|on|denied|noinst|nosoporte
+  const [msg,setMsg]=useState("");
+  const [ocupado,setOcupado]=useState(false);
+  useEffect(function(){
+    if(esIOS&&!instalada){setEstado("noinst");return;}
+    if(!soporta){setEstado("nosoporte");return;}
+    if(Notification.permission==="denied"){setEstado("denied");return;}
+    navigator.serviceWorker.ready
+      .then(function(r){return r.pushManager.getSubscription();})
+      .then(function(s){setEstado(s&&Notification.permission==="granted"?"on":"off");})
+      .catch(function(){setEstado("off");});
+  },[]);
+  async function activar(){
+    setOcupado(true);setMsg("");
+    try{
+      if(VAPID_PUBLIC_KEY.indexOf("PEGA")===0)throw new Error("Falta configurar la clave VAPID en la app");
+      var perm=await Notification.requestPermission();
+      if(perm!=="granted"){setEstado(perm==="denied"?"denied":"off");return;}
+      var reg=await navigator.serviceWorker.ready;
+      var sub=await reg.pushManager.getSubscription();
+      if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToU8(VAPID_PUBLIC_KEY)});
+      var j=sub.toJSON();
+      await supa("rpc/registrar_push",{method:"POST",token,body:{p_endpoint:j.endpoint,p_p256dh:j.keys.p256dh,p_auth:j.keys.auth,p_ua:navigator.userAgent.slice(0,200)}});
+      setEstado("on");
+    }catch(ex){setMsg(String(ex.message||ex).slice(0,160));}
+    finally{setOcupado(false);}
+  }
+  async function desactivar(){
+    setOcupado(true);setMsg("");
+    try{
+      var reg=await navigator.serviceWorker.ready;
+      var sub=await reg.pushManager.getSubscription();
+      if(sub){
+        try{await supa("rpc/quitar_push",{method:"POST",token,body:{p_endpoint:sub.endpoint}});}catch(e){}
+        await sub.unsubscribe();
+      }
+      setEstado("off");
+    }catch(ex){setMsg(String(ex.message||ex).slice(0,160));}
+    finally{setOcupado(false);}
+  }
+  if(estado==="cargando"||estado==="nosoporte")return null;
+  var caja={display:"flex",alignItems:"center",gap:"10px",padding:"10px 12px",marginBottom:"12px",
+    background:"#0a0a18",border:"1px solid "+C.border,borderRadius:"12px",fontSize:"12px",color:C.muted};
+  if(estado==="noinst")return <div style={caja}><span>🔔</span><span style={{flex:1}}>Para recibir avisos de equipos vencidos, instala Lumo en la pantalla de inicio y actívalos desde ahí.</span></div>;
+  if(estado==="denied")return <div style={caja}><span>🔕</span><span style={{flex:1}}>Las notificaciones están bloqueadas. Actívalas en los ajustes del navegador o de la app para recibir avisos.</span></div>;
+  if(estado==="on")return <div style={caja}><span>🔔</span><span style={{flex:1}}>Avisos de equipos vencidos activados</span>
+    <button onClick={desactivar} disabled={ocupado} style={{background:"transparent",border:"none",color:C.muted,textDecoration:"underline",cursor:"pointer",fontSize:"12px",fontFamily:"inherit"}}>Desactivar</button></div>;
+  return <div style={{...caja,border:"1px solid "+C.blue+"44"}}>
+    <span>🔔</span>
+    <span style={{flex:1,color:C.text}}>Recibe un resumen cuando haya equipos con más de 5 días sin devolver{msg?<span style={{color:C.red}}> · {msg}</span>:null}</span>
+    <button onClick={activar} disabled={ocupado} style={{padding:"7px 12px",background:C.blue,border:"none",borderRadius:"8px",color:"#001a2a",fontWeight:"700",cursor:"pointer",fontSize:"12px",fontFamily:"inherit"}}>{ocupado?"…":"Activar"}</button>
+  </div>;
+}
+
 // ─── STORAGE ─────────────────────────────────────────
 async function subirFotoStorage(dataUrl, token, equipoId, tipo){
   // Convertir dataUrl base64 a Blob
@@ -366,7 +434,7 @@ function Badge({reg,enRep}){
   if(!reg) return <span style={{background:`linear-gradient(135deg,${C.green},#00c066)`,
     color:"#001a0d",padding:"3px 10px",borderRadius:"20px",fontSize:"11px",
     fontWeight:"700",textTransform:"uppercase",letterSpacing:"0.05em"}}>Disponible</span>;
-  const dias=getDias(reg.fecha_retiro), alerta=getDiasNum(reg.fecha_retiro)>5;
+  const dias=getDias(reg.fecha_retiro), alerta=getDiasNum(reg.fecha_retiro)>=5;
   if(reg.tipo==="paqueteria") return <span style={{background:`linear-gradient(135deg,${C.blue},#2266cc)`,
     color:"#fff",padding:"3px 10px",borderRadius:"20px",fontSize:"11px",fontWeight:"700",
     textTransform:"uppercase",letterSpacing:"0.04em"}}>📦 Tránsito · {dias}</span>;
@@ -1707,7 +1775,7 @@ function Login({onLogin}){
           </button>
         </form>
         <p style={{textAlign:"center",color:C.muted,fontSize:"11px",marginTop:"20px"}}>
-          ¿Sin acceso? Contacta al administrador · v0.32.2
+          ¿Sin acceso? Contacta al administrador · v0.33.0
         </p>
         <p style={{textAlign:"center",marginTop:"8px"}}>
           <a href="/dashboard.html" style={{color:C.muted,fontSize:"12px",textDecoration:"underline"}}>
@@ -3666,8 +3734,21 @@ function CatSelect({token,value,onChange}){
 }
 
 // - MAPA -
-function MapaModal({registros,equipos,onCerrar}){ // font heredado de App via Sora
+function MapaModal({registros,equipos:equiposTodos,coordDefault,onCerrar}){ // font heredado de App via Sora
   const mapRef=useRef(),mapInst=useRef();
+  // Filtro por coordinador: "" = todo el país | nombre | "__sin" = sin coordinador
+  const [coordSel,setCoordSel]=useState(coordDefault||"");
+  const equipos=equiposTodos.filter(function(eq){
+    if(!coordSel)return true;
+    if(coordSel==="__sin")return !(eq.coordinador||"").trim();
+    return eq.coordinador===coordSel;
+  });
+  const coordLista=(function(){
+    var m={};
+    equiposTodos.forEach(function(eq){if((eq.coordinador||"").trim())m[eq.coordinador]=true;});
+    if(coordDefault)m[coordDefault]=true;
+    return Object.keys(m).sort();
+  })();
   useEffect(()=>{
     if(!document.getElementById("lf-css")){
       const l=document.createElement("link");
@@ -3703,7 +3784,7 @@ function MapaModal({registros,equipos,onCerrar}){ // font heredado de App via So
             iconSize:[28,28],iconAnchor:[14,14]});
           var popupDisp='<div style="font-size:13px;font-family:sans-serif;min-width:180px"><b style="color:#00aa55">✅ Disponibles en '+estado+'</b><hr style="margin:5px 0">';
           popupDisp+=grupo.disponibles.map(function(eq){
-            return '<b>'+eq.nombre+'</b><br><small>'+eq.sitio_base+' · '+eq.ciudad_base+'</small>';
+            return '<b>'+eq.nombre+'</b><br><small>'+eq.sitio_base+' · '+eq.ciudad_base+'</small>'+(eq.coordinador?'<br><small>🧭 '+eq.coordinador+'</small>':'');
           }).join("<hr style='margin:4px 0'>");
           popupDisp+='</div>';
           L.marker([coords[0]-0.05,coords[1]],{icon:iconDisp}).addTo(mapInst.current).bindPopup(popupDisp);
@@ -3716,7 +3797,7 @@ function MapaModal({registros,equipos,onCerrar}){ // font heredado de App via So
             iconSize:[28,28],iconAnchor:[14,14]});
           var popupRep='<div style="font-size:13px;font-family:sans-serif;min-width:180px"><b style="color:#ff9500">🔧 En reparación en '+estado+'</b><hr style="margin:5px 0">';
           popupRep+=grupo.reparacion.map(function(eq){
-            return '<b>'+eq.nombre+'</b><br><small>'+eq.sitio_base+'</small>';
+            return '<b>'+eq.nombre+'</b><br><small>'+eq.sitio_base+'</small>'+(eq.coordinador?'<br><small>🧭 '+eq.coordinador+'</small>':'');
           }).join("<hr style='margin:4px 0'>");
           popupRep+='</div>';
           L.marker([coords[0]+0.05,coords[1]],{icon:iconRep}).addTo(mapInst.current).bindPopup(popupRep);
@@ -3736,13 +3817,13 @@ function MapaModal({registros,equipos,onCerrar}){ // font heredado de App via So
         const estado=entry[0], items=entry[1];
         const coords=COORDS_ESTADO[estado];if(!coords)return;
         const tienePaq=items.some(function(x){return x.reg.tipo==="paqueteria";});
-        const alerta=items.some(function(x){return getDiasNum(x.reg.fecha_retiro)>5;});
+        const alerta=items.some(function(x){return getDiasNum(x.reg.fecha_retiro)>=5;});
         const color=tienePaq?C.blue:alerta?C.red:C.orange;
         const icon=L.divIcon({className:"",
           html:'<div style="background:'+color+';color:#fff;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;border:3px solid #fff;box-shadow:0 2px 12px rgba(0,0,0,0.4)">'+items.length+'</div>',
           iconSize:[34,34],iconAnchor:[17,17]});
         const popup=items.map(function(x){
-          return '<b>'+x.eq.nombre+'</b><br>👤 '+x.reg.ingeniero+'<br>📍 '+x.reg.ciudad+'<br>⏱ '+getDias(x.reg.fecha_retiro)+(x.reg.tipo==="paqueteria"?"<br>📦 En tránsito":"");
+          return '<b>'+x.eq.nombre+'</b>'+(x.eq.coordinador?'<br>🧭 '+x.eq.coordinador:'')+'<br>👤 '+x.reg.ingeniero+'<br>📍 '+x.reg.ciudad+'<br>⏱ '+getDias(x.reg.fecha_retiro)+(x.reg.tipo==="paqueteria"?"<br>📦 En tránsito":"");
         }).join("<hr style='margin:5px 0'>");
         L.marker(coords,{icon}).addTo(mapInst.current)
           .bindPopup('<div style="font-size:13px;font-family:sans-serif;min-width:180px"><b style="color:'+C.orange+'">📍 '+estado+'</b><hr style="margin:5px 0">'+popup+'</div>');
@@ -3755,9 +3836,9 @@ function MapaModal({registros,equipos,onCerrar}){ // font heredado de App via So
       s.onload=init;document.head.appendChild(s);
     }
     return function(){if(mapInst.current){mapInst.current.remove();}mapInst.current=null;};
-  },[]);
+  },[coordSel]);
 
-  const enUso=Object.keys(registros).length;
+  const enUso=equipos.filter(function(e){return registros[e.id];}).length;
   const enRep=equipos.filter(function(e){return e.estatus==="reparacion"&&!registros[e.id];}).length;
   const disponibles=equipos.length-enUso-enRep;
   return(
@@ -3767,7 +3848,7 @@ function MapaModal({registros,equipos,onCerrar}){ // font heredado de App via So
         <div>
           <h2 style={{margin:0,fontSize:"17px",fontWeight:"800",color:C.text}}>🗺 Mapa de equipos</h2>
           <p style={{color:C.muted,fontSize:"11px",margin:"2px 0 0",fontFamily:"'JetBrains Mono',monospace"}}>
-            {enUso} en campo · {disponibles} disponibles · OpenStreetMap (sin costo)
+            {enUso} en campo · {disponibles} disponibles{coordSel?" · "+equipos.length+" de "+equiposTodos.length+" equipos del país":""}
           </p>
         </div>
         <button onClick={onCerrar} style={{background:"#12121f",border:`1px solid ${C.border}`,
@@ -3775,8 +3856,20 @@ function MapaModal({registros,equipos,onCerrar}){ // font heredado de App via So
           ✕ Cerrar
         </button>
       </div>
+      <div style={{padding:"0 20px 10px"}}>
+        <select value={coordSel} onChange={function(e){setCoordSel(e.target.value);}}
+          style={{width:"100%",padding:"9px 12px",background:"#12121f",borderRadius:"10px",cursor:"pointer",
+            border:"1px solid "+(coordSel?"#00d4ff66":C.border),color:coordSel?"#00d4ff":C.text,fontFamily:"inherit"}}>
+          <option value="">🌎 Todo el país · todos los coordinadores ({equiposTodos.length})</option>
+          {coordLista.map(function(n){
+            var c=equiposTodos.filter(function(eq){return eq.coordinador===n;}).length;
+            return <option key={n} value={n}>🧭 {n} ({c})</option>;
+          })}
+          <option value="__sin">⚠️ Sin coordinador ({equiposTodos.filter(function(eq){return !(eq.coordinador||"").trim();}).length})</option>
+        </select>
+      </div>
       <div style={{display:"flex",gap:"10px",padding:"0 20px 10px",flexWrap:"wrap"}}>
-        {[{c:C.green,l:"✓ Disponible"},{c:"#555",l:"🔧 Reparación"},{c:C.orange,l:"En uso"},{c:C.red,l:"+5 días"},{c:C.blue,l:"📦 Tránsito"}].map(function(x){return(
+        {[{c:C.green,l:"✓ Disponible"},{c:"#555",l:"🔧 Reparación"},{c:C.orange,l:"En uso"},{c:C.red,l:"5+ días"},{c:C.blue,l:"📦 Tránsito"}].map(function(x){return(
           <div key={x.l} style={{display:"flex",alignItems:"center",gap:"5px"}}>
             <div style={{width:"12px",height:"12px",borderRadius:"50%",background:x.c}}/>
             <span style={{fontSize:"10px",color:C.muted}}>{x.l}</span>
@@ -3948,6 +4041,10 @@ export default function App(){
   const isAdmin=isAdminOrSuper(session);
   const isSA=isSuperAdmin(session);
   const isGer=isGerente(session);
+  // Perfil propio (para el coordinador por defecto del mapa y los avisos push)
+  const miPerfil=perfiles.find(function(p){return (p.email||"").toLowerCase()===(session.email||"").toLowerCase();});
+  const esCoord=!!(miPerfil&&miPerfil.es_coordinador);
+  const coordMapaDefault=miPerfil?(miPerfil.es_coordinador?miPerfil.nombre:(miPerfil.rol==="admin"&&miPerfil.coordinador?miPerfil.coordinador:"")):"";
   const registros={};
   regsArr.forEach(r=>{registros[r.equipo_id]=r;});
 
@@ -4279,6 +4376,8 @@ export default function App(){
           </div>
         </div>
 
+        {(isAdmin||esCoord)&&<PushAvisos token={session.token}/>}
+
         {/* Stats */}
         <div style={{display:"flex",gap:"8px",marginBottom:"16px"}}>
           {[{label:"Disponibles",val:disponibles,color:C.green,icon:"✓"},
@@ -4393,7 +4492,7 @@ export default function App(){
           )}
           {filtrados.slice(0,(eqPage*EQ_PER_PAGE)).map((eq,i)=>{
             const reg=registros[eq.id];
-            const alerta=reg&&getDiasNum(reg.fecha_retiro)>5;
+            const alerta=reg&&getDiasNum(reg.fecha_retiro)>=5;
             const esPaq=reg&&reg.tipo==="paqueteria";
             const enRep=eq.estatus==="reparacion";
             return(
@@ -4597,7 +4696,7 @@ export default function App(){
       token={session.token} session={session}
       onConfirmar={onAccion} onCerrar={cerrar}/>}
 
-    {showMapa&&<MapaModal registros={registros} equipos={equipos} onCerrar={()=>setShowMapa(false)}/>}
+    {showMapa&&<MapaModal registros={registros} equipos={equipos} coordDefault={coordMapaDefault} onCerrar={()=>setShowMapa(false)}/>}
 
     {/* ── GUÍA RÁPIDA LUMI ── */}
     {showGuia&&<>
@@ -4830,7 +4929,7 @@ export default function App(){
 
             <p style={{textAlign:"center",fontSize:"11px",color:"#333",
               marginTop:"20px",fontStyle:"italic",fontFamily:"'Sora',sans-serif"}}>
-              Cada activo en su lugar ✦ Lumo v0.32.2
+              Cada activo en su lugar ✦ Lumo v0.33.0
             </p>
           </div>
         </div>

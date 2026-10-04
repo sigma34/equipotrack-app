@@ -100,7 +100,7 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 // modo: "gente" = usos de MIS ingenieros sobre cualquier equipo; "equipos" = usos de MIS equipos por cualquier ingeniero
 let shared=false,token=null,data=[],ing=[],cap="",sortK="usos",sortD=-1,modo="gente",eqMap=new Map(),me=null;
-const COLS=[["equipo_id","ID"],["nombre","Equipo"],["gerencia","Gerencia"],["coordinador","Coordinador"],["admin_nombre","Administrador"],["usos","Usos"],["usos_30d","30 días"],["ultimo_uso","Último uso"],["dias_desde_ultimo_uso","Días sin uso"],["dias_en_uso","Días en uso"],["en_uso_ahora","Estado"]];
+const COLS=[["equipo_id","ID"],["nombre","Equipo"],["gerencia","Gerencia"],["ciudad_base","Ciudad"],["coordinador","Coordinador"],["admin_nombre","Administrador"],["usos","Usos"],["usos_30d","30 días"],["ultimo_uso","Último uso"],["dias_desde_ultimo_uso","Días sin uso"],["dias_en_uso","Días en uso"],["en_uso_ahora","Estado"]];
 
 window.onHC=function(){hcaptcha.render("hc",{sitekey:SITEKEY,theme:"dark",callback:t=>cap=t,"expired-callback":()=>cap=""})};
 const s=document.createElement("script");s.src="https://js.hcaptcha.com/1/api.js?render=explicit&onload=onHC&hl=es";s.async=true;document.head.appendChild(s);
@@ -221,7 +221,8 @@ function render(){
   const f=F(),ir=ingRows(f),d=eqRows(f,ir),G=modo==="gente";
   const k=(l,v,c)=>`<div class="kpi"><span class="mu">${l}</span><b style="color:${c}">${v}</b></div>`;
   const sum=(a,key)=>a.reduce((s,x)=>s+Number(x[key]||0),0);
-  const tot=sum(ir,"usos"),ajena=ir.filter(x=>(x.coordinador||"")!==(x.coordinador_equipo||"")).reduce((s,x)=>s+x.usos,0);
+  // % de otras coordinaciones: se excluyen los movimientos de ingenieros SIN coordinador (no se sabe a qué coordinación pertenecen)
+  const irC=ir.filter(x=>(x.coordinador||"").trim()!==""),tot=sum(irC,"usos"),ajena=irC.filter(x=>x.coordinador!==(x.coordinador_equipo||"")).reduce((s,x)=>s+x.usos,0);
   const pct=tot?Math.round(ajena/tot*100)+"%":"—";
   const usados=d.filter(x=>x.usos>0);
   if(G){
@@ -237,7 +238,7 @@ function render(){
     const nunca=d.filter(x=>x.usos===0&&!rep(x)).length,prom=usados.length?Math.round(usados.reduce((s,x)=>s+x.dias_desde_ultimo_uso,0)/usados.length):0;
     $("kpis").innerHTML=k("Equipos",d.length,"var(--tx)")+k("Usos totales",sum(d,"usos"),"var(--g)")+k("Usos últimos 30 días",sum(d,"usos_30d"),"var(--b)")+
       k("En uso ahora",d.filter(x=>x.en_uso_ahora).length,"var(--o)")+k("En reparación",d.filter(rep).length,"var(--p)")+
-      k("Días sin uso (promedio)",prom,"var(--p)")+k("Nunca usados",nunca,"var(--r)")+k("Uso de mi flota por OTRAS coordinaciones",pct,"var(--r)");
+      k("Días sin uso (promedio)",prom,"var(--p)")+k("Nunca usados",nunca,"var(--r)")+k("Uso de mis equipos por OTRAS coordinaciones",pct,"var(--r)");
     $("t1").textContent="Equipos más usados";$("t2").textContent="Más tiempo sin uso (solo equipos ya usados)";
     bars("top",[...d].sort((a,b)=>b.usos-a.usos).slice(0,10).map(x=>({l:x.equipo_id+" "+x.nombre,t:x.nombre,v:x.usos})),"var(--g)");
     bars("idle",[...usados].sort((a,b)=>b.dias_desde_ultimo_uso-a.dias_desde_ultimo_uso).slice(0,10).map(x=>({l:x.equipo_id+" "+x.nombre,t:x.nombre,v:x.dias_desde_ultimo_uso})),"var(--o)");
@@ -251,7 +252,7 @@ function render(){
   document.querySelectorAll("#th th").forEach(t=>t.onclick=()=>{const kk=t.dataset.k;sortD=sortK===kk?-sortD:-1;sortK=kk;render()});
   const rows=[...d].sort((a,b)=>{const x=a[sortK],y=b[sortK];if(x==null)return 1;if(y==null)return-1;return(x>y?1:x<y?-1:0)*sortD});
   $("cnt").textContent="("+rows.length+")";
-  $("tb").innerHTML=rows.map(x=>`<tr><td>${esc(x.equipo_id)}</td><td>${esc(x.nombre)}</td><td>${esc(x.gerencia||"—")}</td><td>${esc(x.coordinador||"—")}</td><td>${esc(x.admin_nombre||x.admin_email||"—")}</td>
+  $("tb").innerHTML=rows.map(x=>`<tr><td>${esc(x.equipo_id)}</td><td>${esc(x.nombre)}</td><td>${esc(x.gerencia||"—")}</td><td>${esc(x.ciudad_base||"—")}</td><td>${esc(x.coordinador||"—")}</td><td>${esc(x.admin_nombre||x.admin_email||"—")}</td>
    <td>${x.usos}</td><td>${x.usos_30d}</td><td>${fd(x.ultimo_uso)}</td><td>${x.dias_desde_ultimo_uso==null?"—":x.dias_desde_ultimo_uso}</td><td>${x.dias_en_uso}</td>
    <td><span class="tag ${est(x)[0]}">${est(x)[1]}</span></td></tr>`).join("");
 }

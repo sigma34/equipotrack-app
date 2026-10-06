@@ -2373,6 +2373,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
 
   // Selección de equipos para hoja QR
   const [selEtiquetas,setSelEtiquetas]=useState({}); // {id: true}
+  const [dymoCorte,setDymoCorte]=useState(false); // etiqueta Dymo con zona de corte
   const selCount=Object.keys(selEtiquetas).filter(function(k){return selEtiquetas[k];}).length;
 
   function toggleSelEtiqueta(id){
@@ -2396,6 +2397,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
 
   function imprimirHojaEtiquetas(modo){
     var dymo=(modo==="dymo");
+    var corte=dymo&&dymoCorte;
     var APP_URL="https://equipotrack-app.vercel.app";
     var equiposSel=selCount>0
       ?eqsFiltrados.filter(function(eq){return selEtiquetas[eq.id];})
@@ -2435,23 +2437,33 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
         "@page{size:28.6mm 88.9mm;margin:0;}",
         "html,body{width:28.6mm;}",
         ".hoja{display:block;width:28.6mm;padding:0;margin:0;gap:0;}",
-        ".et{width:28.6mm;height:88.9mm;border:none;border-radius:0;padding:3mm 2.4mm 2mm;page-break-after:always;break-after:page;background:#fff;}",
+        ".et{width:28.6mm;height:88.9mm;border:none;border-radius:0;padding:6.5mm 2.4mm 0;page-break-after:always;break-after:page;background:#fff;}",
         ".et:last-child{page-break-after:auto;break-after:auto;}",
         ".eh{background:#fff!important;height:auto;padding:0 0 1mm;border-bottom:0.5mm solid #000;display:block;text-align:center;}",
         ".brand{display:block;color:#000!important;font-size:6pt;letter-spacing:0.3mm;}",
         ".eid{display:block;color:#000!important;font-size:13pt;font-weight:800;font-family:Arial,sans-serif;margin-top:0.3mm;}",
-        ".qrwrap{height:25mm;padding:0;margin-top:1.5mm;}",
-        ".qrwrap img,.qrwrap canvas{width:24mm!important;height:24mm!important;}",
+        ".qrwrap{height:23.5mm;padding:0;margin-top:1.2mm;}",
+        ".qrwrap img,.qrwrap canvas{width:23mm!important;height:23mm!important;}",
         ".info{padding:1.5mm 0 0;overflow:visible;}",
-        ".ename{font-size:8.5pt;line-height:1.2;-webkit-line-clamp:4;color:#000;}",
+        ".ename{font-size:8pt;line-height:1.2;-webkit-line-clamp:4;color:#000;}",
         ".eserie{font-size:7pt;color:#000;margin-top:1mm;}",
         ".ecat{font-size:6pt;color:#000;border:0.3mm solid #000;border-radius:2mm;padding:0.4mm 1.4mm;margin-top:1.2mm;white-space:normal;}",
         ".eger{font-size:6.5pt;color:#000;font-weight:800;margin-top:1.2mm;}",
         ".ebase{font-size:6pt;color:#000;white-space:normal;overflow:visible;text-overflow:clip;margin-top:0.8mm;line-height:1.2;}",
-        ".ef{background:#fff!important;height:auto;padding:1.2mm 0 0;border-top:0.5mm solid #000;margin-top:auto;text-align:center;}",
+        ".ef{background:#fff!important;height:auto;padding:1mm 0 1.5mm;border-top:0.5mm solid #000;margin-top:auto;text-align:center;}",
         ".scan{font-size:5pt;letter-spacing:0;color:#000;text-align:center;display:block;}",
         "@media print{.eh{background:#fff!important;}.brand,.eid,.eger,.ename,.eserie,.ecat,.ebase,.scan{color:#000!important;}.ef{background:#fff!important;}}"
       ].join("");
+      if(corte){
+        // Arriba: ID + QR + nombre (2 líneas, más chico) + serie. Abajo de la línea punteada: lo que se puede cortar.
+        estilos+=[
+          ".brand{display:none!important;}",
+          ".ename{font-size:6.5pt;line-height:1.15;-webkit-line-clamp:2;}",
+          ".eserie{font-size:6pt;margin-top:0.6mm;}",
+          ".corte{position:relative;height:0;border-top:0.4mm dashed #000;margin:2.2mm 0 1.6mm;}",
+          ".corte span{position:absolute;left:0;top:-2.6mm;background:#fff;padding-right:1mm;font-size:7pt;line-height:1;font-family:'Segoe UI Symbol',Arial,sans-serif;color:#000;}"
+        ].join("");
+      }
     }
 
     var etiquetasData=equiposSel.map(function(eq){
@@ -2475,6 +2487,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
         '<div class="info">'+
           '<div class="ename">'+eq.nombre+'</div>'+
           '<div class="eserie">S/N: '+eq.serie+'</div>'+
+          (corte?'<div class="corte"><span>\u2702</span></div>':'')+
           (eq.categoria?'<div class="ecat">'+eq.categoria+'</div>':'')+
           (eq.gerencia?'<div class="eger">'+eq.gerencia+'</div>':'')+
           (eq.base?'<div class="ebase">'+eq.base+'</div>':'')+
@@ -3005,6 +3018,10 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                   🖨️ {selCount>0?"Imprimir ("+selCount+")":"Hoja QR"}
                 </button>
               </div>}
+              {listaEqs.length>0&&<label style={{display:"flex",alignItems:"center",gap:"8px",fontSize:"12px",color:"#aaa",cursor:"pointer"}}>
+                <input type="checkbox" checked={dymoCorte} onChange={function(e){setDymoCorte(e.target.checked);}}/>
+                ✂️ Dymo con zona de corte (equipos chicos): ID, QR, nombre y serie arriba; lo demás bajo la línea
+              </label>}
               {/* Controles de selección para hoja QR */}
               {eqsFiltrados.length>0&&<div style={{display:"flex",gap:"6px",alignItems:"center"}}>
                 <button onClick={selTodos}

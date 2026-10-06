@@ -2394,11 +2394,12 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
   }
   function deselTodos(){setSelEtiquetas({});}
 
-  function imprimirHojaEtiquetas(){
+  function imprimirHojaEtiquetas(modo){
+    var dymo=(modo==="dymo");
     var APP_URL="https://equipotrack-app.vercel.app";
     var equiposSel=selCount>0
       ?eqsFiltrados.filter(function(eq){return selEtiquetas[eq.id];})
-      :eqsFiltrados.slice(0,12);
+      :(dymo?eqsFiltrados:eqsFiltrados.slice(0,12));
 
     if(equiposSel.length===0){alert("Selecciona al menos un equipo o filtra la lista");return;}
 
@@ -2427,6 +2428,22 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
       "  .eid{color:#00e87a!important;}",
       "}"
     ].join("");
+    // DYMO 30254 / 30252 (28 x 89 mm): una etiqueta por página, impresión continua
+    if(dymo){
+      estilos+=[
+        "@page{size:28.6mm 88.9mm;margin:0;}",
+        "html,body{width:28.6mm;}",
+        ".hoja{display:block;width:28.6mm;padding:0;margin:0;gap:0;}",
+        ".et{width:28.6mm;height:88.9mm;border:0.3mm solid #222;border-radius:1mm;page-break-after:always;break-after:page;}",
+        ".et:last-child{page-break-after:auto;break-after:auto;}",
+        ".eh{height:7mm;padding:1mm 1.5mm;}",
+        ".qrwrap{height:27mm;padding:0.5mm;}",
+        ".qrwrap img,.qrwrap canvas{width:25mm!important;height:25mm!important;}",
+        ".info{padding:1mm 1.5mm;}",
+        ".ename{font-size:6.5pt;}.eserie{font-size:5.5pt;}.ecat{font-size:5pt;}.eger{font-size:5pt;}.ebase{font-size:5pt;}",
+        ".ef{height:6mm;}.scan{font-size:5pt;}"
+      ].join("");
+    }
 
     var etiquetasData=equiposSel.map(function(eq){
       var base=[(eq.ciudad_base||""),(eq.estado_base||"")].filter(Boolean).join(", ");
@@ -2461,6 +2478,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
     var etiquetasPaginas="";
     (function(){
       var items=etiquetasHtmlArr;
+      if(dymo){etiquetasPaginas='<div class="hoja">'+items.join("")+'</div>';return;}
       for(var k=0;k<items.length;k+=12){
         etiquetasPaginas+='<div class="hoja" style="'+(k+12<items.length?'page-break-after:always;break-after:page;':'')+'">'+items.slice(k,k+12).join("")+'</div>';
       }
@@ -2959,7 +2977,16 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
                     fontWeight:"700",fontFamily:"inherit"}}>
                   📊 CSV ({filtroCoord?eqsFiltrados.length:listaEqs.length})
                 </button>
-                <button onClick={imprimirHojaEtiquetas}
+                <button onClick={function(){imprimirHojaEtiquetas("dymo");}}
+                  disabled={eqsFiltrados.length===0}
+                  style={{flex:1,padding:"10px",background:"transparent",
+                    border:"1px solid "+C.green+(eqsFiltrados.length===0?"22":"44"),borderRadius:"10px",
+                    color:eqsFiltrados.length===0?"#333":C.green,
+                    cursor:eqsFiltrados.length===0?"not-allowed":"pointer",
+                    fontSize:"12px",fontWeight:"700",fontFamily:"inherit"}}>
+                  🏷️ {selCount>0?"Dymo ("+selCount+")":"Dymo"}
+                </button>
+                <button onClick={function(){imprimirHojaEtiquetas();}}
                   disabled={eqsFiltrados.length===0}
                   style={{flex:1,padding:"10px",background:"transparent",
                     border:"1px solid #9966ff"+(eqsFiltrados.length===0?"22":"44"),borderRadius:"10px",

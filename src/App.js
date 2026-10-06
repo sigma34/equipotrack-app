@@ -2448,8 +2448,8 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
         ".ecat{font-size:6pt;color:#000;border:0.3mm solid #000;border-radius:2mm;padding:0.4mm 1.4mm;margin-top:1.2mm;white-space:normal;}",
         ".eger{font-size:6.5pt;color:#000;font-weight:800;margin-top:1.2mm;}",
         ".ebase{font-size:6pt;color:#000;white-space:normal;overflow:visible;text-overflow:clip;margin-top:0.8mm;line-height:1.2;}",
-        ".ef{background:#fff!important;height:6mm;border-top:0.5mm solid #000;margin-top:auto;}",
-        ".scan{font-size:5.5pt;color:#000;}",
+        ".ef{background:#fff!important;height:auto;padding:1.2mm 0 0;border-top:0.5mm solid #000;margin-top:auto;text-align:center;}",
+        ".scan{font-size:5pt;letter-spacing:0;color:#000;text-align:center;display:block;}",
         "@media print{.eh{background:#fff!important;}.brand,.eid,.eger,.ename,.eserie,.ecat,.ebase,.scan{color:#000!important;}.ef{background:#fff!important;}}"
       ].join("");
     }
@@ -2470,7 +2470,7 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
     var etiquetasHtmlArr=etiquetasData.map(function(eq){
       var divId="q"+eq.id.replace("-","");
       return '<div class="et">'+
-        '<div class="eh"><span class="brand">Lumo</span><span class="eid">'+eq.id+'</span></div>'+
+        '<div class="eh"><span class="brand"'+(dymo?' style="color:#000!important;font-size:9pt;font-weight:800;letter-spacing:0.4mm;"':'')+'>Lumo</span><span class="eid"'+(dymo?' style="color:#000!important;"':'')+'>'+eq.id+'</span></div>'+
         '<div class="qrwrap" id="'+divId+'"></div>'+
         '<div class="info">'+
           '<div class="ename">'+eq.nombre+'</div>'+

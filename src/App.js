@@ -2430,18 +2430,27 @@ function AdminPanel({token,onClose,onEquipoCreado,perfilesAdmin=[],isSA=false}){
     ].join("");
     // DYMO 30254 / 30252 (28 x 89 mm): una etiqueta por página, impresión continua
     if(dymo){
+      // Térmica: solo negro/blanco (sin grises ni fondos oscuros), márgenes internos para evitar recortes
       estilos+=[
         "@page{size:28.6mm 88.9mm;margin:0;}",
         "html,body{width:28.6mm;}",
         ".hoja{display:block;width:28.6mm;padding:0;margin:0;gap:0;}",
-        ".et{width:28.6mm;height:88.9mm;border:0.3mm solid #222;border-radius:1mm;page-break-after:always;break-after:page;}",
+        ".et{width:28.6mm;height:88.9mm;border:none;border-radius:0;padding:3mm 2.4mm 2mm;page-break-after:always;break-after:page;background:#fff;}",
         ".et:last-child{page-break-after:auto;break-after:auto;}",
-        ".eh{height:7mm;padding:1mm 1.5mm;}",
-        ".qrwrap{height:27mm;padding:0.5mm;}",
-        ".qrwrap img,.qrwrap canvas{width:25mm!important;height:25mm!important;}",
-        ".info{padding:1mm 1.5mm;}",
-        ".ename{font-size:6.5pt;}.eserie{font-size:5.5pt;}.ecat{font-size:5pt;}.eger{font-size:5pt;}.ebase{font-size:5pt;}",
-        ".ef{height:6mm;}.scan{font-size:5pt;}"
+        ".eh{background:#fff!important;height:auto;padding:0 0 1mm;border-bottom:0.5mm solid #000;display:block;text-align:center;}",
+        ".brand{display:block;color:#000!important;font-size:6pt;letter-spacing:0.3mm;}",
+        ".eid{display:block;color:#000!important;font-size:13pt;font-weight:800;font-family:Arial,sans-serif;margin-top:0.3mm;}",
+        ".qrwrap{height:25mm;padding:0;margin-top:1.5mm;}",
+        ".qrwrap img,.qrwrap canvas{width:24mm!important;height:24mm!important;}",
+        ".info{padding:1.5mm 0 0;overflow:visible;}",
+        ".ename{font-size:8.5pt;line-height:1.2;-webkit-line-clamp:4;color:#000;}",
+        ".eserie{font-size:7pt;color:#000;margin-top:1mm;}",
+        ".ecat{font-size:6pt;color:#000;border:0.3mm solid #000;border-radius:2mm;padding:0.4mm 1.4mm;margin-top:1.2mm;white-space:normal;}",
+        ".eger{font-size:6.5pt;color:#000;font-weight:800;margin-top:1.2mm;}",
+        ".ebase{font-size:6pt;color:#000;white-space:normal;overflow:visible;text-overflow:clip;margin-top:0.8mm;line-height:1.2;}",
+        ".ef{background:#fff!important;height:6mm;border-top:0.5mm solid #000;margin-top:auto;}",
+        ".scan{font-size:5.5pt;color:#000;}",
+        "@media print{.eh{background:#fff!important;}.brand,.eid,.eger,.ename,.eserie,.ecat,.ebase,.scan{color:#000!important;}.ef{background:#fff!important;}}"
       ].join("");
     }
 
